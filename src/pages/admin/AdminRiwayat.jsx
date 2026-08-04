@@ -1,0 +1,251 @@
+import { useContext, useState } from 'react';
+import { AppContext } from '../../context/AppContext';
+import { useNavigate } from 'react-router-dom';
+
+export default function AdminRiwayat() {
+  const { logs, gugus, peserta, hasAdminNotifications } = useContext(AppContext);
+  const navigate = useNavigate();
+
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedGugus, setSelectedGugus] = useState('all');
+  const [selectedDate, setSelectedDate] = useState('2026-08-04');
+  const [activeTab, setActiveTab] = useState('Semua');
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
+
+  const handleExport = (type) => {
+    alert(`Mengekspor data riwayat absensi dalam format ${type}...`);
+  };
+
+  // Filtering logic
+  const filteredLogs = logs.filter(log => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = log.name.toLowerCase().includes(term) || log.nim.includes(term) || log.scanner.toLowerCase().includes(term);
+    
+    let matchesGugus = true;
+    if (selectedGugus !== 'all') {
+      matchesGugus = log.gugusName.toLowerCase().includes(selectedGugus.toLowerCase());
+    }
+
+    const matchesDate = !selectedDate || log.date === selectedDate;
+
+    let matchesTab = true;
+    if (activeTab === 'Valid') {
+      matchesTab = log.status === 'Valid';
+    } else if (activeTab === 'Invalid') {
+      matchesTab = log.status !== 'Valid';
+    }
+
+    return matchesSearch && matchesGugus && matchesDate && matchesTab;
+  });
+
+  // Pagination calculations
+  const totalItems = filteredLogs.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredLogs.slice(indexOfFirstItem, indexOfLastItem);
+
+  const totalHadir = peserta.filter(p => p.status === 'Hadir').length;
+  const totalInvalid = logs.filter(l => l.status !== 'Valid').length;
+
+  return (
+<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Riwayat</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile admin")}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profil</span></button></div></header><main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full relative">
+{/* Header Section */}
+<div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6 relative z-10">
+<div className="flex flex-col">
+<h2 className="font-headline-lg text-headline-lg text-on-background mb-2">Riwayat Absensi</h2>
+</div>
+{/* Action Buttons */}
+<div className="flex gap-4 shrink-0">
+<button onClick={() => handleExport('PDF')} className="group flex items-center gap-2 bg-surface text-primary border border-outline-variant px-5 py-2.5 rounded-xl hover:bg-primary/5 transition-all shadow-sm cursor-pointer">
+<span className="material-symbols-outlined text-[20px] transition-transform group-hover:-translate-y-1">picture_as_pdf</span>
+<span className="font-label-md text-label-md">Ekspor PDF</span>
+</button>
+<button onClick={() => handleExport('Excel')} className="group flex items-center gap-2 bg-[#1A73E8] text-white px-5 py-2.5 rounded-xl hover:bg-[#1A73E8]/90 transition-all shadow-md shadow-[#1A73E8]/20 cursor-pointer">
+<span className="material-symbols-outlined text-[20px] transition-transform group-hover:-translate-y-1">table</span>
+<span className="font-label-md text-label-md">Ekspor Excel</span>
+</button>
+</div>
+</div>
+{/* Filters & Metrics Grid */}
+<div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 relative z-10">
+{/* Filter Panel (Spans 8 cols) */}
+<div className="lg:col-span-8 bg-surface-container rounded-2xl p-6 shadow-sm">
+<div className="flex flex-col md:flex-row gap-6">
+{/* Search */}
+<div className="flex-1">
+<label className="font-label-md text-label-md text-on-surface block mb-3">Pencarian</label>
+<div className="relative group">
+<span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary transition-colors">search</span>
+<input className="w-full bg-surface border border-outline-variant rounded-xl py-3 pl-12 pr-4 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all" placeholder="Nama atau NIM..." type="text" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
+</div>
+</div>
+{/* Filters Grid */}
+<div className="flex-1 grid grid-cols-2 gap-4">
+{/* Gugus Filter */}
+<div>
+<label className="font-label-md text-label-md text-on-surface block mb-3">Gugus</label>
+<div className="relative group">
+<select className="w-full appearance-none bg-surface border border-outline-variant rounded-xl py-3 pl-4 pr-10 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all cursor-pointer" value={selectedGugus} onChange={(e) => { setSelectedGugus(e.target.value); setCurrentPage(1); }}>
+<option value="all">Semua Gugus</option>
+{gugus.map(g => (
+  <option key={g.id} value={g.id}>{g.name}</option>
+))}
+</select>
+<span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none group-focus-within:text-primary transition-colors">expand_more</span>
+</div>
+</div>
+{/* Date Filter */}
+<div>
+<label className="font-label-md text-label-md text-on-surface block mb-3">Tanggal</label>
+<div className="relative group">
+<input className="w-full appearance-none bg-surface border border-outline-variant rounded-xl py-3 pl-4 pr-4 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all cursor-pointer" type="date" value={selectedDate} onChange={(e) => { setSelectedDate(e.target.value); setCurrentPage(1); }} />
+</div>
+</div>
+</div>
+</div>
+</div>
+{/* Quick Stats (Spans 4 cols) */}
+<div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+<div className="bg-surface-container rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+<div className="flex justify-between items-start mb-4">
+<span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Hadir</span>
+<div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center">
+<span className="material-symbols-outlined text-on-secondary-container text-[16px]">how_to_reg</span>
+</div>
+</div>
+<div className="flex items-end gap-2">
+<span className="font-headline-lg text-headline-lg text-on-surface leading-none">{totalHadir}</span>
+</div>
+</div>
+<div className="bg-surface-container rounded-2xl p-5 shadow-sm flex flex-col justify-between relative overflow-hidden">
+<svg className="absolute bottom-0 left-0 w-full h-1/2 opacity-20" preserveAspectRatio="none" viewBox="0 0 100 40">
+<path className="text-error" d="M0 40 L0 30 Q 10 20 20 25 T 40 15 T 60 20 T 80 5 T 100 10 L100 40 Z" fill="currentColor"></path>
+</svg>
+<div className="flex justify-between items-start mb-4 relative z-10">
+<span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Scan Tidak Valid</span>
+<div className="w-8 h-8 rounded-full bg-error-container flex items-center justify-center">
+<span className="material-symbols-outlined text-on-error-container text-[16px]">warning</span>
+</div>
+</div>
+<div className="flex items-end gap-2 relative z-10">
+<span className="font-headline-lg text-headline-lg text-error leading-none">{totalInvalid}</span>
+</div>
+</div>
+</div>
+</div>
+{/* Main Table Section */}
+<div className="bg-surface rounded-3xl shadow-lg shadow-primary/5 overflow-hidden flex flex-col relative z-10">
+{/* Table Header Toolbar */}
+<div className="px-6 py-5 border-b border-surface-variant flex justify-between items-center bg-surface-container-lowest">
+<div className="flex items-center gap-3">
+<span className="material-symbols-outlined text-primary">list_alt</span>
+<h3 className="font-headline-sm text-headline-sm text-on-surface">Data Kehadiran</h3>
+</div>
+{/* Status Tabs */}
+<div className="hidden sm:flex bg-surface-container-low rounded-lg p-1">
+<button onClick={() => { setActiveTab('Semua'); setCurrentPage(1); }} className={`px-4 py-1.5 rounded-md font-label-md text-label-md transition-all ${
+  activeTab === 'Semua' ? 'bg-surface shadow-sm text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
+}`}>Semua</button>
+<button onClick={() => { setActiveTab('Valid'); setCurrentPage(1); }} className={`px-4 py-1.5 rounded-md font-label-md text-label-md transition-all ${
+  activeTab === 'Valid' ? 'bg-surface shadow-sm text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
+}`}>Valid</button>
+<button onClick={() => { setActiveTab('Invalid'); setCurrentPage(1); }} className={`px-4 py-1.5 rounded-md font-label-md text-label-md transition-all ${
+  activeTab === 'Invalid' ? 'bg-surface shadow-sm text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
+}`}>Invalid</button>
+</div>
+</div>
+{/* Table Wrapper for scrolling */}
+<div className="overflow-x-auto">
+<table className="w-full text-left border-collapse min-w-[900px]">
+<thead>
+<tr className="bg-surface-container-low">
+<th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Waktu</th>
+<th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Peserta</th>
+<th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Gugus</th>
+<th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Pemindai</th>
+<th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Status</th>
+<th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-right">Aksi</th>
+</tr>
+</thead>
+<tbody className="bg-surface divide-y divide-surface-variant">
+  {currentItems.length > 0 ? (
+    currentItems.map((log) => (
+      <tr key={log.id} className="hover:bg-surface-container-lowest transition-colors group cursor-pointer">
+      <td className="py-4 px-6">
+      <div className="flex flex-col">
+      <span className="font-body-md text-body-md text-on-surface font-medium">{log.timestamp}</span>
+      <span className="font-body-sm text-body-sm text-on-surface-variant">{log.date}</span>
+      </div>
+      </td>
+      <td className="py-4 px-6">
+      <div className="flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+        log.status === 'Valid' ? 'bg-primary-fixed-dim/20 text-primary font-bold' : 'bg-error-container text-error'
+      }`}>
+        {log.status === 'Valid' ? log.name.substring(0, 2).toUpperCase() : <span className="material-symbols-outlined text-[20px]">qr_code</span>}
+      </div>
+      <div className="flex flex-col min-w-0">
+      <span className={`font-body-md text-body-md text-on-surface font-medium truncate ${log.status === 'Valid' ? '' : 'text-on-surface-variant italic'}`}>{log.name}</span>
+      <span className="font-body-sm text-body-sm text-on-surface-variant font-mono text-[13px]">NIM: {log.nim}</span>
+      </div>
+      </div>
+      </td>
+      <td className="py-4 px-6">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary-container/20 text-on-secondary-container font-label-sm text-label-sm">
+                      {log.gugusName}
+                    </span>
+      </td>
+      <td className="py-4 px-6">
+      <div className="flex flex-col">
+      <span className="font-body-sm text-body-sm text-on-surface">{log.scanner}</span>
+      </div>
+      </td>
+      <td className="py-4 px-6">
+      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-label-md text-label-md ${
+        log.status === 'Valid' ? 'bg-[#E6F4EA] text-[#137333]' : 'bg-error-container text-on-error-container'
+      }`}>
+      <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                      {log.status}
+                    </span>
+      </td>
+      <td className="py-4 px-6 text-right">
+      <button onClick={() => alert(`Log ID: ${log.id}`)} className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant hover:text-on-surface transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer">
+      <span className="material-symbols-outlined text-[20px]">more_vert</span>
+      </button>
+      </td>
+      </tr>
+    ))
+  ) : (
+    <tr>
+      <td colSpan="6" className="text-center py-10 text-on-surface-variant">Tidak ada log.</td>
+    </tr>
+  )}
+</tbody>
+</table>
+</div>
+{/* Pagination Footer */}
+<div className="px-6 py-4 border-t border-surface-variant bg-surface-container-lowest flex items-center justify-between">
+<span className="font-body-sm text-body-sm text-on-surface-variant">Menampilkan {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, totalItems)} dari {totalItems} log</span>
+<div className="flex items-center gap-2">
+<button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} className="w-8 h-8 rounded-lg border border-outline-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant hover:text-on-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors" disabled={currentPage === 1}>
+<span className="material-symbols-outlined text-[20px]">chevron_left</span>
+</button>
+{Array.from({ length: totalPages }).map((_, i) => (
+  <button key={i} onClick={() => setCurrentPage(i + 1)} className={`w-8 h-8 rounded-lg font-label-md text-label-md flex items-center justify-center transition-colors ${
+    currentPage === i + 1 ? 'bg-primary text-on-primary font-bold' : 'border border-outline-variant text-on-surface hover:bg-surface-variant'
+  }`}>{i + 1}</button>
+))}
+<button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} className="w-8 h-8 rounded-lg border border-outline-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-variant hover:text-on-surface disabled:opacity-50 transition-colors" disabled={currentPage === totalPages}>
+<span className="material-symbols-outlined text-[20px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div></main></div>
+  );
+}
