@@ -1,14 +1,20 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
 
 export default function LoginAdmin() {
-  const { login } = useContext(AppContext);
+  const { login, currentUser } = useContext(AppContext);
   const [nim, setNim] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'admin') {
+      navigate('/admin/dashboard', { replace: true });
+    }
+  }, [currentUser, navigate]);
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -60,10 +66,10 @@ export default function LoginAdmin() {
 <div className="space-y-5">
 {/* NIM Input */}
 <div>
-<label className="block text-label-md font-label-md text-on-surface mb-2" htmlFor="nim">Email / Username</label>
+<label className="block text-label-md font-label-md text-on-surface mb-2" htmlFor="nim">Email Admin</label>
 <div className="relative group">
 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary transition-colors text-[20px]">person</span>
-<input className="w-full pl-12 pr-4 py-4 bg-surface rounded-xl border border-outline-variant/50 text-body-md font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-on-surface-variant/30" id="nim" name="username" placeholder="Masukkan email atau username admin..." required type="text" value={nim} onChange={(e) => setNim(e.target.value)} />
+<input className="w-full pl-12 pr-4 py-4 bg-surface rounded-xl border border-outline-variant/50 text-body-md font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-on-surface-variant/30" id="nim" name="username" placeholder="Masukkan email admin Anda..." required type="text" value={nim} onChange={(e) => setNim(e.target.value)} />
 </div>
 </div>
 {/* Password Input */}

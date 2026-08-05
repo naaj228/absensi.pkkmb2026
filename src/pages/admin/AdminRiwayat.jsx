@@ -1,33 +1,37 @@
 import { useContext, useState } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
+import { isHadir } from '../../utils/statusHelper';
 
 export default function AdminRiwayat() {
-  const { logs, gugus, peserta, hasAdminNotifications } = useContext(AppContext);
+  const { logs, gugus, peserta, deleteLog, hasAdminNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGugus, setSelectedGugus] = useState('all');
-  const [selectedDate, setSelectedDate] = useState('2026-08-04');
+  const [selectedDate, setSelectedDate] = useState(''); // Default empty to show all history
   const [activeTab, setActiveTab] = useState('Semua');
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 25;
 
-  const handleExport = (type) => {
-    alert(`Mengekspor data riwayat absensi dalam format ${type}...`);
-  };
+  // Get active gugus name from selectedGugus ID
+  const selectedGugusObj = gugus.find(g => g.id === selectedGugus);
+  const selectedGugusName = selectedGugusObj ? selectedGugusObj.name : '';
 
   // Filtering logic
   const filteredLogs = logs.filter(log => {
     const term = searchTerm.toLowerCase();
-    const matchesSearch = log.name.toLowerCase().includes(term) || log.nim.includes(term) || log.scanner.toLowerCase().includes(term);
+    const matchesSearch = log.name.toLowerCase().includes(term) || 
+                          log.nim.includes(term) || 
+                          log.scanner.toLowerCase().includes(term);
     
     let matchesGugus = true;
     if (selectedGugus !== 'all') {
-      matchesGugus = log.gugusName.toLowerCase().includes(selectedGugus.toLowerCase());
+      matchesGugus = log.gugusName.toLowerCase() === selectedGugusName.toLowerCase();
     }
 
     const matchesDate = !selectedDate || log.date === selectedDate;
@@ -42,6 +46,106 @@ export default function AdminRiwayat() {
     return matchesSearch && matchesGugus && matchesDate && matchesTab;
   });
 
+  const handleExport = (type) => {
+    if (filteredLogs.length === 0) {
+      alert("Tidak ada data absensi untuk diekspor!");
+      return;
+    }
+
+    if (type === 'Excel') {
+      const data = filteredLogs.map(log => ({
+        'Tanggal': log.date,
+        'Waktu': log.timestamp,
+        'NIM': log.nim,
+        'Nama Peserta': log.name,
+        'Gugus': log.gugusName,
+        'Pemindai': log.scanner,
+        'Status': log.status
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Absensi");
+      XLSX.writeFile(workbook, `Laporan_Absensi_PKKMB_2026_${selectedDate || 'Semua_Hari'}.xlsx`);
+    } 
+    else if (type === 'PDF') {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert("Pop-up diblokir! Izinkan pop-up di browser Anda untuk mencetak PDF.");
+        return;
+      }
+
+      const html = `
+        <html>
+          <head>
+            <title>Laporan Absensi PKKMB 2026</title>
+            <style>
+              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 25px; color: #1f2937; }
+              h1 { font-size: 20px; color: #4f46e5; margin: 0 0 5px 0; }
+              .meta { font-size: 13px; color: #4b5563; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+              th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; font-size: 12px; }
+              th { background-color: #f3f4f6; color: #374151; font-weight: 600; }
+              tr:nth-child(even) { background-color: #f9fafb; }
+              .badge { display: inline-block; padding: 2px 6px; border-radius: 9999px; font-size: 11px; font-weight: 500; }
+              .valid { background: #d1fae5; color: #065f46; }
+              .invalid { background: #fee2e2; color: #991b1b; }
+              .footer { margin-top: 30px; font-size: 11px; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+            </style>
+          </head>
+          <body>
+            <h1>Laporan Riwayat Kehadiran PKKMB 2026</h1>
+            <div class="meta">
+              Gugus: ${selectedGugus === 'all' ? 'Semua Gugus' : selectedGugusName} | 
+              Tanggal: ${selectedDate || 'Semua Tanggal'} | 
+              Kategori: ${activeTab} |
+              Total Log: ${filteredLogs.length}
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Waktu</th>
+                  <th>Nama Peserta</th>
+                  <th>NIM</th>
+                  <th>Gugus</th>
+                  <th>Pemindai</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredLogs.map(log => `
+                  <tr>
+                    <td>${log.date}</td>
+                    <td>${log.timestamp}</td>
+                    <td><strong>${log.name}</strong></td>
+                    <td>${log.nim}</td>
+                    <td>${log.gugusName}</td>
+                    <td>${log.scanner}</td>
+                    <td>
+                      <span class="badge ${log.status === 'Valid' ? 'valid' : 'invalid'}">${log.status}</span>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <div class="footer">
+              Dicetak pada: ${new Date().toLocaleString('id-ID')}
+            </div>
+            <script>
+              window.onload = function() {
+                window.print();
+                window.close();
+              };
+            </script>
+          </body>
+        </html>
+      `;
+      printWindow.document.write(html);
+      printWindow.document.close();
+    }
+  };
+
   // Pagination calculations
   const totalItems = filteredLogs.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
@@ -49,8 +153,23 @@ export default function AdminRiwayat() {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredLogs.slice(indexOfFirstItem, indexOfLastItem);
 
-  const totalHadir = peserta.filter(p => p.status === 'Hadir').length;
-  const totalInvalid = logs.filter(l => l.status !== 'Valid').length;
+  // Sync quick stats with selected filters
+  const filteredPesertaForStats = peserta.filter(p => {
+    if (selectedGugus !== 'all') {
+      return p.gugusId === selectedGugus;
+    }
+    return true;
+  });
+  const totalHadir = filteredPesertaForStats.filter(p => isHadir(p.status)).length;
+
+  const totalInvalid = logs.filter(l => {
+    let matchesGugus = true;
+    if (selectedGugus !== 'all') {
+      matchesGugus = l.gugusName.toLowerCase() === selectedGugusName.toLowerCase();
+    }
+    const matchesDate = !selectedDate || l.date === selectedDate;
+    return l.status !== 'Valid' && matchesGugus && matchesDate;
+  }).length;
 
   return (
 <div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Riwayat</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile admin")}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profil</span></button></div></header><main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full relative">
@@ -213,10 +332,28 @@ export default function AdminRiwayat() {
                       {log.status}
                     </span>
       </td>
-      <td className="py-4 px-6 text-right">
-      <button onClick={() => alert(`Log ID: ${log.id}`)} className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant hover:text-on-surface transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer">
-      <span className="material-symbols-outlined text-[20px]">more_vert</span>
-      </button>
+      <td className="py-4 px-6 text-right relative">
+        <div className="flex items-center justify-end gap-1">
+          <button 
+            onClick={() => navigate(`/admin/peserta/${log.nim}`)}
+            className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
+            title="Lihat Detail Peserta"
+          >
+            <span className="material-symbols-outlined text-[18px]">visibility</span>
+          </button>
+          <button 
+            onClick={() => {
+              if (window.confirm(`Hapus log absensi untuk ${log.name} (${log.nim})?`)) {
+                deleteLog(log.id);
+                alert("Log absensi berhasil dihapus.");
+              }
+            }}
+            className="p-1.5 text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
+            title="Hapus Log Absensi"
+          >
+            <span className="material-symbols-outlined text-[18px]">delete</span>
+          </button>
+        </div>
       </td>
       </tr>
     ))

@@ -1,27 +1,31 @@
 import { useContext, useState } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { isHadir, CLAIM_STATUS_OPTIONS, getStatusBadge } from '../../utils/statusHelper';
 
 export default function MentorAbsensiManual() {
-  const { peserta, addClaim, hasMentorNotifications } = useContext(AppContext);
+  const { peserta, gugus, addClaim, currentUser, hasMentorNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
   // States
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterTab, setFilterTab] = useState('Semua'); // Semua, Belum Hadir
+  const [filterTab, setFilterTab] = useState('Semua');
   const [showModal, setShowModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [reason, setReason] = useState('jaringan');
   const [note, setNote] = useState('');
+  const [requestedStatus, setRequestedStatus] = useState('Hadir Penuh');
 
-  const mentorGugusId = 'G-12-FT';
+  const mentorGugusId = currentUser?.gugusId || '';
+  const mentorGugus = gugus.find(g => g.id === mentorGugusId);
+  const mentorGugusName = mentorGugus?.name || 'Gugus Saya';
 
-  // Get Gugus 12 students
+  // Get mentor's group students
   const gugusStudents = peserta.filter(p => p.gugusId === mentorGugusId);
 
   // Statistics
   const totalStudents = gugusStudents.length;
-  const hadirStudents = gugusStudents.filter(p => p.status === 'Hadir').length;
+  const hadirStudents = gugusStudents.filter(p => isHadir(p.status)).length;
   const attendancePercentage = totalStudents > 0 ? Math.round((hadirStudents / totalStudents) * 100) : 0;
   const strokeDash = `${attendancePercentage}, 100`;
 
@@ -31,8 +35,8 @@ export default function MentorAbsensiManual() {
     const matchesSearch = student.name.toLowerCase().includes(term) || student.id.includes(term);
     
     let matchesTab = true;
-    if (filterTab === 'Belum Hadir') {
-      matchesTab = student.status === 'Belum Hadir' || student.status === 'Alpa';
+    if (filterTab === 'Alpha') {
+      matchesTab = student.status === 'Alpha' || !student.status;
     }
     
     return matchesSearch && matchesTab;
@@ -42,6 +46,7 @@ export default function MentorAbsensiManual() {
     setSelectedStudent(student);
     setReason('jaringan');
     setNote('');
+    setRequestedStatus('Hadir Penuh');
     setShowModal(true);
   };
 
@@ -53,20 +58,20 @@ export default function MentorAbsensiManual() {
     if (reason === 'kamera') reasonLabel = 'Kamera / Scanner Rusak';
     if (reason === 'qr_error') reasonLabel = 'QR Code Tidak Terbaca';
 
-    addClaim(selectedStudent.id, reasonLabel, note);
+    addClaim(selectedStudent.id, reasonLabel, note, requestedStatus);
     setShowModal(false);
     alert(`Pengajuan absensi manual untuk ${selectedStudent.name} dikirim.`);
   };
 
   return (
-<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Absensi Manual</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/mentor/notifikasi')}>notifications</span>{hasMentorNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile mentor")}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profil</span></button></div></header><main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full gap-10 relative">
+<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Absensi Manual</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/mentor/notifikasi')}>notifications</span>{hasMentorNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile mentor")}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profil</span></button></div></header><main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full gap-10 relative">
 {/* Decorative Background Blob */}
 <div className="absolute -top-32 -right-32 w-96 h-96 bg-secondary/10 rounded-full blur-[100px] pointer-events-none"></div>
 {/* Header Section */}
-<div className="flex flex-col gap-2 -mt-4 relative z-10">
+<div className="flex flex-col gap-2 relative z-10">
 <div className="flex items-center gap-3 mb-2">
 <span className="px-3 py-1 bg-surface-container-high text-on-surface-variant text-label-sm font-label-sm rounded-full shadow-sm">Mentor Mode</span>
-<span className="px-3 py-1 bg-primary text-on-primary text-label-sm font-label-sm rounded-full shadow-sm tracking-widest uppercase">Gugus 12</span>
+<span className="px-3 py-1 bg-primary text-on-primary text-label-sm font-label-sm rounded-full shadow-sm tracking-widest uppercase">{mentorGugusName}</span>
 </div>
 <h2 className="text-display-lg text-display-lg text-on-background">Absensi Manual</h2>
 </div>
@@ -78,7 +83,7 @@ export default function MentorAbsensiManual() {
 <div className="relative z-10 flex justify-between items-start">
 <div className="flex flex-col">
 <span className="text-label-md font-label-md text-primary-fixed-dim uppercase tracking-widest mb-1">Kelompok</span>
-<h3 className="text-display-lg font-display-lg text-on-primary leading-none">Gugus 12</h3>
+<h3 className="text-display-lg font-display-lg text-on-primary leading-none">{mentorGugusName}</h3>
 </div>
 <div className="w-12 h-12 bg-on-primary text-primary rounded-full flex items-center justify-center shadow-lg">
 <span className="material-symbols-outlined text-[24px]">supervised_user_circle</span>
@@ -115,9 +120,9 @@ export default function MentorAbsensiManual() {
 <button onClick={() => setFilterTab('Semua')} className={`px-4 py-2 rounded-lg text-label-sm font-label-sm shadow-sm transition-colors cursor-pointer ${
   filterTab === 'Semua' ? 'bg-surface-container-high text-on-surface' : 'bg-surface text-on-surface-variant hover:bg-surface-container-high'
 }`}>Semua</button>
-<button onClick={() => setFilterTab('Belum Hadir')} className={`px-4 py-2 rounded-lg text-label-sm font-label-sm shadow-sm transition-colors cursor-pointer ${
-  filterTab === 'Belum Hadir' ? 'bg-surface-container-high text-on-surface' : 'bg-surface text-on-surface-variant hover:bg-surface-container-high'
-}`}>Belum Hadir</button>
+<button onClick={() => setFilterTab('Alpha')} className={`px-4 py-2 rounded-lg text-label-sm font-label-sm shadow-sm transition-colors cursor-pointer ${
+  filterTab === 'Alpha' ? 'bg-surface-container-high text-on-surface' : 'bg-surface text-on-surface-variant hover:bg-surface-container-high'
+}`}>Alpha</button>
 </div>
 </div>
 {/* Grid */}
@@ -135,33 +140,24 @@ export default function MentorAbsensiManual() {
       <span className="text-label-sm font-label-sm text-on-surface-variant font-mono mt-1">{student.id}</span>
       </div>
       </div>
-      {student.status === 'Hadir' ? (
-        <span className="px-3 py-1.5 bg-secondary-container/50 text-on-secondary-container text-label-sm font-label-sm rounded-lg shadow-sm flex-shrink-0 flex items-center gap-1">
-        <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span> Hadir
+      {/* Status badge */}
+      {(() => { const b = getStatusBadge(student.status); return (
+        <span className={`px-3 py-1.5 ${b.bg} ${b.text} text-label-sm font-label-sm rounded-lg shadow-sm flex-shrink-0 flex items-center gap-1`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span> {b.label}
         </span>
-      ) : student.status === 'Manual (Pending)' ? (
-        <span className="px-3 py-1.5 bg-surface-container-highest text-on-surface-variant text-label-sm font-label-sm rounded-lg shadow-sm flex-shrink-0 flex items-center gap-1">
-        <span className="w-1.5 h-1.5 rounded-full bg-outline"></span> Menunggu
-        </span>
-      ) : (
-        <span className="px-3 py-1.5 bg-error-container/50 text-on-error-container text-label-sm font-label-sm rounded-lg shadow-sm flex-shrink-0 flex items-center gap-1">
-        <span className="w-1.5 h-1.5 rounded-full bg-error"></span> Belum Hadir
-        </span>
-      )}
+      ); })()}
       </div>
-      {student.status === 'Hadir' ? (
-        <div className="w-full bg-surface-container-low text-on-surface-variant py-3 rounded-xl text-label-md font-label-md flex items-center justify-center gap-2 cursor-not-allowed">
-        <span className="material-symbols-outlined text-[18px]">check_circle</span>
-        Tercatat Hadir
-        </div>
-      ) : student.status === 'Manual (Pending)' ? (
+      {student.status === 'Manual (Pending)' ? (
         <div className="w-full bg-surface-container-low text-on-surface-variant py-3 rounded-xl text-label-md font-label-md flex items-center justify-center gap-2">
         <span className="material-symbols-outlined text-[18px]">pending_actions</span>
         Manual: Tertunda
         </div>
       ) : (
-        <button onClick={() => handleOpenModal(student)} className="w-full bg-primary text-on-primary py-3 rounded-xl text-label-md font-label-md hover:bg-primary-container hover:text-on-primary-container hover:shadow-md transition-all duration-300 action-absen cursor-pointer">
-        Absen Manual
+        <button onClick={() => handleOpenModal(student)} className={`w-full py-3 rounded-xl text-label-md font-label-md hover:shadow-md transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${
+          student.status === 'Manual (Ditolak)' ? 'bg-error text-on-error hover:bg-error/90' : 'bg-primary text-on-primary hover:bg-primary/90'
+        }`}>
+          <span className="material-symbols-outlined text-[18px]">{student.status === 'Manual (Ditolak)' ? 'refresh' : 'edit_note'}</span>
+          {student.status === 'Manual (Ditolak)' ? 'Ajukan Lagi' : 'Absen Manual'}
         </button>
       )}
       </div>
@@ -222,6 +218,19 @@ export default function MentorAbsensiManual() {
   </div>
   <input checked={reason === 'qr_error'} onChange={() => setReason('qr_error')} className="w-5 h-5 accent-primary cursor-pointer" name="reason" type="radio" value="qr_error" />
   </label>
+  </div>
+  </div>
+  <div className="flex flex-col gap-2">
+  <label className="text-label-md font-label-md text-on-surface">Status yang Diajukan</label>
+  <div className="grid grid-cols-1 gap-2">
+    {CLAIM_STATUS_OPTIONS.map(opt => (
+      <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border-2 transition-all ${
+        requestedStatus === opt.value ? 'border-primary bg-primary/5' : 'border-outline-variant bg-surface-container hover:bg-surface-container-high'
+      }`}>
+        <input type="radio" name="reqStatus" value={opt.value} checked={requestedStatus === opt.value} onChange={() => setRequestedStatus(opt.value)} className="accent-primary" />
+        <span className="text-body-md text-on-surface">{opt.label}</span>
+      </label>
+    ))}
   </div>
   </div>
   <div className="flex flex-col gap-2">

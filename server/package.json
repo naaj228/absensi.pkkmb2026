@@ -1,0 +1,19 @@
+{
+  "name": "pkkmb-email-server",
+  "version": "1.0.0",
+  "description": "Backend email server for Absensi PKKMB 2026",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jszip": "^3.10.1",
+    "nodemailer": "^6.9.14",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.35.3"
+  }
+}

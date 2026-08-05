@@ -1,70 +1,155 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import {
+  pesertaDb,
+  gugusDb,
+  mentorsDb,
+  claimsDb,
+  logsDb,
+  qrSessionsDb
+} from '../lib/db';
 
 export const AppContext = createContext();
 
-const initialPeserta = [];
-const initialMentors = [];
-const initialGugus = [];
-const initialClaims = [];
-const initialLogs = [];
-const initialQrCodes = [];
+// ----------------------------------------------------
+// DB to App State Transformers
+// ----------------------------------------------------
+const transformPeserta = (p) => ({
+  id: p.nim,
+  uuid: p.id,
+  name: p.nama,
+  email: p.email,
+  gugusId: p.gugus_id || '',
+  fakultas: p.jurusan || '',
+  status: p.status || 'Alpha',
+  fotoUrl: p.foto_url || ''
+});
+
+const transformGugus = (g) => ({
+  id: g.id,
+  name: g.nama,
+  mentorId: g.mentor_id || 'Unassigned',
+  capacity: g.kuota || 30
+});
+
+const transformMentor = (m) => ({
+  id: m.id,
+  name: m.full_name || m.email,
+  email: m.email,
+  nip: m.nip || '',
+  gugusId: m.gugus_id || 'Unassigned'
+});
+
+const transformClaim = (c) => ({
+  id: c.id,
+  pesertaId: c.nim,
+  name: c.nama,
+  nim: c.nim,
+  gugusName: c.gugus_nama || '-',
+  issue: c.issue,
+  time: c.waktu || new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+  requestedStatus: c.requested_status || 'Hadir Penuh'
+});
+
+const transformLog = (l) => ({
+  id: l.id,
+  timestamp: l.waktu ? new Date(l.waktu).toTimeString().split(' ')[0] : '',
+  date: l.waktu ? new Date(l.waktu).toISOString().split('T')[0] : '',
+  name: l.peserta_nama || '',
+  nim: l.peserta_nim || '',
+  gugusName: l.gugus_nama || '-',
+  scanner: l.dicatat_nama || 'System',
+  status: l.status_log || 'Valid',
+  note: l.catatan || ''
+});
+
+const transformQr = (q) => ({
+  id: q.kode,
+  title: q.nama_sesi,
+  sessionType: 'PKKMB',
+  targetAudience: 'All',
+  startTime: q.berlaku_mulai ? new Date(q.berlaku_mulai).toTimeString().split(' ')[0] : '',
+  endTime: q.berlaku_sampai ? new Date(q.berlaku_sampai).toTimeString().split(' ')[0] : '',
+  status: q.status === 'active' ? 'Active' : 'Expired',
+  scans: 0
+});
 
 export function AppContextProvider({ children }) {
-  // Clear any existing localStorage data once to force a fresh state for the user
-  useState(() => {
-    const reset = localStorage.getItem('pkkmb_reset_v3');
-    if (!reset) {
-      localStorage.removeItem('pkkmb_peserta');
-      localStorage.removeItem('pkkmb_mentors');
-      localStorage.removeItem('pkkmb_gugus');
-      localStorage.removeItem('pkkmb_claims');
-      localStorage.removeItem('pkkmb_logs');
-      localStorage.removeItem('pkkmb_qrCodes');
-      localStorage.setItem('pkkmb_reset_v3', 'true');
+  const [peserta, setPeserta] = useState([]);
+  const [mentors, setMentors] = useState([]);
+  const [gugus, setGugus] = useState([]);
+  const [claims, setClaims] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [qrCodes, setQrCodes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [adminUser, setAdminUser] = useState(() => {
+    try {
+      const local = localStorage.getItem('pkkmb_currentUser_admin');
+      return local ? JSON.parse(local) : null;
+    } catch (e) {
+      return null;
     }
   });
 
-  const [peserta, setPeserta] = useState(() => {
-    const local = localStorage.getItem('pkkmb_peserta');
-    return local ? JSON.parse(local) : initialPeserta;
+  const [mentorUser, setMentorUser] = useState(() => {
+    try {
+      const local = localStorage.getItem('pkkmb_currentUser_mentor');
+      return local ? JSON.parse(local) : null;
+    } catch (e) {
+      return null;
+    }
   });
 
-  const [mentors, setMentors] = useState(() => {
-    const local = localStorage.getItem('pkkmb_mentors');
-    return local ? JSON.parse(local) : initialMentors;
+  const currentUser = window.location.pathname.startsWith('/admin') ? adminUser : mentorUser;
+
+  // Notification Dismissal states
+  const [dismissedNotifications, setDismissedNotifications] = useState(() => {
+    try {
+      const local = localStorage.getItem('pkkmb_dismissed_notifications');
+      return local ? JSON.parse(local) : [];
+    } catch (e) {
+      return [];
+    }
   });
 
-  const [gugus, setGugus] = useState(() => {
-    const local = localStorage.getItem('pkkmb_gugus');
-    return local ? JSON.parse(local) : initialGugus;
-  });
+  const dismissNotification = (id) => {
+    setDismissedNotifications(prev => {
+      const updated = [...prev, id];
+      localStorage.setItem('pkkmb_dismissed_notifications', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
-  const [claims, setClaims] = useState(() => {
-    const local = localStorage.getItem('pkkmb_claims');
-    return local ? JSON.parse(local) : initialClaims;
-  });
-
-  const [logs, setLogs] = useState(() => {
-    const local = localStorage.getItem('pkkmb_logs');
-    return local ? JSON.parse(local) : initialLogs;
-  });
-
-  const [qrCodes, setQrCodes] = useState(() => {
-    const local = localStorage.getItem('pkkmb_qrCodes');
-    return local ? JSON.parse(local) : initialQrCodes;
-  });
-
-  const [currentUser, setCurrentUser] = useState(() => {
-    const local = localStorage.getItem('pkkmb_currentUser');
-    return local ? JSON.parse(local) : null;
-  });
+  const dismissAllNotifications = (ids) => {
+    setDismissedNotifications(prev => {
+      const updated = Array.from(new Set([...prev, ...ids]));
+      localStorage.setItem('pkkmb_dismissed_notifications', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   const [adminNotificationsCleared, setAdminNotificationsCleared] = useState(false);
   const [mentorNotificationsCleared, setMentorNotificationsCleared] = useState(false);
 
-  const adminNotificationsCount = claims.length + logs.filter(l => l.status !== 'Valid').length + qrCodes.length;
-  const mentorNotificationsCount = logs.filter(l => l.gugusName === 'Gugus 12').length + claims.filter(c => c.gugusName === 'Gugus 12').length;
+  const mentorGugusId = currentUser?.gugusId || '';
+  const mentorGugusObj = gugus.find(g => g.id === mentorGugusId);
+  const mentorGugusName = mentorGugusObj ? mentorGugusObj.name : '';
+
+  const activeAdminNotifications = [
+    ...claims.map(c => `claim-${c.id}`),
+    ...logs.filter(l => l.status !== 'Valid').map(l => `invalid-${l.id}`),
+    ...qrCodes.map(q => `qr-${q.id}`)
+  ].filter(id => !dismissedNotifications.includes(id));
+
+  const adminNotificationsCount = activeAdminNotifications.length;
+
+  const activeMentorNotifications = [
+    ...logs.filter(l => l.gugusName === mentorGugusName).map(l => `log-${l.id}`),
+    ...claims.filter(c => c.gugusName === mentorGugusName).map(c => `claim-${c.id}`)
+  ].filter(id => !dismissedNotifications.includes(id));
+
+  const mentorNotificationsCount = activeMentorNotifications.length;
 
   const [prevAdminCount, setPrevAdminCount] = useState(adminNotificationsCount);
   const [prevMentorCount, setPrevMentorCount] = useState(mentorNotificationsCount);
@@ -86,240 +171,495 @@ export function AppContextProvider({ children }) {
   const hasAdminNotifications = adminNotificationsCount > 0 && !adminNotificationsCleared;
   const hasMentorNotifications = mentorNotificationsCount > 0 && !mentorNotificationsCleared;
 
+  // ----------------------------------------------------
+  // Initial Data Load (only if Supabase session exists)
+  // ----------------------------------------------------
   useEffect(() => {
-    localStorage.setItem('pkkmb_peserta', JSON.stringify(peserta));
-  }, [peserta]);
-
-  useEffect(() => {
-    localStorage.setItem('pkkmb_mentors', JSON.stringify(mentors));
-  }, [mentors]);
-
-  useEffect(() => {
-    localStorage.setItem('pkkmb_gugus', JSON.stringify(gugus));
-  }, [gugus]);
-
-  useEffect(() => {
-    localStorage.setItem('pkkmb_claims', JSON.stringify(claims));
-  }, [claims]);
-
-  useEffect(() => {
-    localStorage.setItem('pkkmb_logs', JSON.stringify(logs));
-  }, [logs]);
-
-  useEffect(() => {
-    localStorage.setItem('pkkmb_qrCodes', JSON.stringify(qrCodes));
-  }, [qrCodes]);
-
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('pkkmb_currentUser', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('pkkmb_currentUser');
+    async function loadData() {
+      try {
+        const [pData, mData, gData, cData, lData, qrData] = await Promise.all([
+          pesertaDb.fetchAll(),
+          mentorsDb.fetchAll(),
+          gugusDb.fetchAll(),
+          claimsDb.fetchAll(),
+          logsDb.fetchAll(),
+          qrSessionsDb.fetchAll()
+        ]);
+        setPeserta(pData);
+        setMentors(mData);
+        setGugus(gData);
+        setClaims(cData);
+        setLogs(lData);
+        setQrCodes(qrData);
+      } catch (err) {
+        console.error('Error fetching data from Supabase:', err);
+      } finally {
+        setLoading(false);
+      }
     }
-  }, [currentUser]);
 
-  // Operations
-  const addPeserta = (item) => {
-    setPeserta(prev => [...prev, { ...item, status: item.status || 'Belum Hadir' }]);
-  };
+    async function init() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await loadData();
+      } else {
+        setLoading(false);
+      }
+    }
+    init();
 
-  const updatePeserta = (id, fields) => {
-    setPeserta(prev => prev.map(p => p.id === id ? { ...p, ...fields } : p));
-  };
+    // Listen to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        await loadData();
+      } else if (event === 'SIGNED_OUT') {
+        setPeserta([]); setMentors([]); setGugus([]);
+        setClaims([]); setLogs([]); setQrCodes([]);
+      }
+    });
 
-  const deletePeserta = (id) => {
-    setPeserta(prev => prev.filter(p => p.id !== id));
-  };
+    return () => subscription.unsubscribe();
+  }, []);
 
-  const addMentor = (item) => {
-    setMentors(prev => [...prev, { ...item, id: `M-${Date.now()}` }]);
-  };
+  // ----------------------------------------------------
+  // Real-time Subscriptions
+  // ----------------------------------------------------
+  useEffect(() => {
+    const pesertaChannel = supabase
+      .channel('peserta-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'peserta' }, async (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const transformed = transformPeserta(payload.new);
+          setPeserta(prev => {
+            if (prev.some(p => p.id === transformed.id)) return prev;
+            return [...prev, transformed];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const transformed = transformPeserta(payload.new);
+          setPeserta(prev => prev.map(p => p.id === transformed.id ? transformed : p));
+        } else if (payload.eventType === 'DELETE') {
+          const nim = payload.old.nim;
+          setPeserta(prev => prev.filter(p => p.id !== nim));
+        }
+      })
+      .subscribe();
 
-  const updateMentor = (id, fields) => {
-    setMentors(prev => prev.map(m => m.id === id ? { ...m, ...fields } : m));
-  };
+    const gugusChannel = supabase
+      .channel('gugus-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gugus' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const transformed = transformGugus(payload.new);
+          setGugus(prev => {
+            if (prev.some(g => g.id === transformed.id)) return prev;
+            return [...prev, transformed];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const transformed = transformGugus(payload.new);
+          setGugus(prev => prev.map(g => g.id === transformed.id ? transformed : g));
 
-  const deleteMentor = (id) => {
-    setMentors(prev => prev.filter(m => m.id !== id));
-  };
+          // If this gugus assignment change affects the logged-in mentor, update their gugusId
+          setMentorUser(prev => {
+            if (!prev) return prev;
+            // New mentor assigned to this gugus
+            if (payload.new.mentor_id === prev.id) {
+              const updated = { ...prev, gugusId: payload.new.id };
+              localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(updated));
+              return updated;
+            }
+            // Old mentor removed from this gugus
+            if (payload.old.mentor_id === prev.id && prev.gugusId === payload.new.id) {
+              const updated = { ...prev, gugusId: '' };
+              localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(updated));
+              return updated;
+            }
+            return prev;
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setGugus(prev => prev.filter(g => g.id !== payload.old.id));
+        }
+      })
+      .subscribe();
 
-  const addGugus = (item) => {
-    setGugus(prev => [...prev, { ...item, id: `G-${Date.now()}` }]);
-  };
+    const profilesChannel = supabase
+      .channel('profiles-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+        // Only process mentors
+        if (payload.new && payload.new.role !== 'mentor') return;
+        if (payload.eventType === 'INSERT') {
+          const transformed = transformMentor(payload.new);
+          setMentors(prev => {
+            if (prev.some(m => m.id === transformed.id)) return prev;
+            return [...prev, transformed];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const transformed = transformMentor(payload.new);
+          setMentors(prev => prev.map(m => m.id === transformed.id ? transformed : m));
 
-  const updateGugus = (id, fields) => {
-    setGugus(prev => prev.map(g => g.id === id ? { ...g, ...fields } : g));
-  };
+          // Also update mentorUser if it's the currently logged-in mentor
+          setMentorUser(prev => {
+            if (!prev || prev.id !== payload.new.id) return prev;
+            const updated = {
+              ...prev,
+              name: payload.new.full_name || payload.new.email,
+              email: payload.new.email,
+              gugusId: payload.new.gugus_id || prev.gugusId || ''
+            };
+            localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(updated));
+            return updated;
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setMentors(prev => prev.filter(m => m.id !== payload.old.id));
+        }
+      })
+      .subscribe();
 
-  const deleteGugus = (id) => {
-    setGugus(prev => prev.filter(g => g.id !== id));
-  };
+    const claimsChannel = supabase
+      .channel('claims-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'approval_manual' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const transformed = transformClaim(payload.new);
+          setClaims(prev => {
+            if (prev.some(c => c.id === transformed.id)) return prev;
+            return [...prev, transformed];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          if (payload.new.status !== 'pending') {
+            setClaims(prev => prev.filter(c => c.id !== payload.new.id));
+          } else {
+            const transformed = transformClaim(payload.new);
+            setClaims(prev => prev.map(c => c.id === transformed.id ? transformed : c));
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setClaims(prev => prev.filter(c => c.id !== payload.old.id));
+        }
+      })
+      .subscribe();
 
-  const addLog = (name, nim, gugusName, scanner, status = 'Valid') => {
-    const now = new Date();
-    const timeStr = now.toTimeString().split(' ')[0];
-    const dateStr = now.toISOString().split('T')[0];
-    const newLog = {
-      id: `L-${Date.now()}`,
-      timestamp: timeStr,
-      date: dateStr,
-      name,
-      nim,
-      gugusName,
-      scanner,
-      status
+    const logsChannel = supabase
+      .channel('logs-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'absensi' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const transformed = transformLog(payload.new);
+          setLogs(prev => {
+            if (prev.some(l => l.id === transformed.id)) return prev;
+            return [transformed, ...prev];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const transformed = transformLog(payload.new);
+          setLogs(prev => prev.map(l => l.id === transformed.id ? transformed : l));
+        } else if (payload.eventType === 'DELETE') {
+          setLogs(prev => prev.filter(l => l.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    const qrChannel = supabase
+      .channel('qr-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'qr_sessions' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const transformed = transformQr(payload.new);
+          setQrCodes(prev => {
+            if (prev.some(q => q.id === transformed.id)) return prev;
+            return [...prev, transformed];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const transformed = transformQr(payload.new);
+          setQrCodes(prev => prev.map(q => q.id === transformed.id ? transformed : q));
+        } else if (payload.eventType === 'DELETE') {
+          setQrCodes(prev => prev.filter(q => q.id !== payload.old.kode));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      pesertaChannel.unsubscribe();
+      gugusChannel.unsubscribe();
+      profilesChannel.unsubscribe();
+      claimsChannel.unsubscribe();
+      logsChannel.unsubscribe();
+      qrChannel.unsubscribe();
     };
-    setLogs(prev => [newLog, ...prev]);
+  }, []);
+
+  const saveCurrentUser = (user, role) => {
+    if (role === 'admin') {
+      setAdminUser(user);
+      if (user) {
+        localStorage.setItem('pkkmb_currentUser_admin', JSON.stringify(user));
+      } else {
+        localStorage.removeItem('pkkmb_currentUser_admin');
+      }
+    } else {
+      setMentorUser(user);
+      if (user) {
+        localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(user));
+      } else {
+        localStorage.removeItem('pkkmb_currentUser_mentor');
+      }
+    }
   };
 
-  const addClaim = (pesertaId, issue, note = '') => {
-    const student = peserta.find(p => p.id === pesertaId);
-    if (!student) return;
-
-    const group = gugus.find(g => g.id === student.gugusId);
-    const groupName = group ? group.name : '-';
-    
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-
-    const newClaim = {
-      id: `C-${Date.now()}`,
-      pesertaId,
-      name: student.name,
-      nim: student.id,
-      gugusName: groupName,
-      issue: issue + (note ? `: ${note}` : ''),
-      time: timeStr,
-      fakultas: student.fakultas
-    };
-
-    setClaims(prev => [...prev, newClaim]);
-    updatePeserta(pesertaId, { status: 'Manual (Pending)' });
+  const logout = (role) => {
+    saveCurrentUser(null, role);
   };
 
-  const approveClaim = (claimId) => {
-    const claim = claims.find(c => c.id === claimId);
-    if (!claim) return;
-
-    updatePeserta(claim.pesertaId, { status: 'Hadir' });
-    addLog(claim.name, claim.nim, claim.gugusName, 'Admin PKKMB', 'Valid');
-    setClaims(prev => prev.filter(c => c.id !== claimId));
+  // ----------------------------------------------------
+  // AppContext Actions mapped to Supabase Services
+  // ----------------------------------------------------
+  const addPeserta = async (item) => {
+    try {
+      await pesertaDb.add(item);
+    } catch (err) {
+      console.error("Error adding peserta:", err);
+      alert(err.message || "Gagal menambahkan peserta.");
+    }
   };
 
-  const rejectClaim = (claimId) => {
-    const claim = claims.find(c => c.id === claimId);
-    if (!claim) return;
-
-    updatePeserta(claim.pesertaId, { status: 'Belum Hadir' });
-    setClaims(prev => prev.filter(c => c.id !== claimId));
+  const updatePeserta = async (id, fields) => {
+    try {
+      await pesertaDb.update(id, fields);
+    } catch (err) {
+      console.error("Error updating peserta:", err);
+      alert(err.message || "Gagal memperbarui peserta.");
+    }
   };
 
-  const generateQr = (item) => {
-    setQrCodes(prev => [...prev, {
-      id: `QR-${Date.now()}`,
-      title: item.title,
-      sessionType: item.sessionType,
-      targetAudience: item.targetAudience,
-      startTime: item.startTime,
-      endTime: item.endTime,
-      status: 'Active',
-      scans: 0
-    }]);
+  const deletePeserta = async (id) => {
+    try {
+      await pesertaDb.delete(id);
+    } catch (err) {
+      console.error("Error deleting peserta:", err);
+      alert(err.message || "Gagal menghapus peserta.");
+    }
   };
 
-  const expireQr = (id) => {
-    setQrCodes(prev => prev.map(qr => qr.id === id ? { ...qr, status: 'Expired' } : qr));
+  const addMentor = async (item) => {
+    try {
+      await mentorsDb.add(item);
+    } catch (err) {
+      console.error("Error adding mentor:", err);
+      alert(err.message || "Gagal menambahkan mentor.");
+    }
   };
 
-  const deleteQr = (id) => {
-    setQrCodes(prev => prev.filter(qr => qr.id !== id));
+  const updateMentor = async (id, fields) => {
+    try {
+      await mentorsDb.update(id, fields);
+    } catch (err) {
+      console.error("Error updating mentor:", err);
+      alert(err.message || "Gagal memperbarui mentor.");
+    }
   };
 
-  const recordScan = (studentId) => {
-    const student = peserta.find(p => p.id === studentId);
+  const deleteMentor = async (id) => {
+    try {
+      await mentorsDb.delete(id);
+    } catch (err) {
+      console.error("Error deleting mentor:", err);
+      alert(err.message || "Gagal menghapus mentor.");
+    }
+  };
+
+  const addGugus = async (item) => {
+    try {
+      await gugusDb.add(item);
+    } catch (err) {
+      console.error("Error adding gugus:", err);
+      alert(err.message || "Gagal menambahkan gugus.");
+    }
+  };
+
+  const updateGugus = async (id, fields) => {
+    try {
+      await gugusDb.update(id, fields);
+    } catch (err) {
+      console.error("Error updating gugus:", err);
+      alert(err.message || "Gagal memperbarui gugus.");
+    }
+  };
+
+  const deleteGugus = async (id) => {
+    try {
+      await gugusDb.delete(id);
+    } catch (err) {
+      console.error("Error deleting gugus:", err);
+      alert(err.message || "Gagal menghapus gugus.");
+    }
+  };
+
+  const addLog = async (name, nim, gugusName, scanner, status = 'Valid', note = '') => {
+    try {
+      const student = peserta.find(p => p.id === nim);
+      await logsDb.add(name, nim, gugusName, scanner, status, note, student?.uuid, currentUser?.id);
+    } catch (err) {
+      console.error("Error writing scan log:", err);
+    }
+  };
+
+  const deleteLog = async (id) => {
+    try {
+      await logsDb.delete(id);
+    } catch (err) {
+      console.error("Error deleting scan log:", err);
+    }
+  };
+
+  const addClaim = async (pesertaId, issue, note = '', requestedStatus = 'Hadir Penuh') => {
+    try {
+      const student = peserta.find(p => p.id === pesertaId);
+      if (!student) return;
+      const group = gugus.find(g => g.id === student.gugusId);
+      const groupName = group ? group.name : '-';
+
+      await claimsDb.add(pesertaId, issue, note, requestedStatus, student, groupName, currentUser);
+      await pesertaDb.update(pesertaId, { status: 'Manual (Pending)' });
+    } catch (err) {
+      console.error("Error creating claim:", err);
+      alert("Gagal mengirim pengajuan absensi manual.");
+    }
+  };
+
+  const approveClaim = async (claimId) => {
+    try {
+      const claim = claims.find(c => c.id === claimId);
+      if (!claim) return;
+
+      const targetStatus = claim.requestedStatus || 'Hadir Penuh';
+      await pesertaDb.update(claim.nim, { status: targetStatus });
+      await addLog(claim.name, claim.nim, claim.gugusName, 'Admin PKKMB', 'Valid');
+      await claimsDb.updateStatus(claimId, 'approved');
+    } catch (err) {
+      console.error("Error approving claim:", err);
+      alert("Gagal menyetujui klaim.");
+    }
+  };
+
+  const rejectClaim = async (claimId, reason = '') => {
+    try {
+      const claim = claims.find(c => c.id === claimId);
+      if (!claim) return;
+
+      await pesertaDb.update(claim.nim, { status: 'Manual (Ditolak)' });
+      await addLog(claim.name, claim.nim, claim.gugusName, 'Admin (Tolak Manual)', 'Tidak Valid', reason);
+      await claimsDb.updateStatus(claimId, 'rejected');
+    } catch (err) {
+      console.error("Error rejecting claim:", err);
+      alert("Gagal menolak klaim.");
+    }
+  };
+
+  const generateQr = async (item) => {
+    try {
+      await qrSessionsDb.add(item, currentUser?.id);
+    } catch (err) {
+      console.error("Error creating QR session:", err);
+      alert("Gagal membuat sesi QR.");
+    }
+  };
+
+  const expireQr = async (id) => {
+    try {
+      await qrSessionsDb.expire(id);
+    } catch (err) {
+      console.error("Error expiring QR session:", err);
+    }
+  };
+
+  const deleteQr = async (id) => {
+    try {
+      await qrSessionsDb.delete(id);
+    } catch (err) {
+      console.error("Error deleting QR session:", err);
+    }
+  };
+
+  const recordScan = async (studentId) => {
+    const student = peserta.find(p => String(p.id) === String(studentId));
     if (!student) return false;
 
     const group = gugus.find(g => g.id === student.gugusId);
     const groupName = group ? group.name : '-';
 
-    updatePeserta(studentId, { status: 'Hadir' });
-    addLog(student.name, student.id, groupName, currentUser ? currentUser.name : 'Mentor Budi', 'Valid');
-    return true;
+    try {
+      await pesertaDb.update(studentId, { status: 'Hadir Penuh' });
+      await addLog(student.name, student.id, groupName, currentUser ? currentUser.name : 'Mentor', 'Valid');
+      return true;
+    } catch (err) {
+      console.error("Error recording scan:", err);
+      return false;
+    }
   };
 
   const login = async (emailOrUsername, password, role) => {
     let email = emailOrUsername;
+
+    // If input is not an email, try NIP lookup (mentor only)
     if (!email.includes('@')) {
-      if (role === 'admin') {
-        if (email.toLowerCase() === 'admin' && password === 'admin') {
-          const adminUser = { id: 'admin-01', name: 'Admin PKKMB', email: 'admin@univ.ac.id', role: 'admin' };
-          setCurrentUser(adminUser);
-          return true;
+      if (role === 'mentor') {
+        const { data } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('nip', emailOrUsername)
+          .maybeSingle();
+        if (data?.email) {
+          email = data.email;
+        } else {
+          throw new Error('NIP tidak ditemukan. Coba gunakan email kamu.');
         }
       } else {
-        const localMentor = mentors.find(m => m.nip === emailOrUsername);
-        if (localMentor && localMentor.email) {
-          email = localMentor.email;
-        }
+        throw new Error('Masukkan email admin yang valid (contoh: admin@univ.ac.id).');
       }
     }
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+    // Authenticate via Supabase Auth
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message || 'Email atau password salah.');
 
-      if (error) {
-        if (role === 'admin' && email.toLowerCase() === 'admin' && password === 'admin') {
-          setCurrentUser({ id: 'admin-01', name: 'Admin PKKMB', email: 'admin@univ.ac.id', role: 'admin' });
-          return true;
-        }
-        throw error;
-      }
+    // Fetch profile to verify role
+    const { data: profile, error: profileErr } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
 
-      const supabaseUser = data.user;
-      
-      if (role === 'admin') {
-        setCurrentUser({
-          id: supabaseUser.id,
-          name: supabaseUser.user_metadata?.name || 'Admin PKKMB',
-          email: supabaseUser.email,
-          role: 'admin'
-        });
-        return true;
-      } else {
-        const matchedMentor = mentors.find(m => m.email?.toLowerCase() === supabaseUser.email?.toLowerCase());
-        setCurrentUser({
-          id: matchedMentor ? matchedMentor.id : supabaseUser.id,
-          name: matchedMentor ? matchedMentor.name : (supabaseUser.user_metadata?.name || 'Mentor'),
-          email: supabaseUser.email,
-          role: 'mentor',
-          gugusId: matchedMentor ? matchedMentor.gugusId : 'G-12-FT'
-        });
-        return true;
-      }
-    } catch (err) {
-      console.error("Supabase Auth Error:", err);
-      
-      if (role === 'admin' && email.toLowerCase() === 'admin' && password === 'admin') {
-        setCurrentUser({ id: 'admin-01', name: 'Admin PKKMB', email: 'admin@univ.ac.id', role: 'admin' });
-        return true;
-      }
-      const localMentor = mentors.find(m => (m.nip === emailOrUsername || m.email === emailOrUsername) && password === '123456');
-      if (role === 'mentor' && localMentor) {
-        setCurrentUser({
-          id: localMentor.id,
-          name: localMentor.name,
-          email: localMentor.email || 'mentor@univ.ac.id',
-          role: 'mentor',
-          gugusId: localMentor.gugusId
-        });
-        return true;
-      }
-      
-      throw new Error(err.message || "Email atau password salah.");
+    if (profileErr || !profile) {
+      await supabase.auth.signOut();
+      throw new Error('Profil tidak ditemukan. Hubungi administrator.');
     }
+
+    if (role === 'admin' && profile.role !== 'admin') {
+      await supabase.auth.signOut();
+      throw new Error('Akun ini bukan akun admin.');
+    }
+
+    if (role === 'mentor' && profile.role !== 'mentor') {
+      await supabase.auth.signOut();
+      throw new Error('Akun ini bukan akun mentor. Gunakan halaman login admin.');
+    }
+
+    // For mentor: look up gugusId from gugus table (mentor_id = user.id)
+    // This ensures correct gugusId even if profiles.gugus_id wasn't synced
+    let gugusId = profile.gugus_id || '';
+    if (profile.role === 'mentor') {
+      const { data: gugusData } = await supabase
+        .from('gugus')
+        .select('id')
+        .eq('mentor_id', data.user.id)
+        .maybeSingle();
+      if (gugusData?.id) gugusId = gugusData.id;
+    }
+
+    const userObj = {
+      id: data.user.id,
+      name: profile.full_name || data.user.email,
+      email: data.user.email,
+      role: profile.role,
+      gugusId,
+      nip: profile.nip || ''
+    };
+
+    saveCurrentUser(userObj, role === 'admin' ? 'admin' : 'mentor');
+    return true;
   };
 
   return (
@@ -331,7 +671,14 @@ export function AppContextProvider({ children }) {
       logs,
       qrCodes,
       currentUser,
-      setCurrentUser,
+      adminUser,
+      setAdminUser,
+      mentorUser,
+      setMentorUser,
+      logout,
+      dismissNotification,
+      dismissAllNotifications,
+      dismissedNotifications,
       login,
       addPeserta,
       updatePeserta,
@@ -350,10 +697,12 @@ export function AppContextProvider({ children }) {
       deleteQr,
       recordScan,
       addLog,
+      deleteLog,
       hasAdminNotifications,
       hasMentorNotifications,
       setAdminNotificationsCleared,
-      setMentorNotificationsCleared
+      setMentorNotificationsCleared,
+      loading
     }}>
       {children}
     </AppContext.Provider>

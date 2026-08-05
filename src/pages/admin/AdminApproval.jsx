@@ -3,7 +3,7 @@ import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminApproval() {
-  const { claims, approveClaim, rejectClaim, hasAdminNotifications } = useContext(AppContext);
+  const { claims, gugus, approveClaim, rejectClaim, hasAdminNotifications } = useContext(AppContext);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGugus, setSelectedGugus] = useState('all');
@@ -14,21 +14,25 @@ export default function AdminApproval() {
   };
 
   const handleReject = (id, name) => {
-    window.confirmAction(`Tolak klaim absensi dari ${name}?`, () => {
-      rejectClaim(id);
-      alert(`Klaim absensi ${name} telah DITOLAK.`);
-    });
+    const reason = prompt(`Tolak klaim absensi dari ${name}?\nMasukkan alasan penolakan:`, "Berkas pendukung kurang lengkap / kurang valid");
+    if (reason === null) return; // User cancelled prompt
+    
+    rejectClaim(id, reason || "Ditolak oleh Admin");
+    alert(`Klaim absensi ${name} telah DITOLAK.`);
   };
 
   const filteredClaims = claims.filter(c => {
     const term = searchTerm.toLowerCase();
     const matchesSearch = c.name.toLowerCase().includes(term) || c.nim.includes(term) || c.issue.toLowerCase().includes(term);
-    const matchesGugus = selectedGugus === 'all' || c.gugusName.toLowerCase().includes(selectedGugus.toLowerCase());
+    const matchesGugus = selectedGugus === 'all' || c.gugusName.toLowerCase() === selectedGugus.toLowerCase();
     return matchesSearch && matchesGugus;
   });
 
+  // Get active unique gugus names that currently have claims pending
+  const activeGugusWithClaims = Array.from(new Set(claims.map(c => c.gugusName))).filter(Boolean);
+
   return (
-<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Persetujuan Klaim</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile admin")}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profil</span></button></div></header><main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full gap-gutter relative">
+<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Persetujuan Klaim</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile admin")}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profil</span></button></div></header><main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full gap-gutter relative">
 <div className="absolute top-0 right-0 -mt-16 w-[600px] h-[600px] bg-secondary-fixed-dim/20 rounded-full blur-[100px] pointer-events-none mix-blend-screen"></div>
 <div className="flex items-end justify-between w-full relative z-10 mb-unit">
 <div className="flex flex-col max-w-2xl gap-unit">
@@ -59,15 +63,17 @@ export default function AdminApproval() {
 <button onClick={() => setSelectedGugus('all')} className={`font-label-md text-label-md px-4 py-2 rounded-lg whitespace-nowrap transition-transform ${
   selectedGugus === 'all' ? 'bg-primary text-on-primary shadow-md hover:scale-105' : 'bg-surface text-on-surface shadow-sm hover:bg-surface-dim'
 }`}>Semua</button>
-<button onClick={() => setSelectedGugus('alpha')} className={`font-label-md text-label-md px-4 py-2 rounded-lg whitespace-nowrap transition-transform ${
-  selectedGugus === 'alpha' ? 'bg-primary text-on-primary shadow-md hover:scale-105' : 'bg-surface text-on-surface shadow-sm hover:bg-surface-dim'
-}`}>Alpha</button>
-<button onClick={() => setSelectedGugus('beta')} className={`font-label-md text-label-md px-4 py-2 rounded-lg whitespace-nowrap transition-transform ${
-  selectedGugus === 'beta' ? 'bg-primary text-on-primary shadow-md hover:scale-105' : 'bg-surface text-on-surface shadow-sm hover:bg-surface-dim'
-}`}>Beta</button>
-<button onClick={() => setSelectedGugus('12')} className={`font-label-md text-label-md px-4 py-2 rounded-lg whitespace-nowrap transition-transform ${
-  selectedGugus === '12' ? 'bg-primary text-on-primary shadow-md hover:scale-105' : 'bg-surface text-on-surface shadow-sm hover:bg-surface-dim'
-}`}>Gugus 12</button>
+{activeGugusWithClaims.map(gName => (
+  <button 
+    key={gName} 
+    onClick={() => setSelectedGugus(gName)} 
+    className={`font-label-md text-label-md px-4 py-2 rounded-lg whitespace-nowrap transition-transform ${
+      selectedGugus.toLowerCase() === gName.toLowerCase() ? 'bg-primary text-on-primary shadow-md hover:scale-105' : 'bg-surface text-on-surface shadow-sm hover:bg-surface-dim'
+    }`}
+  >
+    {gName}
+  </button>
+))}
 </div>
 </div>
 <div className="w-full overflow-x-auto">
@@ -78,6 +84,7 @@ export default function AdminApproval() {
 <th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">NIM</th>
 <th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Gugus</th>
 <th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Kendala</th>
+<th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Status Diajukan</th>
 <th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Waktu</th>
 <th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-right">Aksi</th>
 </tr>
@@ -110,6 +117,13 @@ export default function AdminApproval() {
       <span className="font-body-sm text-body-sm">{c.issue}</span>
       </div>
       </td>
+      <td className="px-6 py-5">
+      {(() => {
+        const s = c.requestedStatus || 'Hadir Penuh';
+        const colors = s === 'Hadir Penuh' ? 'bg-green-500/15 text-green-700' : s === 'Hadir Sebagian' ? 'bg-amber-500/15 text-amber-700' : 'bg-blue-500/15 text-blue-700';
+        return <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-label-sm font-label-sm ${colors}`}>{s}</span>;
+      })()}
+      </td>
       <td className="px-6 py-5 font-body-sm text-body-sm text-on-surface-variant">{c.time}</td>
       <td className="px-6 py-5 text-right">
       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -125,7 +139,7 @@ export default function AdminApproval() {
     ))
   ) : (
     <tr>
-      <td colSpan="6" className="text-center py-10 text-on-surface-variant">Tidak ada klaim manual yang tertunda.</td>
+      <td colSpan="7" className="text-center py-10 text-on-surface-variant">Tidak ada klaim manual yang tertunda.</td>
     </tr>
   )}
 </tbody>

@@ -1,5 +1,5 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useContext } from 'react';
+import { NavLink, Outlet, useNavigate, Navigate } from 'react-router-dom';
+import { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 
 const navItems = [
@@ -13,18 +13,29 @@ const navItems = [
 ];
 
 export default function AdminLayout() {
-  const { currentUser, setCurrentUser } = useContext(AppContext);
+  const { currentUser, logout } = useContext(AppContext);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
+
+  console.log('--- AdminLayout render, currentUser:', currentUser);
+
+  // Protect admin routes
+  if (!currentUser || currentUser.role !== 'admin') {
+    console.log('--- AdminLayout: Access denied, redirecting to login...');
+    return <Navigate to="/admin/login" replace />;
+  }
 
   const handleLogout = (e) => {
     e.preventDefault();
-    setCurrentUser(null);
+    logout('admin');
     navigate('/admin/login');
   };
 
   return (
     <div className="bg-background font-body-md text-on-background min-h-screen">
-      <aside className="fixed left-0 top-0 h-full w-[280px] bg-[#0d1b4d] z-50 flex flex-col shadow-2xl">
+      <aside className={`fixed left-0 top-0 h-full w-[280px] bg-[#0d1b4d] z-50 flex flex-col shadow-2xl transition-transform duration-300 ${
+        isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      }`}>
         <div className="p-gutter mb-6 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center">
             <span className="material-symbols-outlined text-white">badge</span>
@@ -74,7 +85,24 @@ export default function AdminLayout() {
           </button>
         </div>
       </aside>
-      <div className="pl-[280px] min-h-screen">
+
+      {/* Floating Hamburger Toggle (visible on mobile only) */}
+      <button 
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        className="fixed left-4 top-3 z-[60] lg:hidden cursor-pointer flex items-center justify-center w-10 h-10 rounded-xl bg-white text-[#0d1b4d] shadow-md border border-gray-200 hover:bg-gray-100 transition-colors"
+      >
+        <span className="material-symbols-outlined">{isSidebarOpen ? 'close' : 'menu'}</span>
+      </button>
+
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)} 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
+        />
+      )}
+
+      <div className="pl-0 lg:pl-[280px] min-h-screen">
         <Outlet />
       </div>
     </div>

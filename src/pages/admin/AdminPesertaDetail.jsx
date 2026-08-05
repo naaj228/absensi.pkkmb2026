@@ -1,6 +1,8 @@
-import { useContext } from 'react';
+import { useContext, useCallback, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
+import { sendQrEmail } from '../../lib/emailService';
+import { isHadir, STATUS_OPTIONS } from '../../utils/statusHelper';
 
 export default function AdminPesertaDetail() {
   const { id } = useParams();
@@ -27,6 +29,46 @@ export default function AdminPesertaDetail() {
   const groupName = group ? group.name : '-';
   const mentor = mentors.find(m => m.gugusId === student.gugusId || (group && m.id === group.mentorId));
   const mentorName = mentor ? mentor.name : 'Belum Ditentukan';
+
+  // QR Code URL — same format as AdminQrManagement: NIM encoded into QR
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(student.id)}`;
+
+  // Email sending state
+  const [emailSending, setEmailSending] = useState(false);
+
+  // Download QR Code PNG
+  const handleDownloadQr = useCallback(async () => {
+    try {
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `QR-${student.name.replace(/\s+/g, '_')}-${student.id}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Gagal mengunduh QR Code. Pastikan koneksi internet tersedia.');
+    }
+  }, [qrUrl, student.name, student.id]);
+
+  // Kirim QR Code otomatis via EmailJS
+  const handleEmailQr = useCallback(async () => {
+    if (emailSending) return;
+    setEmailSending(true);
+    const result = await sendQrEmail({
+      toEmail: student.email,
+      toName:  student.name,
+      nim:     student.id,
+      gugus:   groupName,
+      mentor:  mentorName,
+      qrUrl,
+    });
+    setEmailSending(false);
+    alert(result.message);
+  }, [student, groupName, mentorName, qrUrl, emailSending]);
 
   // Find attendance logs for this student
   const studentLogs = logs.filter(log => log.nim === student.id);
@@ -111,21 +153,25 @@ export default function AdminPesertaDetail() {
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-1">
-                    <p className="text-label-sm text-on-surface-variant uppercase tracking-wider">Fakultas</p>
-                    <p className="text-body-lg text-on-surface font-medium">{student.fakultas}</p>
+                    <p className="text-label-sm text-on-surface-variant uppercase tracking-wider">Jurusan</p>
+                    <p className="text-body-lg text-on-surface font-medium">{student.fakultas || 'Belum Diisi'}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-label-sm text-on-surface-variant uppercase tracking-wider">Gugus</p>
-                    <p className="text-body-lg text-on-surface font-medium">{groupName}</p>
+                    <p className={`text-body-lg font-medium ${groupName === '-' ? 'text-on-surface-variant italic' : 'text-on-surface'}`}>
+                      {groupName === '-' ? 'Belum Ditentukan' : groupName}
+                    </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-label-sm text-on-surface-variant uppercase tracking-wider">Mentor</p>
-                    <p className="text-body-lg text-on-surface font-medium">{mentorName}</p>
+                    <p className={`text-body-lg font-medium ${mentorName === 'Belum Ditentukan' ? 'text-on-surface-variant italic' : 'text-on-surface'}`}>
+                      {mentorName}
+                    </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-label-sm text-on-surface-variant uppercase tracking-wider">Metode Kehadiran</p>
                     <p className="text-body-lg text-on-surface font-medium">
-                      {student.status === 'Hadir' ? 'Scan QR / Manual' : 'Belum Terabsen'}
+                      {isHadir(student.status) ? student.status : 'Belum Terabsen'}
                     </p>
                   </div>
                 </div>
@@ -137,47 +183,79 @@ export default function AdminPesertaDetail() {
                   <span className="material-symbols-outlined text-secondary">tune</span>
                   Override Kehadiran
                 </h3>
-                <div className="flex flex-wrap gap-4">
-                  <button onClick={() => handleStatusChange('Hadir')} className="bg-[#ecfdf5] hover:bg-[#d1fae5] text-[#059669] px-6 py-3 rounded-xl font-label-md text-label-md flex items-center gap-2 border border-[#a7f3d0] transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined">check_circle</span>
-                    Hadir
-                  </button>
-                  <button onClick={() => handleStatusChange('Izin')} className="bg-[#fffbeb] hover:bg-[#fef3c7] text-[#d97706] px-6 py-3 rounded-xl font-label-md text-label-md flex items-center gap-2 border border-[#fde68a] transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined">info</span>
-                    Izin
-                  </button>
-                  <button onClick={() => handleStatusChange('Alpa')} className="bg-[#fef2f2] hover:bg-[#fee2e2] text-[#dc2626] px-6 py-3 rounded-xl font-label-md text-label-md flex items-center gap-2 border border-[#fecaca] transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined">cancel</span>
-                    Alpa
-                  </button>
-                  <button onClick={() => handleStatusChange('Belum Hadir')} className="bg-surface-container hover:bg-surface-container-high text-on-surface-variant px-6 py-3 rounded-xl font-label-md text-label-md flex items-center gap-2 border border-outline-variant transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined">schedule</span>
-                    Belum Hadir
-                  </button>
+                <div className="flex flex-wrap gap-3">
+                  {STATUS_OPTIONS.map(opt => {
+                    const isActive = student.status === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => handleStatusChange(opt.value)}
+                        className={`px-5 py-2.5 rounded-xl font-label-md text-label-md flex items-center gap-2 border transition-all cursor-pointer hover:scale-105 ${
+                          isActive
+                            ? 'ring-2 ring-primary ring-offset-2 opacity-100'
+                            : 'opacity-80 hover:opacity-100'
+                        } ${
+                          opt.value === 'Hadir Penuh'    ? 'bg-green-500/15 text-green-700 border-green-300' :
+                          opt.value === 'Hadir Sebagian' ? 'bg-amber-500/15 text-amber-700 border-amber-300' :
+                          opt.value === 'Izin'           ? 'bg-blue-500/15  text-blue-700  border-blue-300'  :
+                                                          'bg-red-500/15   text-red-700   border-red-300'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          {opt.value === 'Hadir Penuh' ? 'check_circle' :
+                           opt.value === 'Hadir Sebagian' ? 'brightness_half' :
+                           opt.value === 'Izin' ? 'description' : 'cancel'}
+                        </span>
+                        {opt.value}
+                        {isActive && <span className="text-[10px] bg-primary text-on-primary rounded-full px-1.5 py-0.5 ml-1">Aktif</span>}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
             {/* Right Column: QR Code Card & Scans timeline */}
             <div className="flex flex-col gap-8">
-              {/* Simulated QR Code Card */}
+              {/* QR Code Card */}
               <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-sm border border-outline-variant/30 flex flex-col items-center text-center">
-                <h3 className="text-headline-sm font-headline-md text-on-surface mb-6 self-start flex items-center gap-2">
+                <h3 className="text-headline-sm font-headline-md text-on-surface mb-4 self-start flex items-center gap-2">
                   <span className="material-symbols-outlined text-tertiary">qr_code_2</span>
                   QR Code
                 </h3>
-                <div className="w-48 h-48 bg-white rounded-xl p-3 border border-outline-variant/30 flex items-center justify-center shadow-inner relative overflow-hidden group mb-6">
-                  {/* Simulated QR Pattern */}
-                  <div className="w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTAgMGgxMDB2MTAwSDB6bTIwMCAwaDEwMHYxMDBIMjAwek0wIDIwMGgxMDB2MTAwSDB6IiBmaWxsPSIjMTAxMTE1Ii8+PC9zdmc+')] bg-contain bg-center bg-no-repeat opacity-85"></div>
+                <p className="text-body-sm text-on-surface-variant mb-4 self-start">Scan QR ini untuk mencatat kehadiran. Data: <span className="font-mono font-semibold text-primary">{student.id}</span></p>
+                <div className="w-52 h-52 bg-white rounded-xl p-2 border border-outline-variant/30 flex items-center justify-center shadow-md relative overflow-hidden group mb-6">
+                  <img
+                    src={qrUrl}
+                    alt={`QR Code NIM ${student.id}`}
+                    className="w-full h-full object-contain"
+                    crossOrigin="anonymous"
+                  />
                 </div>
                 <div className="flex gap-3 w-full">
-                  <button onClick={() => alert("Mengunduh QR Code PNG...")} className="flex-1 bg-surface-container hover:bg-surface-container-high text-on-surface py-2.5 rounded-xl text-label-md font-label-md transition-colors flex items-center justify-center gap-2 border border-outline-variant cursor-pointer">
+                  <button
+                    onClick={handleDownloadQr}
+                    className="flex-1 bg-surface-container hover:bg-surface-container-high text-on-surface py-2.5 rounded-xl text-label-md font-label-md transition-colors flex items-center justify-center gap-2 border border-outline-variant cursor-pointer"
+                  >
                     <span className="material-symbols-outlined text-[18px]">download</span>
                     Unduh
                   </button>
-                  <button onClick={() => alert(`Kirim QR Code ke email ${student.email}...`)} className="flex-1 bg-primary text-on-primary py-2.5 rounded-xl text-label-md font-label-md transition-colors flex items-center justify-center gap-2 shadow-md hover:bg-primary-fixed cursor-pointer">
-                    <span className="material-symbols-outlined text-[18px]">mail</span>
-                    Email
+                  <button
+                    onClick={handleEmailQr}
+                    disabled={emailSending}
+                    className="flex-1 bg-primary text-on-primary py-2.5 rounded-xl text-label-md font-label-md transition-colors flex items-center justify-center gap-2 shadow-md hover:bg-primary-fixed cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {emailSending ? (
+                      <>
+                        <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                        Mengirim...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[18px]">mail</span>
+                        Email
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

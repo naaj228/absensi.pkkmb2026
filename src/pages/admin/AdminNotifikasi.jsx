@@ -1,22 +1,32 @@
-import { useContext, useState, useEffect } from 'react';
+import { useContext, useEffect } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminNotifikasi() {
-  const { claims, logs, qrCodes, setAdminNotificationsCleared } = useContext(AppContext);
+  const { 
+    claims, 
+    logs, 
+    qrCodes, 
+    setAdminNotificationsCleared,
+    dismissedNotifications,
+    dismissNotification,
+    dismissAllNotifications
+  } = useContext(AppContext);
   const navigate = useNavigate();
 
   useEffect(() => {
     setAdminNotificationsCleared(true);
   }, [setAdminNotificationsCleared]);
 
-  // Create notifications dynamically based on system states
-  const systemNotifications = [];
+  // Create notifications dynamically based on system states and filter dismissed ones
+  const notifications = [];
 
   // 1. Pending Claims Notifications
   claims.forEach(c => {
-    systemNotifications.push({
-      id: `claim-${c.id}`,
+    const id = `claim-${c.id}`;
+    if (dismissedNotifications.includes(id)) return;
+    notifications.push({
+      id,
       type: 'claim',
       title: 'Klaim Absensi Manual Baru',
       message: `${c.name} (NIM: ${c.nim}) mengajukan absensi manual: ${c.issue}`,
@@ -31,8 +41,10 @@ export default function AdminNotifikasi() {
 
   // 2. Invalid Scans Notifications
   logs.filter(l => l.status !== 'Valid').forEach(l => {
-    systemNotifications.push({
-      id: `invalid-${l.id}`,
+    const id = `invalid-${l.id}`;
+    if (dismissedNotifications.includes(id)) return;
+    notifications.push({
+      id,
       type: 'invalid_scan',
       title: 'Scan Tidak Valid Dideteksi',
       message: `Mahasiswa ${l.name || 'Tidak Dikenal'} (NIM: ${l.nim}) gagal melakukan scan di ${l.gugusName || 'Gugus'}`,
@@ -47,8 +59,10 @@ export default function AdminNotifikasi() {
 
   // 3. QR Session Created
   qrCodes.forEach(q => {
-    systemNotifications.push({
-      id: `qr-${q.id}`,
+    const id = `qr-${q.id}`;
+    if (dismissedNotifications.includes(id)) return;
+    notifications.push({
+      id,
       type: 'qr',
       title: 'Sesi QR Code Aktif',
       message: `Sesi "${q.title}" ditargetkan ke ${q.targetAudience === 'all' ? 'Semua Peserta' : q.targetAudience} (${q.startTime} - ${q.endTime})`,
@@ -61,15 +75,14 @@ export default function AdminNotifikasi() {
     });
   });
 
-  const [notifications, setNotifications] = useState(systemNotifications);
-
   const handleClearAll = () => {
-    setNotifications([]);
+    const currentIds = notifications.map(n => n.id);
+    dismissAllNotifications(currentIds);
     alert("Semua notifikasi telah dibersihkan.");
   };
 
   const handleRemove = (id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    dismissNotification(id);
   };
 
   return (
@@ -86,7 +99,7 @@ export default function AdminNotifikasi() {
         </div>
       </header>
 
-      <main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto">
+      <main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto">
         <div className="flex flex-col w-full relative space-y-6">
           <div className="flex items-center justify-between">
             <div>

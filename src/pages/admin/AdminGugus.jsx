@@ -15,7 +15,6 @@ export default function AdminGugus() {
   const [formData, setFormData] = useState({
     id: '', // Custom ID, e.g. G-01-FT
     name: '',
-    fakultas: '',
     mentorId: 'Unassigned',
     capacity: 50
   });
@@ -24,7 +23,6 @@ export default function AdminGugus() {
     setFormData({
       id: '',
       name: '',
-      fakultas: 'Fakultas Teknik',
       mentorId: 'Unassigned',
       capacity: 50
     });
@@ -36,7 +34,6 @@ export default function AdminGugus() {
     setFormData({
       id: g.id,
       name: g.name,
-      fakultas: g.fakultas,
       mentorId: g.mentorId || 'Unassigned',
       capacity: g.capacity
     });
@@ -77,14 +74,7 @@ export default function AdminGugus() {
     return peserta.filter(p => p.gugusId === gugusId).length;
   };
 
-  const getFakultasColor = (fakultas) => {
-    switch (fakultas) {
-      case 'Fakultas Teknik': return 'bg-primary-fixed text-on-primary-fixed';
-      case 'Fakultas Ekonomi': return 'bg-secondary-fixed text-on-secondary-fixed';
-      case 'Fakultas Ilmu Komputer': return 'bg-tertiary-fixed text-on-tertiary-fixed';
-      default: return 'bg-surface-variant text-on-surface-variant';
-    }
-  };
+
 
   return (
 <div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Gugus</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile admin")}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profile</span></button></div></header><main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full relative">
@@ -151,7 +141,6 @@ export default function AdminGugus() {
       </svg>
       <div className="flex justify-between items-start mb-6">
       <div>
-      <span className={`font-label-sm text-label-sm px-3 py-1 rounded-full mb-2 inline-block ${getFakultasColor(g.fakultas)}`}>{g.fakultas}</span>
       <h3 className="font-headline-md text-headline-md text-on-surface">{g.name}</h3>
       <p className="font-body-sm text-body-sm text-on-surface-variant font-mono mt-1">ID: {g.id}</p>
       </div>
@@ -192,7 +181,7 @@ export default function AdminGugus() {
       </div>
       <div className="mt-6 pt-4 border-t border-surface-container flex gap-3">
       <button onClick={() => {
-        navigate(`/admin/peserta?gugus=${g.id}`);
+        navigate(`/admin/gugus/${g.id}`);
       }} className="flex-1 font-label-md text-label-md text-primary bg-primary/5 hover:bg-primary/10 py-2 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer">
                 Detail <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
       </button>
@@ -225,17 +214,7 @@ export default function AdminGugus() {
             <label className="block text-label-md font-label-md text-on-surface mb-1">Kapasitas Maksimal</label>
             <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="number" min="5" max="100" value={formData.capacity} onChange={(e) => setFormData({...formData, capacity: parseInt(e.target.value)})} />
           </div>
-          <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">Fakultas</label>
-            <select className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary cursor-pointer font-body-md" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})}>
-              <option value="Fakultas Teknik">Fakultas Teknik</option>
-              <option value="Fakultas Ekonomi">Fakultas Ekonomi</option>
-              <option value="Fakultas Hukum">Fakultas Hukum</option>
-              <option value="Fakultas Kedokteran">Fakultas Kedokteran</option>
-              <option value="Fakultas Ilmu Komputer">Fakultas Ilmu Komputer</option>
-              <option value="Fakultas ISIP">Fakultas ISIP</option>
-            </select>
-          </div>
+
           <div>
             <label className="block text-label-md font-label-md text-on-surface mb-1">Mentor Utama</label>
             <select className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary cursor-pointer font-body-md" value={formData.mentorId} onChange={(e) => setFormData({...formData, mentorId: e.target.value})}>

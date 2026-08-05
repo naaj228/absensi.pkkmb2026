@@ -1,6 +1,7 @@
 import { useContext, useState } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { isHadir } from '../../utils/statusHelper';
 
 export default function AdminDashboard() {
   const { peserta, mentors, gugus, logs, currentUser, hasAdminNotifications } = useContext(AppContext);
@@ -10,8 +11,8 @@ export default function AdminDashboard() {
   const totalPeserta = peserta.length;
   const totalMentor = mentors.length;
   const totalGugus = gugus.length;
-  const hadirHariIni = peserta.filter(p => p.status === 'Hadir').length;
-  const belumHadir = peserta.filter(p => p.status === 'Belum Hadir').length;
+  const hadirHariIni = peserta.filter(p => isHadir(p.status)).length;
+  const alphaCount = peserta.filter(p => p.status === 'Alpha' || !p.status).length;
   const persentaseKehadiran = totalPeserta > 0 ? ((hadirHariIni / totalPeserta) * 100).toFixed(1) : '0';
 
   // Get top 5 recent scans
@@ -112,7 +113,7 @@ export default function AdminDashboard() {
 <span className="material-symbols-outlined text-[#ef4444] text-[18px]">cancel</span>
 </div>
 </div>
-<h3 className="text-headline-lg font-headline-md text-on-surface">{belumHadir}</h3>
+<h3 className="text-headline-lg font-headline-md text-on-surface">{alphaCount}</h3>
 </div>
 {/* Card 6: Persentase Kehadiran */}
 <div className="bg-primary rounded-[16px] p-6 shadow-[0_10px_30px_rgba(20,44,142,0.15)] text-on-primary">

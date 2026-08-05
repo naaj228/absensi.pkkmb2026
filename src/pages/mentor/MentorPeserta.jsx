@@ -1,13 +1,16 @@
-import { useContext, useState } from 'react';
+import { useContext, useState, useCallback } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { isHadir, getStatusBadge, STATUS_OPTIONS } from '../../utils/statusHelper';
 
 export default function MentorPeserta() {
-  const { peserta, addPeserta, updatePeserta, deletePeserta, hasMentorNotifications } = useContext(AppContext);
+  const { peserta, gugus, addPeserta, updatePeserta, currentUser, hasMentorNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
-  // Mentor Budi's group is Gugus 12 (G-12-FT)
-  const mentorGugusId = 'G-12-FT';
+  // Get gugus ID from the currently logged-in mentor
+  const mentorGugusId = currentUser?.gugusId || '';
+  const mentorGugus = gugus.find(g => g.id === mentorGugusId);
+  const mentorGugusName = mentorGugus?.name || 'Gugus Saya';
 
   // Search & Tab states
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,12 +29,9 @@ export default function MentorPeserta() {
     name: '',
     email: '',
     gugusId: mentorGugusId,
-    fakultas: 'Fakultas Teknik',
-    status: 'Belum Hadir'
+    fakultas: '',
+    status: 'Alpha'
   });
-
-  // Selected for mass actions
-  const [selectedIds, setSelectedIds] = useState([]);
 
   // Filter students
   const mentorStudents = peserta.filter(p => p.gugusId === mentorGugusId);
@@ -41,29 +41,75 @@ export default function MentorPeserta() {
     
     let matchesStatus = true;
     if (statusFilter === 'hadir') {
-      matchesStatus = student.status === 'Hadir';
+      matchesStatus = isHadir(student.status);
     } else if (statusFilter === 'belum') {
-      matchesStatus = student.status === 'Belum Hadir' || student.status === 'Alpa';
+      matchesStatus = student.status === 'Alpha' || !student.status;
     }
 
     return matchesSearch && matchesStatus;
   });
 
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedIds(filteredStudents.map(p => p.id));
-    } else {
-      setSelectedIds([]);
+  const [downloadingZip, setDownloadingZip] = useState(false);
+
+  const handleDownloadZip = async () => {
+    if (mentorStudents.length === 0) {
+      alert("Tidak ada data peserta di gugus Anda.");
+      return;
+    }
+    setDownloadingZip(true);
+    try {
+      const serverUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
+      const studentsData = mentorStudents.map(p => ({
+        id: p.id,
+        name: p.name,
+        gugusName: mentorGugusName
+      }));
+
+      const response = await fetch(`${serverUrl}/api/generate-gugus-zip`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ students: studentsData }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal mengunduh file ZIP dari server.');
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ID_Cards_${mentorGugusName.replace(/\s+/g, '_')}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Terjadi kesalahan saat mengunduh ZIP: " + err.message);
+    } finally {
+      setDownloadingZip(false);
     }
   };
 
-  const handleSelectOne = (id, checked) => {
-    if (checked) {
-      setSelectedIds(prev => [...prev, id]);
-    } else {
-      setSelectedIds(prev => prev.filter(item => item !== id));
+  const handleDownloadQr = useCallback(async (student) => {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(student.id)}`;
+    try {
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `QR-${student.name.replace(/\s+/g, '_')}-${student.id}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Gagal mengunduh QR Code. Pastikan koneksi internet tersedia.');
     }
-  };
+  }, []);
 
   const handleOpenAddModal = () => {
     setFormData({
@@ -71,8 +117,8 @@ export default function MentorPeserta() {
       name: '',
       email: '',
       gugusId: mentorGugusId,
-      fakultas: 'Fakultas Teknik',
-      status: 'Belum Hadir'
+      fakultas: '',
+      status: 'Alpha'
     });
     setShowAddModal(true);
   };
@@ -112,40 +158,25 @@ export default function MentorPeserta() {
     }
   };
 
-  const handleDeleteOne = (id, name) => {
-    window.confirmAction(`Hapus peserta ${name}?`, () => {
-      deletePeserta(id);
-      setSelectedIds(prev => prev.filter(item => item !== id));
-      alert("Peserta berhasil dihapus.");
-    });
-  };
-
-  const handleDeleteSelected = () => {
-    if (selectedIds.length === 0) return;
-    window.confirmAction(`Hapus ${selectedIds.length} peserta terpilih?`, () => {
-      selectedIds.forEach(id => deletePeserta(id));
-      setSelectedIds([]);
-      alert("Peserta berhasil dihapus.");
-    });
-  };
-
   return (
-<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Anggota Gugus</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/mentor/notifikasi')}>notifications</span>{hasMentorNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile mentor")}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profil</span></button></div></header><main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full h-full relative">
+<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Anggota Gugus</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/mentor/notifikasi')}>notifications</span>{hasMentorNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile mentor")}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profil</span></button></div></header><main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full h-full relative">
 {/* Floating Header Actions / Title */}
 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 relative z-10">
 <div className="flex flex-col gap-2">
 <div className="flex items-center gap-3">
-<h2 className="text-headline-lg font-headline-lg text-on-background">Daftar Peserta - Gugus 12</h2>
+<h2 className="text-headline-lg font-headline-lg text-on-background">Daftar Peserta - {mentorGugusName}</h2>
 <span className="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-label-sm font-label-md">{mentorStudents.length} Total</span>
 </div>
 </div>
 <div className="flex items-center gap-3 shrink-0">
-  {selectedIds.length > 0 && (
-    <button onClick={handleDeleteSelected} className="bg-error/10 hover:bg-error/20 text-error px-4 py-2.5 rounded-xl text-label-sm font-label-sm flex items-center gap-1.5 transition-colors cursor-pointer">
-      <span className="material-symbols-outlined text-[16px]">delete</span>
-      Hapus Terpilih ({selectedIds.length})
-    </button>
-  )}
+<button 
+  onClick={handleDownloadZip} 
+  disabled={downloadingZip}
+  className="flex items-center gap-2 bg-surface text-primary border border-outline-variant hover:bg-primary/5 px-5 py-3 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+>
+  <span className="material-symbols-outlined text-[20px]">{downloadingZip ? 'sync' : 'download'}</span>
+  <span className="text-label-md font-label-md">{downloadingZip ? 'Mengunduh...' : 'Unduh ZIP ID Card & QR'}</span>
+</button>
 <button onClick={handleOpenAddModal} className="group relative flex items-center justify-center gap-2 bg-primary text-on-primary hover:bg-primary/90 transition-all px-5 py-3 rounded-xl shadow-[0_8px_16px_-6px_rgba(0,4,35,0.4)] hover:shadow-[0_12px_20px_-8px_rgba(0,4,35,0.5)] overflow-hidden cursor-pointer">
 <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
 <span className="material-symbols-outlined text-[20px] relative z-10">person_add</span>
@@ -173,25 +204,20 @@ export default function MentorPeserta() {
 <button onClick={() => setStatusFilter(prev => prev === 'belum' ? 'all' : 'belum')} className={`flex items-center gap-2 px-4 py-3 rounded-xl font-label-md text-label-md border transition-all ${
   statusFilter === 'belum' ? 'bg-[#fef2f2] text-[#dc2626] border-[#fecaca]' : 'bg-surface-container-low text-on-surface border-outline-variant/30 hover:bg-surface-container'
 }`}>
-  <span className="material-symbols-outlined text-[18px]">pending_actions</span>
-  <span>Belum Hadir</span>
+  <span className="material-symbols-outlined text-[18px]">cancel</span>
+  <span>Alpha</span>
 </button>
 </div>
 </div>
 </div>
 {/* Data Table */}
 <div className="overflow-x-auto flex-1">
-<table className="w-full text-left border-collapse min-w-[1000px]">
+<table className="w-full text-left border-collapse min-w-[900px]">
 <thead>
 <tr className="bg-surface/50 border-b border-outline-variant/30">
-<th className="py-4 px-6 w-16">
-<label className="flex items-center cursor-pointer">
-<input className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary/20 bg-surface-container-lowest accent-primary" type="checkbox" checked={filteredStudents.length > 0 && filteredStudents.every(p => selectedIds.includes(p.id))} onChange={handleSelectAll} />
-</label>
-</th>
 <th className="py-4 px-6 text-label-sm font-label-sm text-outline uppercase tracking-wider">Mahasiswa</th>
 <th className="py-4 px-6 text-label-sm font-label-sm text-outline uppercase tracking-wider">NIM</th>
-<th className="py-4 px-6 text-label-sm font-label-sm text-outline uppercase tracking-wider">Fakultas</th>
+<th className="py-4 px-6 text-label-sm font-label-sm text-outline uppercase tracking-wider">Jurusan</th>
 <th className="py-4 px-6 text-label-sm font-label-sm text-outline uppercase tracking-wider">Status</th>
 <th className="py-4 px-6 text-right text-label-sm font-label-sm text-outline uppercase tracking-wider">Aksi</th>
 </tr>
@@ -200,9 +226,6 @@ export default function MentorPeserta() {
   {filteredStudents.length > 0 ? (
     filteredStudents.map((student) => (
       <tr key={student.id} className="hover:bg-surface-container-low/50 transition-colors group">
-      <td className="py-4 px-6">
-      <input className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary/20 bg-surface-container-lowest accent-primary" type="checkbox" checked={selectedIds.includes(student.id)} onChange={(e) => handleSelectOne(student.id, e.target.checked)} />
-      </td>
       <td className="py-4 px-6">
       <div className="flex items-center gap-4">
       <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold shadow-inner">
@@ -221,19 +244,11 @@ export default function MentorPeserta() {
         <span className="text-body-md text-on-surface">{student.fakultas}</span>
       </td>
       <td className="py-4 px-6">
-        {student.status === 'Hadir' ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E6F4EA] text-[#137333] text-label-sm font-label-sm h-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#137333]"></span> Hadir
+        {(() => { const b = getStatusBadge(student.status); return (
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${b.bg} ${b.text} text-label-sm font-label-sm h-8`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span> {b.label}
           </span>
-        ) : student.status === 'Manual (Pending)' ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FEF3C7] text-[#92400E] text-label-sm font-label-sm h-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#D97706]"></span> Manual (Pending)
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container text-on-error-container text-label-sm font-label-sm h-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-error"></span> Belum Hadir
-          </span>
-        )}
+        ); })()}
       </td>
       <td className="py-4 px-6 text-right">
       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -243,16 +258,13 @@ export default function MentorPeserta() {
       <button onClick={() => handleOpenEditModal(student)} className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer" title="Edit Data">
       <span className="material-symbols-outlined text-[20px]">edit</span>
       </button>
-      <button onClick={() => handleDeleteOne(student.id, student.name)} className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer" title="Hapus">
-      <span className="material-symbols-outlined text-[20px]">delete</span>
-      </button>
       </div>
       </td>
       </tr>
     ))
   ) : (
     <tr>
-      <td colSpan="6" className="text-center py-8 text-on-surface-variant">Tidak ada data anggota gugus.</td>
+      <td colSpan="5" className="text-center py-8 text-on-surface-variant">Tidak ada data anggota gugus.</td>
     </tr>
   )}
 </tbody>
@@ -284,15 +296,8 @@ export default function MentorPeserta() {
             <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="email" placeholder="mahasiswa@student.univ.ac.id" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
           </div>
           <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">Fakultas</label>
-            <select className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary cursor-pointer font-body-md" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})}>
-              <option value="Fakultas Teknik">Fakultas Teknik</option>
-              <option value="Fakultas Ekonomi">Fakultas Ekonomi</option>
-              <option value="Fakultas Hukum">Fakultas Hukum</option>
-              <option value="Fakultas Kedokteran">Fakultas Kedokteran</option>
-              <option value="Fakultas Ilmu Komputer">Fakultas Ilmu Komputer</option>
-              <option value="Fakultas ISIP">Fakultas ISIP</option>
-            </select>
+            <label className="block text-label-md font-label-md text-on-surface mb-1">Jurusan</label>
+            <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="Cth: Teknik Informatika" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
           </div>
         </div>
         <div className="p-6 bg-surface-container-low flex justify-end gap-3 border-t border-outline-variant/30">
@@ -327,23 +332,15 @@ export default function MentorPeserta() {
             <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
           </div>
           <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">Fakultas</label>
-            <select className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary cursor-pointer font-body-md" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})}>
-              <option value="Fakultas Teknik">Fakultas Teknik</option>
-              <option value="Fakultas Ekonomi">Fakultas Ekonomi</option>
-              <option value="Fakultas Hukum">Fakultas Hukum</option>
-              <option value="Fakultas Kedokteran">Fakultas Kedokteran</option>
-              <option value="Fakultas Ilmu Komputer">Fakultas Ilmu Komputer</option>
-              <option value="Fakultas ISIP">Fakultas ISIP</option>
-            </select>
+            <label className="block text-label-md font-label-md text-on-surface mb-1">Jurusan</label>
+            <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="Cth: Teknik Informatika" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
           </div>
           <div>
             <label className="block text-label-md font-label-md text-on-surface mb-1">Status Kehadiran</label>
             <select className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary cursor-pointer font-body-md" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
-              <option value="Hadir">Hadir</option>
-              <option value="Belum Hadir">Belum Hadir</option>
-              <option value="Izin">Izin</option>
-              <option value="Alpa">Alpa</option>
+              {STATUS_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -363,11 +360,15 @@ export default function MentorPeserta() {
     <div className="relative w-full max-w-sm bg-surface-container-lowest shadow-2xl rounded-[24px] overflow-hidden flex flex-col z-10 p-6 items-center text-center">
       <h3 className="text-headline-sm font-headline-md text-on-surface mb-4 self-start">QR Code</h3>
       <div className="w-48 h-48 bg-white rounded-xl p-3 border border-outline-variant/30 flex items-center justify-center shadow-inner mb-6">
-        <div className="w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTAgMGgxMDB2MTAwSDB6bTIwMCAwaDEwMHYxMDBIMjAwek0wIDIwMGgxMDB2MTAwSDB6IiBmaWxsPSIjMTAxMTE1Ii8+PC9zdmc+')] bg-contain bg-center bg-no-repeat opacity-80"></div>
+        <img 
+          src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrStudent.id)}`} 
+          alt={`QR Code NIM: ${qrStudent.id}`}
+          className="w-full h-full object-contain"
+        />
       </div>
       <p className="text-body-sm text-on-surface-variant font-mono mb-6">{qrStudent.name} • NIM: {qrStudent.id}</p>
       <div className="flex gap-3 w-full">
-        <button onClick={() => alert("Mengunduh QR Code...")} className="flex-1 bg-surface-container hover:bg-surface-container-high text-on-surface py-2.5 rounded-xl text-label-md font-label-md transition-colors border border-outline-variant cursor-pointer">
+        <button onClick={() => handleDownloadQr(qrStudent)} className="flex-1 bg-surface-container hover:bg-surface-container-high text-on-surface py-2.5 rounded-xl text-label-md font-label-md transition-colors border border-outline-variant cursor-pointer">
           Unduh
         </button>
         <button onClick={() => setShowQrModal(false)} className="flex-1 bg-primary text-on-primary py-2.5 rounded-xl text-label-md font-label-md transition-colors shadow-md hover:bg-primary-fixed cursor-pointer">

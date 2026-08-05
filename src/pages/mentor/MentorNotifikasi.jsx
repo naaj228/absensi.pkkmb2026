@@ -1,43 +1,62 @@
-import { useContext, useState, useEffect } from 'react';
+import { useContext, useEffect } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function MentorNotifikasi() {
-  const { logs, claims, peserta, setMentorNotificationsCleared } = useContext(AppContext);
+  const { 
+    logs, 
+    claims, 
+    peserta, 
+    gugus, 
+    currentUser, 
+    setMentorNotificationsCleared,
+    dismissedNotifications,
+    dismissNotification,
+    dismissAllNotifications
+  } = useContext(AppContext);
   const navigate = useNavigate();
 
   useEffect(() => {
     setMentorNotificationsCleared(true);
   }, [setMentorNotificationsCleared]);
 
-  // Mentor's group is Gugus 12
-  const mentorGugusId = 'G-12-FT';
-  const mentorGugusName = 'Gugus 12';
+  // Get mentor's gugus from currentUser
+  const mentorGugusId = currentUser?.gugusId || '';
+  const mentorGugus = gugus.find(g => g.id === mentorGugusId);
+  const mentorGugusName = mentorGugus?.name || '';
 
-  const systemNotifications = [];
+  const notifications = [];
 
-  // 1. Scans in Gugus 12
+  // 1. Scans in mentor's gugus
   const groupLogs = logs.filter(l => l.gugusName === mentorGugusName);
   groupLogs.forEach(l => {
-    systemNotifications.push({
+    if (dismissedNotifications.includes(`log-${l.id}`)) return;
+    
+    const isRejection = l.scanner === 'Admin (Tolak Manual)';
+    
+    notifications.push({
       id: `log-${l.id}`,
       type: 'scan',
-      title: l.status === 'Valid' ? 'Kehadiran Terdaftar' : 'Pemberitahuan Scan',
-      message: `${l.name} (NIM: ${l.nim}) tercatat ${l.status === 'Valid' ? 'hadir' : 'tidak valid'} via ${l.scanner}`,
+      title: isRejection ? 'Pengajuan Absensi Ditolak' : (l.status === 'Valid' ? 'Kehadiran Terdaftar' : 'Pemberitahuan Scan'),
+      message: isRejection 
+        ? `Pengajuan absensi manual untuk ${l.name} (NIM: ${l.nim}) DITOLAK. Alasan: ${l.note || 'Berkas tidak lengkap.'}`
+        : `${l.name} (NIM: ${l.nim}) tercatat ${l.status === 'Valid' ? 'hadir' : 'tidak valid'} via ${l.scanner}`,
       time: `${l.date} ${l.timestamp}`,
-      icon: l.status === 'Valid' ? 'check_circle' : 'warning',
-      color: l.status === 'Valid' ? 'text-green-500 bg-green-50' : 'text-error bg-error-container/30',
-      actionLabel: 'Lihat Anggota',
-      action: () => navigate('/mentor/peserta'),
+      icon: isRejection ? 'cancel' : (l.status === 'Valid' ? 'check_circle' : 'warning'),
+      color: isRejection || l.status !== 'Valid' ? 'text-error bg-error-container/30' : 'text-green-500 bg-green-50',
+      actionLabel: isRejection ? 'Ajukan Kembali' : 'Lihat Anggota',
+      action: () => navigate(isRejection ? '/mentor/absensi-manual' : '/mentor/peserta'),
       originalData: l
     });
   });
 
-  // 2. Claims in Gugus 12
+  // 2. Claims in mentor's gugus
   const groupClaims = claims.filter(c => c.gugusName === mentorGugusName);
   groupClaims.forEach(c => {
-    systemNotifications.push({
-      id: `claim-${c.id}`,
+    const id = `claim-${c.id}`;
+    if (dismissedNotifications.includes(id)) return;
+    notifications.push({
+      id,
       type: 'claim',
       title: 'Status Klaim Manual',
       message: `Klaim absensi manual untuk ${c.name} (${c.nim}) sedang diverifikasi oleh admin.`,
@@ -50,15 +69,14 @@ export default function MentorNotifikasi() {
     });
   });
 
-  const [notifications, setNotifications] = useState(systemNotifications);
-
   const handleClearAll = () => {
-    setNotifications([]);
+    const currentIds = notifications.map(n => n.id);
+    dismissAllNotifications(currentIds);
     alert("Semua notifikasi telah dibersihkan.");
   };
 
   const handleRemove = (id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    dismissNotification(id);
   };
 
   return (
@@ -75,11 +93,11 @@ export default function MentorNotifikasi() {
         </div>
       </header>
 
-      <main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto">
+      <main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto">
         <div className="flex flex-col w-full relative space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-headline-lg font-headline-lg text-on-surface">Notifikasi Gugus 12</h2>
+              <h2 className="text-headline-lg font-headline-lg text-on-surface">Notifikasi {mentorGugusName}</h2>
               <p className="text-body-sm text-on-surface-variant mt-1">Aktivitas kehadiran dan scan terkini di kelompok Anda</p>
             </div>
             {notifications.length > 0 && (

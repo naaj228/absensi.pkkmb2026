@@ -1,37 +1,36 @@
 import { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
+import { isHadir } from '../../utils/statusHelper';
+import { STATUS } from '../../utils/statusHelper';
 
 export default function MentorDashboard() {
-  const { peserta, currentUser, hasMentorNotifications } = useContext(AppContext);
+  const { peserta, gugus, currentUser, hasMentorNotifications } = useContext(AppContext);
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
+  // Get gugus ID from the currently logged-in mentor
+  const mentorGugusId = currentUser?.gugusId || '';
+  const mentorGugus = gugus.find(g => g.id === mentorGugusId);
+  const mentorGugusName = mentorGugus?.name || 'Gugus Saya';
 
-  // Mentor Budi Santoso's group is Gugus 12 (G-12-FT)
-  const mentorGugusId = 'G-12-FT';
-
-  // Filter participants belonging to Gugus 12
+  // Filter participants belonging to mentor's group
   const gugusStudents = peserta.filter(p => p.gugusId === mentorGugusId);
 
   // Stats
   const totalStudents = gugusStudents.length;
-  const hadirCount = gugusStudents.filter(p => p.status === 'Hadir').length;
-  const belumHadirCount = gugusStudents.filter(p => p.status === 'Belum Hadir' || p.status === 'Alpa').length;
-  const pendingCount = gugusStudents.filter(p => p.status === 'Manual (Pending)').length;
-
-  // Filter by search keyword
-  const filteredStudents = gugusStudents.filter(student => {
-    const term = searchTerm.toLowerCase();
-    return student.name.toLowerCase().includes(term) || student.id.includes(term);
-  });
+  const hadirCount = gugusStudents.filter(p => isHadir(p.status)).length;
+  const hadirPenuhCount = gugusStudents.filter(p => p.status === STATUS.HADIR_PENUH).length;
+  const hadirSebagianCount = gugusStudents.filter(p => p.status === STATUS.HADIR_SEBAGIAN).length;
+  const izinCount = gugusStudents.filter(p => p.status === STATUS.IZIN).length;
+  const alphaCount = gugusStudents.filter(p => p.status === STATUS.ALPHA || !p.status).length;
+  const pendingCount = gugusStudents.filter(p => p.status === STATUS.PENDING).length;
 
   return (
-<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Dashboard</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/mentor/notifikasi')}>notifications</span>{hasMentorNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert(`Logged in as ${currentUser?.name || 'Mentor Budi'}`)}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profil</span></button></div></header><main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full gap-gutter">
+<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Dashboard</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/mentor/notifikasi')}>notifications</span>{hasMentorNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert(`Logged in as ${currentUser?.name || 'Mentor'}`)}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profil</span></button></div></header><main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full gap-gutter">
 {/* Header / Welcome */}
 <div className="relative w-full rounded-2xl bg-primary-container overflow-hidden p-8 flex items-center justify-between shadow-lg">
 <div className="relative z-10 flex flex-col gap-2 max-w-2xl">
-<h2 className="font-headline-lg text-headline-lg text-on-primary">Dashboard Gugus 12</h2>
-<p className="font-body-lg text-body-lg text-secondary-fixed-dim">Halo, {currentUser?.name || 'Mentor Budi'}.</p>
+<h2 className="font-headline-lg text-headline-lg text-on-primary">Dashboard {mentorGugusName}</h2>
+<p className="font-body-lg text-body-lg text-secondary-fixed-dim">Halo, {currentUser?.name || 'Mentor'}.</p>
 </div>
 {/* Abstract Decoration */}
 <div className="absolute inset-0 pointer-events-none opacity-20 overflow-hidden">
@@ -69,16 +68,16 @@ export default function MentorDashboard() {
 </div>
 <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-secondary-fixed/40 rounded-full blur-2xl group-hover:bg-secondary-fixed/60 transition-colors"></div>
 </div>
-{/* Stat 3: Belum Hadir */}
+{/* Stat 3: Alpha */}
 <div className="bg-surface-container-lowest rounded-2xl p-6 flex flex-col gap-4 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
 <div className="flex justify-between items-start z-10">
 <div className="w-12 h-12 rounded-xl bg-error-container/50 flex items-center justify-center text-error">
-<span className="material-symbols-outlined text-[24px]">pending_actions</span>
+<span className="material-symbols-outlined text-[24px]">cancel</span>
 </div>
 </div>
 <div className="z-10 mt-2">
-<p className="font-display-lg text-display-lg text-on-surface">{belumHadirCount}</p>
-<p className="font-label-md text-label-md text-on-surface-variant mt-1 uppercase tracking-wider">Belum Hadir</p>
+<p className="font-display-lg text-display-lg text-on-surface">{alphaCount}</p>
+<p className="font-label-md text-label-md text-on-surface-variant mt-1 uppercase tracking-wider">Alpha</p>
 </div>
 <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-error-container/40 rounded-full blur-2xl group-hover:bg-error-container/60 transition-colors"></div>
 </div>
@@ -127,88 +126,7 @@ export default function MentorDashboard() {
 </div>
 </button>
 </div>
-{/* Quick List: Peserta */}
-<div className="bg-surface-container-lowest rounded-2xl shadow-sm overflow-hidden flex flex-col mt-4">
-<div className="p-6 bg-surface-container-lowest border-b border-surface-variant flex items-center justify-between">
-<div>
-<h3 className="font-headline-sm text-headline-sm text-on-surface">Anggota Gugus 12</h3>
-</div>
-{/* Search/Filter */}
-<div className="flex items-center gap-3">
-<div className="relative">
-<span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
-<input className="pl-10 pr-4 py-2 bg-surface-container-low rounded-xl font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 w-64 transition-all" placeholder="Cari..." type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-</div>
-</div>
-</div>
-<div className="overflow-x-auto">
-<table className="w-full text-left border-collapse">
-<thead>
-<tr className="bg-[#F8F9FC]">
-<th className="py-4 px-6 font-label-md text-label-md text-on-primary-container">NAMA PESERTA</th>
-<th className="py-4 px-6 font-label-md text-label-md text-on-primary-container">NIM</th>
-<th className="py-4 px-6 font-label-md text-label-md text-on-primary-container">STATUS</th>
-<th className="py-4 px-6 font-label-md text-label-md text-on-primary-container text-right">AKSI</th>
-</tr>
-</thead>
-<tbody>
-  {filteredStudents.length > 0 ? (
-    filteredStudents.map((student) => (
-      <tr key={student.id} className="border-b border-surface-variant hover:bg-surface-container-low/50 transition-colors group">
-      <td className="py-4 px-6">
-      <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-label-md text-primary">
-        {student.name.substring(0, 2).toUpperCase()}
-      </div>
-      <div>
-      <p className="font-body-md text-body-md font-medium text-on-surface">{student.name}</p>
-      <p className="font-body-sm text-body-sm text-on-surface-variant">{student.fakultas}</p>
-      </div>
-      </div>
-      </td>
-      <td className="py-4 px-6 font-body-md text-body-md text-on-surface-variant">{student.id}</td>
-      <td className="py-4 px-6">
-        {student.status === 'Hadir' ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#E6F4EA] text-[#137333] rounded-full font-label-sm text-label-sm">
-            <span className="w-2 h-2 rounded-full bg-[#137333]"></span> Hadir
-          </span>
-        ) : student.status === 'Manual (Pending)' ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FEF3C7] text-[#92400E] rounded-full font-label-sm text-label-sm">
-            <span className="w-2 h-2 rounded-full bg-[#D97706]"></span> Manual (Tertunda)
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-error-container text-on-error-container rounded-full font-label-sm text-label-sm">
-            <span className="w-2 h-2 rounded-full bg-error"></span> Belum Hadir
-          </span>
-        )}
-      </td>
-      <td className="py-4 px-6 text-right">
-        {student.status === 'Hadir' ? (
-          <button className="px-4 py-2 bg-surface-container rounded-lg font-label-sm text-label-sm text-on-surface-variant/50 transition-colors" disabled>
-            Terpindai
-          </button>
-        ) : student.status === 'Manual (Pending)' ? (
-          <button onClick={() => alert("Klaim manual sedang diverifikasi oleh admin.")} className="px-4 py-2 bg-surface-container-highest text-on-surface rounded-lg font-label-sm text-label-sm hover:bg-surface-variant transition-colors border border-outline-variant cursor-pointer">
-            Tinjau
-          </button>
-        ) : (
-          <button onClick={() => navigate('/mentor/scanner-qr')} className="px-4 py-2 bg-[#142C8E] text-white rounded-lg font-label-sm text-label-sm hover:bg-primary transition-colors flex items-center gap-2 ml-auto cursor-pointer">
-            <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
-            Scan Sekarang
-          </button>
-        )}
-      </td>
-      </tr>
-    ))
-  ) : (
-    <tr>
-      <td colSpan="4" className="text-center py-8 text-on-surface-variant">Tidak ada peserta.</td>
-    </tr>
-  )}
-</tbody>
-</table>
-</div>
-</div>
+
 <style>{`
     @keyframes scan {
       0% { top: 0%; }

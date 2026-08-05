@@ -164,3 +164,21 @@
   transform: translateX(-50%) translateY(0);
   opacity: 1;
 }
+
+/* Mobile responsive layout overrides */
+@media (max-width: 1023px) {
+  header.fixed.left-\[280px\] {
+    left: 0 !important;
+    padding-left: 72px !important; /* Space for hamburger button */
+    padding-right: 16px !important;
+  }
+  
+  header.fixed.left-\[280px\] h1 {
+    font-size: 16px !important;
+  }
+
+  main.px-margin-desktop {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}
