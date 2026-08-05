@@ -185,58 +185,81 @@ export default function MentorAbsensiManual() {
   {/* Body */}
   <form onSubmit={handleModalSubmit}>
   <div className="p-8 flex flex-col gap-6 bg-surface-container-lowest">
-  <div>
-  <label className="text-label-md font-label-md text-on-surface block mb-3">Pilih Alasan Kendala</label>
-  <div className="grid grid-cols-1 gap-3">
-  {/* Option 1 */}
-  <label className="flex items-center justify-between p-4 bg-surface-container rounded-xl cursor-pointer hover:bg-surface-container-high transition-colors group">
-  <div className="flex items-center gap-4">
-  <div className="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
-  <span className="material-symbols-outlined">no_photography</span>
-  </div>
-  <span className="text-body-md font-body-md text-on-surface">Kamera / Scanner Rusak</span>
-  </div>
-  <input checked={reason === 'kamera'} onChange={() => setReason('kamera')} className="w-5 h-5 accent-primary cursor-pointer" name="reason" type="radio" value="kamera" />
-  </label>
-  {/* Option 2 */}
-  <label className="flex items-center justify-between p-4 bg-surface-container rounded-xl cursor-pointer hover:bg-surface-container-high transition-colors group">
-  <div className="flex items-center gap-4">
-  <div className="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
-  <span className="material-symbols-outlined">wifi_off</span>
-  </div>
-  <span className="text-body-md font-body-md text-on-surface">Jaringan Tidak Stabil</span>
-  </div>
-  <input checked={reason === 'jaringan'} onChange={() => setReason('jaringan')} className="w-5 h-5 accent-primary cursor-pointer" name="reason" type="radio" value="jaringan" />
-  </label>
-  {/* Option 3 */}
-  <label className="flex items-center justify-between p-4 bg-surface-container rounded-xl cursor-pointer hover:bg-surface-container-high transition-colors group">
-  <div className="flex items-center gap-4">
-  <div className="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
-  <span className="material-symbols-outlined">qr_code_2</span>
-  </div>
-  <span className="text-body-md font-body-md text-on-surface">QR Code Tidak Terbaca</span>
-  </div>
-  <input checked={reason === 'qr_error'} onChange={() => setReason('qr_error')} className="w-5 h-5 accent-primary cursor-pointer" name="reason" type="radio" value="qr_error" />
-  </label>
-  </div>
-  </div>
-  <div className="flex flex-col gap-2">
-  <label className="text-label-md font-label-md text-on-surface">Status yang Diajukan</label>
-  <div className="grid grid-cols-1 gap-2">
-    {CLAIM_STATUS_OPTIONS.map(opt => (
-      <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border-2 transition-all ${
-        requestedStatus === opt.value ? 'border-primary bg-primary/5' : 'border-outline-variant bg-surface-container hover:bg-surface-container-high'
-      }`}>
-        <input type="radio" name="reqStatus" value={opt.value} checked={requestedStatus === opt.value} onChange={() => setRequestedStatus(opt.value)} className="accent-primary" />
-        <span className="text-body-md text-on-surface">{opt.label}</span>
-      </label>
-    ))}
-  </div>
-  </div>
-  <div className="flex flex-col gap-2">
-  <label className="text-label-md font-label-md text-on-surface">Catatan Tambahan (Opsional)</label>
-  <input className="w-full bg-surface-container text-on-surface text-body-sm font-body-sm p-4 rounded-xl focus:outline-none focus:bg-surface-container-high transition-colors" placeholder="Tuliskan detail jika diperlukan..." type="text" value={note} onChange={(e) => setNote(e.target.value)} />
-  </div>
+    {/* Section 1: Pilih Alasan Kendala */}
+    <div className="flex flex-col gap-3">
+      <label className="text-label-md font-label-md text-on-surface">Pilih Alasan Kendala</label>
+      <div className="grid grid-cols-3 gap-3">
+        {/* Option 1 */}
+        <label className={`flex flex-col items-center gap-2 p-3 rounded-xl cursor-pointer border-2 transition-all text-center group ${
+          reason === 'kamera' ? 'border-primary bg-primary/5' : 'border-outline-variant/30 bg-surface-container hover:bg-surface-container-high'
+        }`} onClick={() => setReason('kamera')}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+            reason === 'kamera' ? 'bg-primary/10 text-primary' : 'bg-surface-container-highest text-on-surface-variant group-hover:text-primary'
+          }`}>
+            <span className="material-symbols-outlined">no_photography</span>
+          </div>
+          <span className="text-label-sm font-label-sm text-on-surface leading-tight">Kamera Rusak</span>
+          <input checked={reason === 'kamera'} onChange={() => setReason('kamera')} className="sr-only" name="reason" type="radio" value="kamera" />
+        </label>
+        {/* Option 2 */}
+        <label className={`flex flex-col items-center gap-2 p-3 rounded-xl cursor-pointer border-2 transition-all text-center group ${
+          reason === 'jaringan' ? 'border-primary bg-primary/5' : 'border-outline-variant/30 bg-surface-container hover:bg-surface-container-high'
+        }`} onClick={() => setReason('jaringan')}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+            reason === 'jaringan' ? 'bg-primary/10 text-primary' : 'bg-surface-container-highest text-on-surface-variant group-hover:text-primary'
+          }`}>
+            <span className="material-symbols-outlined">wifi_off</span>
+          </div>
+          <span className="text-label-sm font-label-sm text-on-surface leading-tight">Jaringan Lambat</span>
+          <input checked={reason === 'jaringan'} onChange={() => setReason('jaringan')} className="sr-only" name="reason" type="radio" value="jaringan" />
+        </label>
+        {/* Option 3 */}
+        <label className={`flex flex-col items-center gap-2 p-3 rounded-xl cursor-pointer border-2 transition-all text-center group ${
+          reason === 'qr_error' ? 'border-primary bg-primary/5' : 'border-outline-variant/30 bg-surface-container hover:bg-surface-container-high'
+        }`} onClick={() => setReason('qr_error')}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+            reason === 'qr_error' ? 'bg-primary/10 text-primary' : 'bg-surface-container-highest text-on-surface-variant group-hover:text-primary'
+          }`}>
+            <span className="material-symbols-outlined">qr_code_2</span>
+          </div>
+          <span className="text-label-sm font-label-sm text-on-surface leading-tight">QR Tak Terbaca</span>
+          <input checked={reason === 'qr_error'} onChange={() => setReason('qr_error')} className="sr-only" name="reason" type="radio" value="qr_error" />
+        </label>
+      </div>
+    </div>
+
+    {/* Section 2: Status yang Diajukan */}
+    <div className="flex flex-col gap-3">
+      <label className="text-label-md font-label-md text-on-surface">Status yang Diajukan</label>
+      <div className="grid grid-cols-3 gap-3">
+        {CLAIM_STATUS_OPTIONS.map(opt => {
+          const isSelected = requestedStatus === opt.value;
+          const icon = opt.value === 'Hadir Penuh' ? 'task_alt' : opt.value === 'Hadir Sebagian' ? 'brightness_half' : 'description';
+          const label = opt.value === 'Hadir Penuh' ? 'Hadir Penuh' : opt.value === 'Hadir Sebagian' ? 'Sebagian' : 'Izin';
+          return (
+            <label key={opt.value} className={`flex flex-col items-center gap-2 p-3 rounded-xl cursor-pointer border-2 transition-all text-center group ${
+              isSelected ? 'border-primary bg-primary/5' : 'border-outline-variant/30 bg-surface-container hover:bg-surface-container-high'
+            }`} onClick={() => setRequestedStatus(opt.value)}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                isSelected ? 'bg-primary/10 text-primary' : 'bg-surface-container-highest text-on-surface-variant group-hover:text-primary'
+              }`}>
+                <span className="material-symbols-outlined">{icon}</span>
+              </div>
+              <span className="text-label-sm font-label-sm text-on-surface leading-tight">
+                {label}
+              </span>
+              <input type="radio" name="reqStatus" value={opt.value} checked={isSelected} onChange={() => setRequestedStatus(opt.value)} className="sr-only" />
+            </label>
+          );
+        })}
+      </div>
+    </div>
+
+    {/* Section 3: Catatan Tambahan (Opsional) */}
+    <div className="flex flex-col gap-3">
+      <label className="text-label-md font-label-md text-on-surface">Catatan Tambahan (Opsional)</label>
+      <input className="w-full bg-surface-container text-on-surface text-body-sm font-body-sm p-4 rounded-xl focus:outline-none focus:bg-surface-container-high transition-colors" placeholder="Tuliskan detail jika diperlukan..." type="text" value={note} onChange={(e) => setNote(e.target.value)} />
+    </div>
   </div>
   {/* Footer */}
   <div className="p-6 bg-surface-container-low flex justify-end gap-3 rounded-b-[24px]">

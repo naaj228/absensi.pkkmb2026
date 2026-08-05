@@ -343,10 +343,10 @@ export default function AdminRiwayat() {
           </button>
           <button 
             onClick={() => {
-              if (window.confirm(`Hapus log absensi untuk ${log.name} (${log.nim})?`)) {
+              window.confirmAction(`Hapus log absensi untuk ${log.name} (${log.nim})?`, () => {
                 deleteLog(log.id);
                 alert("Log absensi berhasil dihapus.");
-              }
+              });
             }}
             className="p-1.5 text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
             title="Hapus Log Absensi"
