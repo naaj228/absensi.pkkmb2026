@@ -11,6 +11,7 @@ export default function AdminPeserta() {
   // Filter & Search states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGugus, setSelectedGugus] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
 
   // Selection states
   const [selectedIds, setSelectedIds] = useState([]);
@@ -40,7 +41,8 @@ export default function AdminPeserta() {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.id.includes(searchTerm);
     const matchesGugus = selectedGugus === '' || student.gugusId === selectedGugus;
-    return matchesSearch && matchesGugus;
+    const matchesStatus = selectedStatus === '' || student.status === selectedStatus;
+    return matchesSearch && matchesGugus && matchesStatus;
   });
 
   // Pagination calculation
@@ -248,21 +250,13 @@ export default function AdminPeserta() {
     return g ? g.name : '-';
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Hadir': return 'bg-[#ecfdf5] text-[#059669]';
-      case 'Alpa': return 'bg-[#fef2f2] text-[#dc2626]';
-      case 'Izin': return 'bg-[#fffbeb] text-[#d97706]';
-      case 'Manual (Pending)': return 'bg-surface-variant text-on-surface-variant';
-      default: return 'bg-surface-container-highest text-on-surface-variant';
-    }
-  };
+
 
   const totalHadir = peserta.filter(p => isHadir(p.status)).length;
   const persentaseKehadiran = peserta.length > 0 ? ((totalHadir / peserta.length) * 100).toFixed(1) : '0';
 
   return (
-    <div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Peserta</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile admin")}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profile</span></button></div></header><main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full space-y-gutter relative">
+    <div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Peserta</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div></div></header><main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full space-y-gutter relative">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter mt-2">
         <div className="bg-surface-container rounded-xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
           <div className="absolute -right-4 -top-4 w-32 h-32 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
@@ -324,12 +318,12 @@ export default function AdminPeserta() {
               </button>
             )}
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
-              <input className="w-full sm:w-64 pl-10 pr-4 py-2.5 bg-surface rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-on-surface-variant border border-outline-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" placeholder="Cari Nama atau NIM..." type="text" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
+              <input className="w-full sm:w-56 pl-10 pr-4 py-2.5 bg-surface rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-on-surface-variant border border-outline-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" placeholder="Cari Nama atau NIM..." type="text" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
             </div>
-            <div className="relative group">
+            <div className="relative">
               <select className="w-full sm:w-40 appearance-none pl-4 pr-10 py-2.5 bg-surface rounded-lg text-body-sm font-body-sm text-on-surface border border-outline-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors cursor-pointer" value={selectedGugus} onChange={(e) => { setSelectedGugus(e.target.value); setCurrentPage(1); }}>
                 <option value="">Semua Gugus</option>
                 {gugus.map(g => (
@@ -338,9 +332,24 @@ export default function AdminPeserta() {
               </select>
               <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[20px]">expand_more</span>
             </div>
-            <button className="bg-surface border border-outline-variant text-on-surface p-2.5 rounded-lg hover:bg-surface-variant transition-colors flex items-center justify-center group" title="Hapus Filter" onClick={() => { setSearchTerm(''); setSelectedGugus(''); }}>
-              <span className="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">tune</span>
-            </button>
+            <div className="relative">
+              <select className="w-full sm:w-44 appearance-none pl-4 pr-10 py-2.5 bg-surface rounded-lg text-body-sm font-body-sm text-on-surface border border-outline-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors cursor-pointer" value={selectedStatus} onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}>
+                <option value="">Semua Status</option>
+                <option value="Hadir Penuh">✅ Hadir Penuh</option>
+                <option value="Hadir Sebagian">🟡 Hadir Sebagian</option>
+                <option value="Izin">📄 Izin</option>
+                <option value="Manual (Pending)">⏳ Pending</option>
+                <option value="Manual (Ditolak)">❌ Ditolak</option>
+                <option value="Alpha">🚫 Alpha</option>
+              </select>
+              <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[20px]">expand_more</span>
+            </div>
+            {(searchTerm || selectedGugus || selectedStatus) && (
+              <button className="bg-error/10 border border-error/20 text-error px-3 py-2.5 rounded-lg hover:bg-error/20 transition-colors flex items-center gap-1.5 text-label-sm font-label-sm cursor-pointer" title="Reset Semua Filter" onClick={() => { setSearchTerm(''); setSelectedGugus(''); setSelectedStatus(''); setCurrentPage(1); }}>
+                <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+                Reset
+              </button>
+            )}
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -385,10 +394,12 @@ export default function AdminPeserta() {
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label-sm font-label-md font-medium ${getStatusColor(student.status)}`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                        {student.status}
-                      </span>
+                      {(() => { const b = getStatusBadge(student.status); return (
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label-sm font-medium ${b.bg} ${b.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span>
+                          {b.label}
+                        </span>
+                      ); })()}
                     </td>
                     <td className="py-4 px-6 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

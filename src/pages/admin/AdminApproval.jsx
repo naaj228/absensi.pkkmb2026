@@ -3,22 +3,25 @@ import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminApproval() {
-  const { claims, gugus, approveClaim, rejectClaim, hasAdminNotifications } = useContext(AppContext);
+  const { claims, gugus, peserta, approveClaim, rejectClaim, hasAdminNotifications } = useContext(AppContext);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGugus, setSelectedGugus] = useState('all');
 
   const handleApprove = (id, name) => {
     approveClaim(id);
-    alert(`Klaim absensi ${name} telah DISETUJUI.`);
+    alert(`Pengajuan ${name} telah DISETUJUI.`);
   };
 
   const handleReject = (id, name) => {
-    const reason = prompt(`Tolak klaim absensi dari ${name}?\nMasukkan alasan penolakan:`, "Berkas pendukung kurang lengkap / kurang valid");
-    if (reason === null) return; // User cancelled prompt
-    
-    rejectClaim(id, reason || "Ditolak oleh Admin");
-    alert(`Klaim absensi ${name} telah DITOLAK.`);
+    window.promptAction(
+      `Tolak pengajuan dari ${name}?`,
+      "Berkas pendukung kurang lengkap / kurang valid",
+      (reason) => {
+        rejectClaim(id, reason || "Ditolak oleh Admin");
+        alert(`Pengajuan ${name} telah DITOLAK.`);
+      }
+    );
   };
 
   const filteredClaims = claims.filter(c => {
@@ -32,7 +35,7 @@ export default function AdminApproval() {
   const activeGugusWithClaims = Array.from(new Set(claims.map(c => c.gugusName))).filter(Boolean);
 
   return (
-<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Persetujuan Klaim</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile admin")}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profil</span></button></div></header><main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full gap-gutter relative">
+<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Persetujuan Klaim</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div></div></header><main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-5xl mx-auto"><div className="flex flex-col w-full gap-gutter relative">
 <div className="absolute top-0 right-0 -mt-16 w-[600px] h-[600px] bg-secondary-fixed-dim/20 rounded-full blur-[100px] pointer-events-none mix-blend-screen"></div>
 <div className="flex items-end justify-between w-full relative z-10 mb-unit">
 <div className="flex flex-col max-w-2xl gap-unit">
@@ -62,7 +65,7 @@ export default function AdminApproval() {
 <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
 <button onClick={() => setSelectedGugus('all')} className={`font-label-md text-label-md px-4 py-2 rounded-lg whitespace-nowrap transition-transform ${
   selectedGugus === 'all' ? 'bg-primary text-on-primary shadow-md hover:scale-105' : 'bg-surface text-on-surface shadow-sm hover:bg-surface-dim'
-}`}>Semua</button>
+ }`}>Semua</button>
 {activeGugusWithClaims.map(gName => (
   <button 
     key={gName} 
@@ -76,67 +79,118 @@ export default function AdminApproval() {
 ))}
 </div>
 </div>
-<div className="w-full overflow-x-auto">
-<table className="w-full text-left whitespace-nowrap">
+<div className="w-full overflow-x-auto lg:overflow-visible">
+<table className="w-full text-left table-auto">
 <thead className="bg-surface-container-highest">
 <tr>
-<th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Peserta</th>
-<th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">NIM</th>
-<th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Gugus</th>
-<th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Kendala</th>
-<th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Status Diajukan</th>
-<th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Waktu</th>
-<th className="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-right">Aksi</th>
+<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Peserta</th>
+<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">NIM</th>
+<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Gugus</th>
+<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Kendala / Tipe</th>
+<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Status / Aksi</th>
+<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Waktu</th>
+<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider text-right">Aksi</th>
 </tr>
 </thead>
 <tbody className="bg-surface-container" id="approvalTableBody">
   {filteredClaims.length > 0 ? (
-    filteredClaims.map((c) => (
-      <tr key={c.id} className="group hover:bg-surface-container-high transition-colors approval-row">
-      <td className="px-6 py-5">
-      <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-full bg-secondary text-on-secondary flex items-center justify-center font-bold text-headline-sm shadow-sm relative">
-          {c.name.substring(0, 2).toUpperCase()}
-          <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-error rounded-full border-2 border-surface-container"></span>
-      </div>
-      <div className="flex flex-col">
-      <span className="font-headline-sm text-body-md text-on-surface">{c.name}</span>
-      <span className="font-body-sm text-body-sm text-on-surface-variant">{c.fakultas}</span>
-      </div>
-      </div>
-      </td>
-      <td className="px-6 py-5 font-body-md text-body-md text-on-surface">{c.nim}</td>
-      <td className="px-6 py-5">
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-label-sm font-label-sm bg-tertiary-container text-on-tertiary-container">
-                                      {c.gugusName}
-                                  </span>
-      </td>
-      <td className="px-6 py-5">
-      <div className="flex items-center gap-2 text-error">
-      <span className="material-symbols-outlined text-[18px]">warning</span>
-      <span className="font-body-sm text-body-sm">{c.issue}</span>
-      </div>
-      </td>
-      <td className="px-6 py-5">
-      {(() => {
-        const s = c.requestedStatus || 'Hadir Penuh';
-        const colors = s === 'Hadir Penuh' ? 'bg-green-500/15 text-green-700' : s === 'Hadir Sebagian' ? 'bg-amber-500/15 text-amber-700' : 'bg-blue-500/15 text-blue-700';
-        return <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-label-sm font-label-sm ${colors}`}>{s}</span>;
-      })()}
-      </td>
-      <td className="px-6 py-5 font-body-sm text-body-sm text-on-surface-variant">{c.time}</td>
-      <td className="px-6 py-5 text-right">
-      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-      <button onClick={() => handleReject(c.id, c.name)} className="action-btn reject-btn w-10 h-10 rounded-lg bg-surface text-error hover:bg-error-container hover:text-on-error-container shadow-sm flex items-center justify-center transition-colors cursor-pointer" title="Tolak">
-      <span className="material-symbols-outlined text-[20px]">close</span>
-      </button>
-      <button onClick={() => handleApprove(c.id, c.name)} className="action-btn approve-btn w-10 h-10 rounded-lg bg-primary text-on-primary shadow-sm hover:scale-105 flex items-center justify-center transition-all cursor-pointer" title="Setujui">
-      <span className="material-symbols-outlined text-[20px]">check</span>
-      </button>
-      </div>
-      </td>
-      </tr>
-    ))
+    filteredClaims.map((c) => {
+      let detailsText = '';
+      if (c.issue === 'Edit Peserta' && c.catatan) {
+        try {
+          const updated = JSON.parse(c.catatan);
+          const original = peserta.find(p => p.id === c.nim);
+          if (original) {
+            const changes = [];
+            if (original.name !== updated.name) changes.push(`Nama: ${original.name} ➔ ${updated.name}`);
+            if (original.email !== updated.email) changes.push(`Email: ${original.email || '-'} ➔ ${updated.email || '-'}`);
+            if (original.fakultas !== updated.fakultas) changes.push(`Jurusan: ${original.fakultas || '-'} ➔ ${updated.fakultas || '-'}`);
+            if (original.status !== updated.status) changes.push(`Status: ${original.status} ➔ ${updated.status}`);
+            detailsText = changes.join(', ');
+          } else {
+            detailsText = `Nama: ${updated.name}, Email: ${updated.email}`;
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      } else if (c.issue === 'Tambah Peserta' && c.catatan) {
+        try {
+          const data = JSON.parse(c.catatan);
+          detailsText = `Jurusan: ${data.fakultas || '-'} • Email: ${data.email || '-'}`;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      return (
+        <tr key={c.id} className="group hover:bg-surface-container-high transition-colors approval-row">
+        <td className="px-3 py-4">
+        <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-secondary text-on-secondary flex items-center justify-center font-bold text-headline-sm shadow-sm relative">
+            {c.name.substring(0, 2).toUpperCase()}
+            <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-error rounded-full border-2 border-surface-container"></span>
+        </div>
+        <div className="flex flex-col">
+        <span className="font-headline-sm text-body-md text-on-surface leading-snug">{c.name}</span>
+        {detailsText ? (
+          <span className="text-[10px] text-primary font-medium mt-0.5 bg-primary/5 px-2 py-0.5 rounded w-max whitespace-normal max-w-[220px] leading-tight">{detailsText}</span>
+        ) : (
+          <span className="font-body-sm text-body-sm text-on-surface-variant leading-none">{c.fakultas}</span>
+        )}
+        </div>
+        </div>
+        </td>
+        <td className="px-3 py-4 font-body-md text-body-md text-on-surface">{c.nim}</td>
+        <td className="px-3 py-4">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-tertiary-container text-on-tertiary-container">
+                                        {c.gugusName}
+                                    </span>
+        </td>
+        <td className="px-3 py-4">
+        {c.issue === 'Tambah Peserta' ? (
+          <div className="flex items-center gap-1.5 text-primary font-semibold">
+            <span className="material-symbols-outlined text-[16px]">person_add</span>
+            <span className="font-body-sm text-body-sm">Tambah Peserta</span>
+          </div>
+        ) : c.issue === 'Edit Peserta' ? (
+          <div className="flex items-center gap-1.5 text-secondary font-semibold">
+            <span className="material-symbols-outlined text-[16px]">edit_note</span>
+            <span className="font-body-sm text-body-sm">Ubah Profil</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-error">
+            <span className="material-symbols-outlined text-[16px]">warning</span>
+            <span className="font-body-sm text-body-sm">{c.issue}</span>
+          </div>
+        )}
+        </td>
+        <td className="px-3 py-4">
+        {c.issue === 'Tambah Peserta' ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-primary/10 text-primary">Registrasi</span>
+        ) : c.issue === 'Edit Peserta' ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-secondary/10 text-secondary">Ubah Data</span>
+        ) : (
+          (() => {
+            const s = c.requestedStatus || 'Hadir Penuh';
+            const colors = s === 'Hadir Penuh' ? 'bg-green-500/15 text-green-700' : s === 'Hadir Sebagian' ? 'bg-amber-500/15 text-amber-700' : 'bg-blue-500/15 text-blue-700';
+            return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm ${colors}`}>{s}</span>;
+          })()
+        )}
+        </td>
+        <td className="px-3 py-4 font-body-sm text-body-sm text-on-surface-variant">{c.time}</td>
+        <td className="px-3 py-4 text-right">
+        <div className="flex justify-end gap-1.5">
+        <button onClick={() => handleReject(c.id, c.name)} className="action-btn reject-btn w-9 h-9 rounded-lg bg-surface text-error hover:bg-error-container hover:text-on-error-container shadow-sm flex items-center justify-center transition-colors cursor-pointer" title="Tolak">
+        <span className="material-symbols-outlined text-[18px]">close</span>
+        </button>
+        <button onClick={() => handleApprove(c.id, c.name)} className="action-btn approve-btn w-9 h-9 rounded-lg bg-primary text-on-primary shadow-sm hover:scale-105 flex items-center justify-center transition-all cursor-pointer" title="Setujui">
+        <span className="material-symbols-outlined text-[18px]">check</span>
+        </button>
+        </div>
+        </td>
+        </tr>
+      );
+    })
   ) : (
     <tr>
       <td colSpan="7" className="text-center py-10 text-on-surface-variant">Tidak ada klaim manual yang tertunda.</td>

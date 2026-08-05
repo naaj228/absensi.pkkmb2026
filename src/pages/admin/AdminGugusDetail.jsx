@@ -47,9 +47,9 @@ export default function AdminGugusDetail() {
 
   // Filtered participants
   const filteredStudents = gugusStudents.filter(student => {
-    return student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-           student.id.includes(searchTerm) ||
-           (student.fakultas && student.fakultas.toLowerCase().includes(searchTerm.toLowerCase()));
+    return student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.id.includes(searchTerm) ||
+      (student.fakultas && student.fakultas.toLowerCase().includes(searchTerm.toLowerCase()));
   });
 
   // Pagination calculation
@@ -58,11 +58,6 @@ export default function AdminGugusDetail() {
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredStudents.slice(indexOfFirstItem, indexOfLastItem);
-
-  const getStatusColor = (status) => {
-    const badge = getStatusBadge(status);
-    return `${badge.bg} ${badge.text}`;
-  };
 
   const handleDeleteOne = (studentId, studentName) => {
     window.confirmAction(`Hapus ${studentName} dari database?`, () => {
@@ -85,10 +80,7 @@ export default function AdminGugusDetail() {
             <span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>
             {hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}
           </div>
-          <button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile admin")}>
-            <span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span>
-            <span className="text-label-md text-on-surface">Profil</span>
-          </button>
+
         </div>
       </header>
 
@@ -110,11 +102,6 @@ export default function AdminGugusDetail() {
                   </span>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-3 relative z-10 self-center md:self-end">
-              <button onClick={() => navigate(`/admin/gugus`)} className="bg-surface border border-outline-variant hover:bg-surface-variant text-on-surface px-4 py-2.5 rounded-xl text-label-md font-label-md transition-colors flex items-center gap-2 cursor-pointer">
-                Kelola Gugus
-              </button>
             </div>
           </div>
 
@@ -144,7 +131,7 @@ export default function AdminGugusDetail() {
             <div className="bg-[#fef2f2] rounded-xl p-5 shadow-sm border border-[#fecaca]/30 flex items-center justify-between">
               <div>
                 <p className="text-label-sm text-[#dc2626] uppercase tracking-wider">Alpa</p>
-                <p className="text-headline-lg font-bold text-[#dc2626] mt-1">{totalAlpa}</p>
+                <p className="text-headline-lg font-bold text-[#dc2626] mt-1">{totalAlpha}</p>
               </div>
               <span className="material-symbols-outlined text-[32px] text-[#dc2626]/40">cancel</span>
             </div>
@@ -163,12 +150,12 @@ export default function AdminGugusDetail() {
               <h2 className="text-headline-sm font-headline-sm text-on-surface">Daftar Mahasiswa Gugus</h2>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
-                <input 
-                  className="w-full sm:w-64 pl-10 pr-4 py-2.5 bg-surface rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-on-surface-variant border border-outline-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" 
-                  placeholder="Cari Nama, NIM, Jurusan..." 
-                  type="text" 
-                  value={searchTerm} 
-                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} 
+                <input
+                  className="w-full sm:w-64 pl-10 pr-4 py-2.5 bg-surface rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-on-surface-variant border border-outline-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                  placeholder="Cari Nama, NIM, Jurusan..."
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 />
               </div>
             </div>
@@ -206,10 +193,14 @@ export default function AdminGugusDetail() {
                           <span className="text-body-sm text-on-surface">{student.fakultas || 'Belum Diisi'}</span>
                         </td>
                         <td className="py-4 px-6">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label-sm font-label-md font-medium ${getStatusColor(student.status)}`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                            {student.status}
-                          </span>
+                          {(() => {
+                            const b = getStatusBadge(student.status); return (
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label-sm font-medium ${b.bg} ${b.text}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span>
+                                {b.label}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="py-4 px-6 text-right">
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -239,9 +230,8 @@ export default function AdminGugusDetail() {
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
                 {Array.from({ length: totalPages }).map((_, i) => (
-                  <button key={i} onClick={() => setCurrentPage(i + 1)} className={`w-8 h-8 flex items-center justify-center rounded-md text-label-sm font-label-md transition-colors ${
-                    currentPage === i + 1 ? 'bg-primary text-on-primary' : 'hover:bg-surface-variant text-on-surface'
-                  }`}>{i + 1}</button>
+                  <button key={i} onClick={() => setCurrentPage(i + 1)} className={`w-8 h-8 flex items-center justify-center rounded-md text-label-sm font-label-md transition-colors ${currentPage === i + 1 ? 'bg-primary text-on-primary' : 'hover:bg-surface-variant text-on-surface'
+                    }`}>{i + 1}</button>
                 ))}
                 <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} className="p-1.5 text-on-surface-variant hover:bg-surface-variant rounded-md transition-colors disabled:opacity-50" disabled={currentPage === totalPages}>
                   <span className="material-symbols-outlined">chevron_right</span>

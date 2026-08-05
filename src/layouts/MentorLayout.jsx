@@ -7,6 +7,7 @@ const navItems = [
   { to: '/mentor/peserta', icon: 'groups', label: 'Anggota Gugus' },
   { to: '/mentor/scanner-qr', icon: 'qr_code_scanner', label: 'Scanner QR' },
   { to: '/mentor/absensi-manual', icon: 'person_add', label: 'Absensi Manual' },
+  { to: '/mentor/riwayat', icon: 'history', label: 'Riwayat Absensi' },
 ];
 
 export default function MentorLayout() {

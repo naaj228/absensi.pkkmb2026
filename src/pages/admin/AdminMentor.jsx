@@ -104,10 +104,7 @@ export default function AdminMentor() {
             <span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>
             {hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}
           </div>
-          <button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile Admin")}>
-            <span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span>
-            <span className="text-label-md text-on-surface">Profil</span>
-          </button>
+          
         </div>
       </header>
       

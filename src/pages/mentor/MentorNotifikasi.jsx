@@ -70,26 +70,59 @@ export default function MentorNotifikasi() {
   });
 
   const handleClearAll = () => {
-    const currentIds = notifications.map(n => n.id);
-    dismissAllNotifications(currentIds);
-    alert("Semua notifikasi telah dibersihkan.");
+    window.confirmAction("Apakah Anda yakin ingin membersihkan semua notifikasi?", () => {
+      const currentIds = notifications.map(n => n.id);
+      dismissAllNotifications(currentIds);
+      alert("Semua notifikasi telah dibersihkan.");
+    });
   };
 
   const handleRemove = (id) => {
-    dismissNotification(id);
+    window.confirmAction("Apakah Anda yakin ingin menghapus notifikasi ini?", () => {
+      dismissNotification(id);
+    });
   };
+
+  // Group notifications for hierarchical display
+  const approvalNotifs = notifications.filter(n => 
+    n.type === 'claim' || 
+    n.title === 'Pengajuan Absensi Ditolak' || 
+    (n.type === 'scan' && n.originalData && n.originalData.status !== 'Valid')
+  );
+  const successNotifs = notifications.filter(n => 
+    n.type === 'scan' && 
+    (!n.originalData || n.originalData.status === 'Valid') && 
+    n.title !== 'Pengajuan Absensi Ditolak'
+  );
+
+  const renderNotifItem = (n) => (
+    <div key={n.id} className="p-5 flex items-start gap-4 hover:bg-surface-container-lowest transition-colors group">
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${n.color}`}>
+        <span className="material-symbols-outlined text-[20px]">{n.icon}</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-4">
+          <h3 className="font-headline-sm text-body-md font-semibold text-on-surface leading-tight">{n.title}</h3>
+          <span className="text-label-sm text-on-surface-variant/70 shrink-0 font-mono">{n.time}</span>
+        </div>
+        <p className="text-body-sm text-on-surface-variant mt-1 leading-relaxed">{n.message}</p>
+        <div className="mt-3 flex items-center gap-3">
+          <button onClick={n.action} className="text-primary hover:underline text-label-sm font-label-md cursor-pointer">
+            {n.actionLabel}
+          </button>
+        </div>
+      </div>
+      <button onClick={() => handleRemove(n.id)} className="text-on-surface-variant/40 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-surface-variant shrink-0 cursor-pointer">
+        <span className="material-symbols-outlined text-[18px]">close</span>
+      </button>
+    </div>
+  );
 
   return (
     <div className="w-full">
       <header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
         <div className="flex items-center gap-4">
           <h1 className="text-headline-sm font-headline-md text-on-surface">Notifikasi Mentor</h1>
-        </div>
-        <div className="flex items-center gap-6">
-          <button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile mentor")}>
-            <span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span>
-            <span className="text-label-md text-on-surface">Profil</span>
-          </button>
         </div>
       </header>
 
@@ -108,34 +141,33 @@ export default function MentorNotifikasi() {
             )}
           </div>
 
-          <div className="bg-surface rounded-3xl border border-outline-variant/30 overflow-hidden shadow-sm">
-            {notifications.length > 0 ? (
-              <div className="divide-y divide-outline-variant/20">
-                {notifications.map((n) => (
-                  <div key={n.id} className="p-6 flex items-start gap-4 hover:bg-surface-container-lowest transition-colors group">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${n.color}`}>
-                      <span className="material-symbols-outlined text-[20px]">{n.icon}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4">
-                        <h3 className="font-headline-sm text-body-md font-semibold text-on-surface leading-tight">{n.title}</h3>
-                        <span className="text-label-sm text-on-surface-variant/70 shrink-0 font-mono">{n.time}</span>
-                      </div>
-                      <p className="text-body-sm text-on-surface-variant mt-1 leading-relaxed">{n.message}</p>
-                      <div className="mt-3 flex items-center gap-3">
-                        <button onClick={n.action} className="text-primary hover:underline text-label-sm font-label-md cursor-pointer">
-                          {n.actionLabel}
-                        </button>
-                      </div>
-                    </div>
-                    <button onClick={() => handleRemove(n.id)} className="text-on-surface-variant/40 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-surface-variant shrink-0 cursor-pointer">
-                      <span className="material-symbols-outlined text-[18px]">close</span>
-                    </button>
-                  </div>
-                ))}
+          <div className="space-y-6">
+            {approvalNotifs.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <h3 className="text-label-md font-bold text-primary px-2 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px]">assignment_late</span>
+                  Persetujuan & Kendala Absensi ({approvalNotifs.length})
+                </h3>
+                <div className="bg-surface rounded-2xl border border-outline-variant/30 overflow-hidden shadow-sm divide-y divide-outline-variant/20">
+                  {approvalNotifs.map(renderNotifItem)}
+                </div>
               </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center text-center py-20 text-on-surface-variant px-6">
+            )}
+
+            {successNotifs.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <h3 className="text-label-md font-bold text-green-600 px-2 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                  Kehadiran Berhasil Terdaftar ({successNotifs.length})
+                </h3>
+                <div className="bg-surface rounded-2xl border border-outline-variant/30 overflow-hidden shadow-sm divide-y divide-outline-variant/20">
+                  {successNotifs.map(renderNotifItem)}
+                </div>
+              </div>
+            )}
+
+            {notifications.length === 0 && (
+              <div className="bg-surface rounded-3xl border border-outline-variant/30 overflow-hidden shadow-sm flex flex-col items-center justify-center text-center py-20 text-on-surface-variant px-6">
                 <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center mb-4 text-on-surface-variant/40">
                   <span className="material-symbols-outlined text-[36px]">notifications_off</span>
                 </div>

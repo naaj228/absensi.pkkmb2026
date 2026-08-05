@@ -53,17 +53,33 @@ export default function AdminRiwayat() {
     }
 
     if (type === 'Excel') {
-      const data = filteredLogs.map(log => ({
-        'Tanggal': log.date,
-        'Waktu': log.timestamp,
-        'NIM': log.nim,
-        'Nama Peserta': log.name,
-        'Gugus': log.gugusName,
-        'Pemindai': log.scanner,
-        'Status': log.status
-      }));
+      const data = filteredLogs.map(log => {
+        const studentInfo = peserta.find(p => p.id === log.nim);
+        const jurusan = studentInfo ? studentInfo.fakultas : '-';
+        return {
+          'Timestamp': `${log.date} ${log.timestamp}`,
+          'NIM': log.nim,
+          'Nama Lengkap': log.name,
+          'Gugus': log.gugusName,
+          'Fakultas / Jurusan': jurusan,
+          'Pemindai (Mentor)': log.scanner,
+          'Status': log.status
+        };
+      });
 
       const worksheet = XLSX.utils.json_to_sheet(data);
+
+      // Set column widths to prevent truncation (similar to Google Sheets)
+      worksheet['!cols'] = [
+        { wch: 22 }, // Timestamp (YYYY-MM-DD HH:MM:SS)
+        { wch: 15 }, // NIM
+        { wch: 30 }, // Nama Lengkap
+        { wch: 15 }, // Gugus
+        { wch: 25 }, // Fakultas / Jurusan
+        { wch: 20 }, // Pemindai (Mentor)
+        { wch: 12 }  // Status
+      ];
+
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Absensi");
       XLSX.writeFile(workbook, `Laporan_Absensi_PKKMB_2026_${selectedDate || 'Semua_Hari'}.xlsx`);
@@ -132,17 +148,16 @@ export default function AdminRiwayat() {
             <div class="footer">
               Dicetak pada: ${new Date().toLocaleString('id-ID')}
             </div>
-            <script>
-              window.onload = function() {
-                window.print();
-                window.close();
-              };
-            </script>
           </body>
         </html>
       `;
       printWindow.document.write(html);
       printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
     }
   };
 
@@ -172,7 +187,7 @@ export default function AdminRiwayat() {
   }).length;
 
   return (
-<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Riwayat</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div><button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile admin")}><span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span><span className="text-label-md text-on-surface">Profil</span></button></div></header><main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full relative">
+<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Riwayat</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div></div></header><main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full relative">
 {/* Header Section */}
 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6 relative z-10">
 <div className="flex flex-col">
@@ -288,6 +303,7 @@ export default function AdminRiwayat() {
 <th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Gugus</th>
 <th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Pemindai</th>
 <th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Status</th>
+<th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Lokasi Scan</th>
 <th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-right">Aksi</th>
 </tr>
 </thead>
@@ -331,6 +347,25 @@ export default function AdminRiwayat() {
       <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
                       {log.status}
                     </span>
+      </td>
+      <td className="py-4 px-6">
+        {log.latitude && log.longitude ? (
+          <a
+            href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-label-sm font-medium transition-all bg-green-500/10 text-green-700 hover:bg-green-500/20"
+            title={`Latitude: ${log.latitude}, Longitude: ${log.longitude}`}
+          >
+            <span className="material-symbols-outlined text-[16px]">pin_drop</span>
+            {log.locationStatus || 'Dalam Area'} {log.distanceMeters ? `(${log.distanceMeters}m)` : ''}
+          </a>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-label-sm font-medium bg-slate-500/10 text-slate-600">
+            <span className="material-symbols-outlined text-[16px]">location_off</span>
+            {log.scanner.startsWith('Admin') ? 'Manual (Admin)' : 'Tanpa Lokasi'}
+          </span>
+        )}
       </td>
       <td className="py-4 px-6 text-right relative">
         <div className="flex items-center justify-end gap-1">

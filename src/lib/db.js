@@ -231,12 +231,13 @@ export const claimsDb = {
       nim: c.nim,
       gugusName: c.gugus_nama || '-',
       issue: c.issue,
+      catatan: c.catatan || '',
       time: c.waktu || new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
       requestedStatus: c.requested_status || 'Hadir Penuh'
     }));
   },
 
-  async add(pesertaId, issue, note = '', requestedStatus = 'Hadir Penuh', student, gugusName, currentUserProfile) {
+  async add(pesertaId, issue, note = '', requestedStatus = 'Hadir Penuh', student, gugusName, currentUserProfile, catatan = null) {
     // Find the participant uuid from nim or check if student passed in
     const { data, error } = await supabase
       .from('approval_manual')
@@ -244,11 +245,12 @@ export const claimsDb = {
         peserta_id: student?.uuid || null,
         diajukan_oleh: currentUserProfile?.id || null,
         alasan: note,
+        catatan: catatan,
         issue: issue,
         status: 'pending',
         requested_status: requestedStatus,
         nim: pesertaId,
-        nama: student?.name || '',
+        nama: student?.name || student?.nama || '',
         gugus_nama: gugusName,
         waktu: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
       })
@@ -287,25 +289,38 @@ export const logsDb = {
       gugusName: l.gugus_nama || '-',
       scanner: l.dicatat_nama || 'System',
       status: l.status_log || 'Valid',
-      note: l.catatan || ''
+      note: l.catatan || '',
+      latitude: l.latitude,
+      longitude: l.longitude,
+      locationStatus: l.location_status || 'Dalam Area',
+      distanceMeters: l.distance_meters
     }));
   },
 
-  async add(name, nim, gugusName, scanner, status = 'Valid', note = '', studentUuid, scannerUuid) {
+  async add(name, nim, gugusName, scanner, status = 'Valid', note = '', studentUuid, scannerUuid, locationData = null) {
+    const insertObj = {
+      peserta_id: studentUuid || null,
+      dicatat_oleh: scannerUuid || null,
+      peserta_nim: nim,
+      peserta_nama: name,
+      gugus_nama: gugusName,
+      dicatat_nama: scanner,
+      status_log: status,
+      catatan: note,
+      status: 'hadir', // internal status matching SQL column
+      waktu: new Date().toISOString()
+    };
+
+    if (locationData) {
+      insertObj.latitude = locationData.latitude;
+      insertObj.longitude = locationData.longitude;
+      insertObj.location_status = locationData.locationStatus;
+      insertObj.distance_meters = locationData.distanceMeters;
+    }
+
     const { data, error } = await supabase
       .from('absensi')
-      .insert({
-        peserta_id: studentUuid || null,
-        dicatat_oleh: scannerUuid || null,
-        peserta_nim: nim,
-        peserta_nama: name,
-        gugus_nama: gugusName,
-        dicatat_nama: scanner,
-        status_log: status,
-        catatan: note,
-        status: 'hadir', // internal status matching SQL column
-        waktu: new Date().toISOString()
-      })
+      .insert(insertObj)
       .select()
       .single();
     if (error) throw error;
@@ -383,5 +398,43 @@ export const qrSessionsDb = {
       .delete()
       .eq('id', id);
     if (error) throw error;
+  }
+};
+
+// ----------------------------------------------------
+// LOCATION SETTINGS SERVICE
+// ----------------------------------------------------
+export const locationSettingsDb = {
+  async fetch() {
+    const { data, error } = await supabase
+      .from('location_settings')
+      .select('*')
+      .eq('id', 1)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? {
+      latitude: data.latitude,
+      longitude: data.longitude,
+      radiusMeters: data.radius_meters,
+      locationName: data.location_name,
+      updatedAt: data.updated_at
+    } : null;
+  },
+
+  async update(settings) {
+    const { data, error } = await supabase
+      .from('location_settings')
+      .upsert({
+        id: 1,
+        latitude: settings.latitude,
+        longitude: settings.longitude,
+        radius_meters: settings.radiusMeters,
+        location_name: settings.locationName,
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
   }
 };

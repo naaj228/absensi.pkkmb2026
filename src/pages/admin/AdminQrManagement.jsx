@@ -1,7 +1,7 @@
-import { useContext, useState, useCallback, useRef } from 'react';
+import { useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { sendQrEmail, sendBulkQrEmail } from '../../lib/emailService';
+import { sendQrEmail, sendBulkQrEmail, checkEmailServerHealth } from '../../lib/emailService';
 
 export default function AdminQrManagement() {
   const { peserta, gugus, updatePeserta, hasAdminNotifications } = useContext(AppContext);
@@ -15,6 +15,15 @@ export default function AdminQrManagement() {
 
   // Selected student for QR Modal
   const [selectedStudent, setSelectedStudent] = useState(null);
+  
+  // Email Server & API Health status
+  const [emailServerOnline, setEmailServerOnline] = useState(true);
+
+  useEffect(() => {
+    checkEmailServerHealth().then(res => {
+      setEmailServerOnline(res.ok);
+    });
+  }, []);
 
   // Filtered participants list
   const filteredStudents = peserta.filter(student => {
@@ -118,9 +127,46 @@ export default function AdminQrManagement() {
     }
   };
 
-  const handleBulkAction = (action) => {
-    if (action === 'download') alert(`Memulai pengunduhan ZIP berisi ${peserta.length} QR Code...`);
-    if (action === 'generate') alert('QR Code di-generate otomatis dari NIM, tidak perlu regenerasi.');
+  const handleDownloadAllZip = async () => {
+    if (peserta.length === 0) {
+      alert('Tidak ada data peserta untuk diunduh.');
+      return;
+    }
+    
+    alert('Sedang membuat file ZIP berisi ID Card & QR Code seluruh peserta. Proses ini membutuhkan waktu beberapa saat...');
+    
+    try {
+      const API_BASE = (import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001') + '/api';
+      const studentsData = peserta.map(p => ({
+        id: p.id,
+        name: p.name,
+        gugusName: getGugusName(p.gugusId)
+      }));
+      
+      const res = await fetch(`${API_BASE}/generate-gugus-zip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students: studentsData })
+      });
+      
+      if (!res.ok) {
+        throw new Error('Gagal menghubungi backend email. Pastikan server sudah dijalankan.');
+      }
+      
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ID_Cards_PKKMB_All.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      alert('File ZIP berhasil dibuat dan mulai diunduh!');
+    } catch (err) {
+      alert(`Gagal membuat file ZIP: ${err.message}. Pastikan server email berjalan.`);
+    }
   };
 
   return (
@@ -135,16 +181,24 @@ export default function AdminQrManagement() {
             <span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>
             {hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}
           </div>
-          <button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile admin")}>
-            <span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span>
-            <span className="text-label-md text-on-surface">Profil</span>
-          </button>
+          
         </div>
       </header>
 
       {/* Main Content */}
       <main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto">
         <div className="flex flex-col w-full gap-gutter">
+          
+          {/* Email Server Status Alert Banner */}
+          {!emailServerOnline && (
+            <div className="bg-error/10 border border-error/20 rounded-2xl p-5 flex items-center gap-4 text-error relative z-10">
+              <span className="material-symbols-outlined text-[32px]">error</span>
+              <div className="flex-1">
+                <h4 className="font-semibold text-body-md">Server Email & ID Card Offline</h4>
+                <p className="text-body-sm text-error/85 mt-0.5">Kirim email massal dan unduh ZIP membutuhkan server backend aktif. Jalankan perintah <code className="bg-error/15 px-1.5 py-0.5 rounded font-mono text-xs font-bold text-error">npm run dev:all</code> di terminal Anda untuk mengaktifkan seluruh fitur.</p>
+              </div>
+            </div>
+          )}
           
           {/* Dashboard Header Panel */}
           <div className="bg-surface-container rounded-[24px] p-6 shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative overflow-hidden group">
@@ -160,11 +214,7 @@ export default function AdminQrManagement() {
             </div>
             {/* Bulk Actions Panel */}
             <div className="flex flex-wrap gap-3 z-10">
-              <button onClick={() => handleBulkAction('generate')} className="bg-surface border border-outline-variant hover:bg-surface-variant text-on-surface px-4 py-2.5 rounded-xl text-label-md font-label-md transition-colors flex items-center gap-2 cursor-pointer">
-                <span className="material-symbols-outlined text-[18px]">cached</span>
-                Regenerasi Semua
-              </button>
-              <button onClick={() => handleBulkAction('download')} className="bg-surface border border-outline-variant hover:bg-surface-variant text-on-surface px-4 py-2.5 rounded-xl text-label-md font-label-md transition-colors flex items-center gap-2 cursor-pointer">
+              <button onClick={handleDownloadAllZip} className="bg-surface border border-outline-variant hover:bg-surface-variant text-on-surface px-4 py-2.5 rounded-xl text-label-md font-label-md transition-colors flex items-center gap-2 cursor-pointer">
                 <span className="material-symbols-outlined text-[18px]">download</span>
                 Unduh Semua ZIP
               </button>

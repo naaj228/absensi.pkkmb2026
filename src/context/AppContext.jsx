@@ -6,7 +6,8 @@ import {
   mentorsDb,
   claimsDb,
   logsDb,
-  qrSessionsDb
+  qrSessionsDb,
+  locationSettingsDb
 } from '../lib/db';
 
 export const AppContext = createContext();
@@ -47,6 +48,7 @@ const transformClaim = (c) => ({
   nim: c.nim,
   gugusName: c.gugus_nama || '-',
   issue: c.issue,
+  catatan: c.catatan || '',
   time: c.waktu || new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
   requestedStatus: c.requested_status || 'Hadir Penuh'
 });
@@ -60,7 +62,11 @@ const transformLog = (l) => ({
   gugusName: l.gugus_nama || '-',
   scanner: l.dicatat_nama || 'System',
   status: l.status_log || 'Valid',
-  note: l.catatan || ''
+  note: l.catatan || '',
+  latitude: l.latitude,
+  longitude: l.longitude,
+  locationStatus: l.location_status || 'Dalam Area',
+  distanceMeters: l.distance_meters
 });
 
 const transformQr = (q) => ({
@@ -82,6 +88,14 @@ export function AppContextProvider({ children }) {
   const [logs, setLogs] = useState([]);
   const [qrCodes, setQrCodes] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Geofencing Location settings state
+  const [locationSettings, setLocationSettings] = useState({
+    latitude: -6.2088,
+    longitude: 106.8456,
+    radiusMeters: 150,
+    locationName: 'Gedung Utama'
+  });
 
   const [adminUser, setAdminUser] = useState(() => {
     try {
@@ -177,13 +191,14 @@ export function AppContextProvider({ children }) {
   useEffect(() => {
     async function loadData() {
       try {
-        const [pData, mData, gData, cData, lData, qrData] = await Promise.all([
+        const [pData, mData, gData, cData, lData, qrData, locData] = await Promise.all([
           pesertaDb.fetchAll(),
           mentorsDb.fetchAll(),
           gugusDb.fetchAll(),
           claimsDb.fetchAll(),
           logsDb.fetchAll(),
-          qrSessionsDb.fetchAll()
+          qrSessionsDb.fetchAll(),
+          locationSettingsDb.fetch()
         ]);
         setPeserta(pData);
         setMentors(mData);
@@ -191,6 +206,9 @@ export function AppContextProvider({ children }) {
         setClaims(cData);
         setLogs(lData);
         setQrCodes(qrData);
+        if (locData) {
+          setLocationSettings(locData);
+        }
       } catch (err) {
         console.error('Error fetching data from Supabase:', err);
       } finally {
@@ -371,6 +389,21 @@ export function AppContextProvider({ children }) {
       })
       .subscribe();
 
+    const locationChannel = supabase
+      .channel('location-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'location_settings' }, (payload) => {
+        if (payload.new) {
+          setLocationSettings({
+            latitude: payload.new.latitude,
+            longitude: payload.new.longitude,
+            radiusMeters: payload.new.radius_meters,
+            locationName: payload.new.location_name,
+            updatedAt: payload.new.updated_at
+          });
+        }
+      })
+      .subscribe();
+
     return () => {
       pesertaChannel.unsubscribe();
       gugusChannel.unsubscribe();
@@ -378,6 +411,7 @@ export function AppContextProvider({ children }) {
       claimsChannel.unsubscribe();
       logsChannel.unsubscribe();
       qrChannel.unsubscribe();
+      locationChannel.unsubscribe();
     };
   }, []);
 
@@ -408,7 +442,22 @@ export function AppContextProvider({ children }) {
   // ----------------------------------------------------
   const addPeserta = async (item) => {
     try {
-      await pesertaDb.add(item);
+      if (currentUser?.role === 'mentor') {
+        const group = gugus.find(g => g.id === item.gugusId);
+        const groupName = group ? group.name : '-';
+        await claimsDb.add(
+          item.id,
+          'Tambah Peserta',
+          `Pengajuan tambah peserta baru`,
+          'Alpha',
+          { id: item.id, name: item.name },
+          groupName,
+          currentUser,
+          JSON.stringify(item)
+        );
+      } else {
+        await pesertaDb.add(item);
+      }
     } catch (err) {
       console.error("Error adding peserta:", err);
       alert(err.message || "Gagal menambahkan peserta.");
@@ -417,7 +466,24 @@ export function AppContextProvider({ children }) {
 
   const updatePeserta = async (id, fields) => {
     try {
-      await pesertaDb.update(id, fields);
+      if (currentUser?.role === 'mentor') {
+        const student = peserta.find(p => p.id === id);
+        if (!student) return;
+        const group = gugus.find(g => g.id === student.gugusId);
+        const groupName = group ? group.name : '-';
+        await claimsDb.add(
+          id,
+          'Edit Peserta',
+          `Pengajuan ubah data peserta`,
+          fields.status || student.status || 'Alpha',
+          student,
+          groupName,
+          currentUser,
+          JSON.stringify({ ...fields, id })
+        );
+      } else {
+        await pesertaDb.update(id, fields);
+      }
     } catch (err) {
       console.error("Error updating peserta:", err);
       alert(err.message || "Gagal memperbarui peserta.");
@@ -487,10 +553,10 @@ export function AppContextProvider({ children }) {
     }
   };
 
-  const addLog = async (name, nim, gugusName, scanner, status = 'Valid', note = '') => {
+  const addLog = async (name, nim, gugusName, scanner, status = 'Valid', note = '', locationData = null) => {
     try {
       const student = peserta.find(p => p.id === nim);
-      await logsDb.add(name, nim, gugusName, scanner, status, note, student?.uuid, currentUser?.id);
+      await logsDb.add(name, nim, gugusName, scanner, status, note, student?.uuid, currentUser?.id, locationData);
     } catch (err) {
       console.error("Error writing scan log:", err);
     }
@@ -501,6 +567,25 @@ export function AppContextProvider({ children }) {
       await logsDb.delete(id);
     } catch (err) {
       console.error("Error deleting scan log:", err);
+    }
+  };
+
+  const updateLocationSettings = async (settings) => {
+    try {
+      const updated = await locationSettingsDb.update(settings);
+      if (updated) {
+        setLocationSettings({
+          latitude: updated.latitude,
+          longitude: updated.longitude,
+          radiusMeters: updated.radius_meters,
+          locationName: updated.location_name,
+          updatedAt: updated.updated_at
+        });
+        return true;
+      }
+    } catch (err) {
+      console.error("Error updating location settings:", err);
+      throw err;
     }
   };
 
@@ -524,9 +609,19 @@ export function AppContextProvider({ children }) {
       const claim = claims.find(c => c.id === claimId);
       if (!claim) return;
 
-      const targetStatus = claim.requestedStatus || 'Hadir Penuh';
-      await pesertaDb.update(claim.nim, { status: targetStatus });
-      await addLog(claim.name, claim.nim, claim.gugusName, 'Admin PKKMB', 'Valid');
+      if (claim.issue === 'Tambah Peserta') {
+        const studentData = JSON.parse(claim.catatan);
+        await pesertaDb.add(studentData);
+        await addLog(studentData.name, studentData.id, claim.gugusName, 'Admin PKKMB', 'Valid', 'Persetujuan Tambah Peserta');
+      } else if (claim.issue === 'Edit Peserta') {
+        const studentData = JSON.parse(claim.catatan);
+        await pesertaDb.update(claim.nim, studentData);
+        await addLog(studentData.name, claim.nim, claim.gugusName, 'Admin PKKMB', 'Valid', 'Persetujuan Edit Peserta');
+      } else {
+        const targetStatus = claim.requestedStatus || 'Hadir Penuh';
+        await pesertaDb.update(claim.nim, { status: targetStatus });
+        await addLog(claim.name, claim.nim, claim.gugusName, 'Admin PKKMB', 'Valid');
+      }
       await claimsDb.updateStatus(claimId, 'approved');
     } catch (err) {
       console.error("Error approving claim:", err);
@@ -539,8 +634,12 @@ export function AppContextProvider({ children }) {
       const claim = claims.find(c => c.id === claimId);
       if (!claim) return;
 
-      await pesertaDb.update(claim.nim, { status: 'Manual (Ditolak)' });
-      await addLog(claim.name, claim.nim, claim.gugusName, 'Admin (Tolak Manual)', 'Tidak Valid', reason);
+      if (claim.issue === 'Tambah Peserta' || claim.issue === 'Edit Peserta') {
+        await addLog(claim.name, claim.nim, claim.gugusName, 'Admin (Tolak)', 'Tidak Valid', `Persetujuan ditolak: ${reason}`);
+      } else {
+        await pesertaDb.update(claim.nim, { status: 'Manual (Ditolak)' });
+        await addLog(claim.name, claim.nim, claim.gugusName, 'Admin (Tolak Manual)', 'Tidak Valid', reason);
+      }
       await claimsDb.updateStatus(claimId, 'rejected');
     } catch (err) {
       console.error("Error rejecting claim:", err);
@@ -573,7 +672,7 @@ export function AppContextProvider({ children }) {
     }
   };
 
-  const recordScan = async (studentId) => {
+  const recordScan = async (studentId, locationData = null) => {
     const student = peserta.find(p => String(p.id) === String(studentId));
     if (!student) return false;
 
@@ -582,7 +681,7 @@ export function AppContextProvider({ children }) {
 
     try {
       await pesertaDb.update(studentId, { status: 'Hadir Penuh' });
-      await addLog(student.name, student.id, groupName, currentUser ? currentUser.name : 'Mentor', 'Valid');
+      await addLog(student.name, student.id, groupName, currentUser ? currentUser.name : 'Mentor', 'Valid', '', locationData);
       return true;
     } catch (err) {
       console.error("Error recording scan:", err);
@@ -698,6 +797,8 @@ export function AppContextProvider({ children }) {
       recordScan,
       addLog,
       deleteLog,
+      locationSettings,
+      updateLocationSettings,
       hasAdminNotifications,
       hasMentorNotifications,
       setAdminNotificationsCleared,

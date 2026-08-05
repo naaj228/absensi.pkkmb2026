@@ -66,3 +66,184 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================================
+-- GEOFENCING & GEOLOCATION MIGRATIONS
+-- ============================================================
+
+-- 8. Tambah kolom log lokasi ke tabel absensi
+ALTER TABLE public.absensi
+  ADD COLUMN IF NOT EXISTS latitude double precision,
+  ADD COLUMN IF NOT EXISTS longitude double precision,
+  ADD COLUMN IF NOT EXISTS location_status text DEFAULT 'Dalam Area',
+  ADD COLUMN IF NOT EXISTS distance_meters integer;
+
+-- 9. Buat tabel location_settings untuk konfigurasi absensi
+CREATE TABLE IF NOT EXISTS public.location_settings (
+  id integer PRIMARY KEY DEFAULT 1,
+  latitude double precision NOT NULL DEFAULT -6.2088,
+  longitude double precision NOT NULL DEFAULT 106.8456,
+  radius_meters integer NOT NULL DEFAULT 150,
+  location_name text NOT NULL DEFAULT 'Gedung Utama',
+  updated_at timestamptz DEFAULT now(),
+  CONSTRAINT one_row CHECK (id = 1)
+);
+
+-- Seed data awal koordinat
+INSERT INTO public.location_settings (id, latitude, longitude, radius_meters, location_name)
+VALUES (1, -6.2088, 106.8456, 150, 'Gedung Utama')
+ON CONFLICT (id) DO NOTHING;
+
+-- Disable RLS sementara untuk lokalan
+ALTER TABLE public.location_settings DISABLE ROW LEVEL SECURITY;
+
+-- Tambah ke realtime publication
+ALTER PUBLICATION supabase_realtime ADD TABLE public.location_settings;
+
+-- ============================================================
+-- PRODUCTION SECURITY & RLS POLICIES (AMANKAN DATABASE)
+-- ============================================================
+-- CATATAN: Jalankan script di bawah ini jika ingin mengamankan database
+-- dari kecurangan/akses tidak sah oleh pihak luar/mahasiswa.
+
+-- 1. Aktifkan RLS di seluruh tabel
+ALTER TABLE public.peserta ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.gugus ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.approval_manual ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.absensi ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.qr_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.location_settings ENABLE ROW LEVEL SECURITY;
+
+-- 2. Kebijakan Tabel: PROFILES (Dibagi per-aksi untuk mencegah loop/rekursi RLS)
+DROP POLICY IF EXISTS "Allow authenticated read profiles" ON public.profiles;
+CREATE POLICY "Allow authenticated read profiles" ON public.profiles FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow admin all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow admin insert profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow admin update profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow admin delete profiles" ON public.profiles;
+
+CREATE POLICY "Allow admin insert profiles" ON public.profiles FOR INSERT TO authenticated WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role::text = 'admin'
+  )
+);
+CREATE POLICY "Allow admin update profiles" ON public.profiles FOR UPDATE TO authenticated USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role::text = 'admin'
+  )
+);
+CREATE POLICY "Allow admin delete profiles" ON public.profiles FOR DELETE TO authenticated USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role::text = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS "Allow users update own profiles" ON public.profiles;
+CREATE POLICY "Allow users update own profiles" ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
+
+-- 3. Kebijakan Tabel: GUGUS
+DROP POLICY IF EXISTS "Allow authenticated read gugus" ON public.gugus;
+CREATE POLICY "Allow authenticated read gugus" ON public.gugus FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow admin all gugus" ON public.gugus;
+CREATE POLICY "Allow admin all gugus" ON public.gugus FOR ALL TO authenticated USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role::text = 'admin'
+  )
+);
+
+-- 4. Kebijakan Tabel: PESERTA
+DROP POLICY IF EXISTS "Allow authenticated read peserta" ON public.peserta;
+CREATE POLICY "Allow authenticated read peserta" ON public.peserta FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow mentors to update status of their own gugus students" ON public.peserta;
+CREATE POLICY "Allow mentors to update status of their own gugus students" ON public.peserta FOR UPDATE TO authenticated USING (
+  gugus_id = (SELECT gugus_id FROM public.profiles WHERE id = auth.uid())
+  OR EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role::text = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS "Allow admin all peserta" ON public.peserta;
+CREATE POLICY "Allow admin all peserta" ON public.peserta FOR ALL TO authenticated USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role::text = 'admin'
+  )
+);
+
+-- 5. Kebijakan Tabel: ABSENSI (LOGS)
+DROP POLICY IF EXISTS "Allow authenticated read absensi" ON public.absensi;
+CREATE POLICY "Allow authenticated read absensi" ON public.absensi FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow mentors to insert absensi" ON public.absensi;
+CREATE POLICY "Allow mentors to insert absensi" ON public.absensi FOR INSERT TO authenticated WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow admin edit absensi" ON public.absensi;
+CREATE POLICY "Allow admin edit absensi" ON public.absensi FOR ALL TO authenticated USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role::text = 'admin'
+  )
+);
+
+-- 6. Kebijakan Tabel: QR_SESSIONS
+DROP POLICY IF EXISTS "Allow authenticated read qr_sessions" ON public.qr_sessions;
+CREATE POLICY "Allow authenticated read qr_sessions" ON public.qr_sessions FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow admin all qr_sessions" ON public.qr_sessions;
+CREATE POLICY "Allow admin all qr_sessions" ON public.qr_sessions FOR ALL TO authenticated USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role::text = 'admin'
+  )
+);
+
+-- 7. Kebijakan Tabel: APPROVAL_MANUAL
+DROP POLICY IF EXISTS "Allow authenticated read approval_manual" ON public.approval_manual;
+CREATE POLICY "Allow authenticated read approval_manual" ON public.approval_manual FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Allow mentors to insert approval_manual" ON public.approval_manual;
+CREATE POLICY "Allow mentors to insert approval_manual" ON public.approval_manual FOR INSERT TO authenticated WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow admin all approval_manual" ON public.approval_manual;
+CREATE POLICY "Allow admin all approval_manual" ON public.approval_manual FOR ALL TO authenticated USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role::text = 'admin'
+  )
+);
+
+-- 8. Kebijakan Tabel: LOCATION_SETTINGS
+DROP POLICY IF EXISTS "Allow authenticated read location_settings" ON public.location_settings;
+DROP POLICY IF EXISTS "Allow admin all location_settings" ON public.location_settings;
+DROP POLICY IF EXISTS "Allow admin insert location_settings" ON public.location_settings;
+DROP POLICY IF EXISTS "Allow admin update location_settings" ON public.location_settings;
+DROP POLICY IF EXISTS "Allow authenticated users read and write location_settings" ON public.location_settings;
+
+CREATE POLICY "Allow authenticated users read and write location_settings" 
+ON public.location_settings 
+FOR ALL 
+TO authenticated 
+USING (true) 
+WITH CHECK (true);
+
+-- 9. Amankan Fungsi Postgres (Mutable Search Path)
+ALTER FUNCTION public.handle_new_user() SET search_path = public;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM public;
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO postgres, service_role;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'is_admin') THEN
+    EXECUTE 'ALTER FUNCTION public.is_admin() SET search_path = public;';
+  END IF;
+END
+$$;

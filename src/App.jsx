@@ -16,21 +16,21 @@ import AdminRiwayat from './pages/admin/AdminRiwayat';
 import AdminPesertaDetail from './pages/admin/AdminPesertaDetail';
 import AdminGugusDetail from './pages/admin/AdminGugusDetail';
 import AdminNotifikasi from './pages/admin/AdminNotifikasi';
+import AdminLocationSettings from './pages/admin/AdminLocationSettings';
 
 import MentorQrScanner from './pages/mentor/MentorQrScanner';
 import MentorPeserta from './pages/mentor/MentorPeserta';
 import MentorDashboard from './pages/mentor/MentorDashboard';
 import MentorAbsensiManual from './pages/mentor/MentorAbsensiManual';
 import MentorNotifikasi from './pages/mentor/MentorNotifikasi';
+import MentorRiwayat from './pages/mentor/MentorRiwayat';
 
 import { useContext } from 'react';
 import { AppContext } from './context/AppContext';
 
 function RootRedirect() {
-  const { adminUser, mentorUser } = useContext(AppContext);
-  if (adminUser) {
-    return <Navigate to="/admin/dashboard" replace />;
-  } else if (mentorUser) {
+  const { mentorUser } = useContext(AppContext);
+  if (mentorUser) {
     return <Navigate to="/mentor/dashboard" replace />;
   }
   return <Navigate to="/login-mentor" replace />;
@@ -70,6 +70,7 @@ function AppContent() {
           <Route path="qr-management" element={<AdminQrManagement />} />
           <Route path="riwayat" element={<AdminRiwayat />} />
           <Route path="notifikasi" element={<AdminNotifikasi />} />
+          <Route path="location" element={<AdminLocationSettings />} />
         </Route>
 
         <Route path="/mentor" element={<MentorLayout />}>
@@ -78,6 +79,7 @@ function AppContent() {
           <Route path="peserta" element={<MentorPeserta />} />
           <Route path="scanner-qr" element={<MentorQrScanner />} />
           <Route path="absensi-manual" element={<MentorAbsensiManual />} />
+          <Route path="riwayat" element={<MentorRiwayat />} />
           <Route path="notifikasi" element={<MentorNotifikasi />} />
         </Route>
 

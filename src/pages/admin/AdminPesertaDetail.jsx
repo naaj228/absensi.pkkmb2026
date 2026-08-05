@@ -106,10 +106,7 @@ export default function AdminPesertaDetail() {
           <h1 className="text-headline-sm font-headline-md text-on-surface">Detail Peserta</h1>
         </div>
         <div className="flex items-center gap-6">
-          <button className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 px-4 py-2 rounded-xl transition-all" onClick={() => alert("Profile admin")}>
-            <span className="material-symbols-outlined text-on-surface text-[20px]">account_circle</span>
-            <span className="text-label-md text-on-surface">Profil</span>
-          </button>
+          
         </div>
       </header>
 
@@ -203,7 +200,7 @@ export default function AdminPesertaDetail() {
                       >
                         <span className="material-symbols-outlined text-[18px]">
                           {opt.value === 'Hadir Penuh' ? 'check_circle' :
-                           opt.value === 'Hadir Sebagian' ? 'brightness_half' :
+                           opt.value === 'Hadir Sebagian' ? 'contrast' :
                            opt.value === 'Izin' ? 'description' : 'cancel'}
                         </span>
                         {opt.value}
