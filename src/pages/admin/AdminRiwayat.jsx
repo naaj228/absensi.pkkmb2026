@@ -18,6 +18,39 @@ export default function AdminRiwayat() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
 
+  // Selection states
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds(currentItems.map(log => log.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id, checked) => {
+    if (checked) {
+      setSelectedIds(prev => [...prev, id]);
+    } else {
+      setSelectedIds(prev => prev.filter(item => item !== id));
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    window.confirmAction(`Hapus ${selectedIds.length} log absensi terpilih?`, async () => {
+      try {
+        await Promise.all(selectedIds.map(id => deleteLog(id)));
+        setSelectedIds([]);
+        alert("Log absensi terpilih berhasil dihapus.");
+      } catch (err) {
+        console.error("Gagal menghapus log absensi:", err);
+        alert("Gagal menghapus beberapa log absensi.");
+      }
+    });
+  };
+
   // Get active gugus name from selectedGugus ID
   const selectedGugusObj = gugus.find(g => g.id === selectedGugus);
   const selectedGugusName = selectedGugusObj ? selectedGugusObj.name : '';
@@ -276,9 +309,17 @@ export default function AdminRiwayat() {
 <div className="bg-surface rounded-3xl shadow-lg shadow-primary/5 overflow-hidden flex flex-col relative z-10">
 {/* Table Header Toolbar */}
 <div className="px-6 py-5 border-b border-surface-variant flex justify-between items-center bg-surface-container-lowest">
-<div className="flex items-center gap-3">
-<span className="material-symbols-outlined text-primary">list_alt</span>
-<h3 className="font-headline-sm text-headline-sm text-on-surface">Data Kehadiran</h3>
+<div className="flex items-center gap-4">
+  <div className="flex items-center gap-3">
+    <span className="material-symbols-outlined text-primary">list_alt</span>
+    <h3 className="font-headline-sm text-headline-sm text-on-surface">Data Kehadiran</h3>
+  </div>
+  {selectedIds.length > 0 && (
+    <button onClick={handleDeleteSelected} className="bg-error/10 hover:bg-error/20 text-error text-label-sm font-label-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer">
+      <span className="material-symbols-outlined text-[16px]">delete</span>
+      Hapus Terpilih ({selectedIds.length})
+    </button>
+  )}
 </div>
 {/* Status Tabs */}
 <div className="hidden sm:flex bg-surface-container-low rounded-lg p-1">
@@ -298,6 +339,14 @@ export default function AdminRiwayat() {
 <table className="w-full text-left border-collapse min-w-[900px]">
 <thead>
 <tr className="bg-surface-container-low">
+<th className="py-4 px-6 w-12 text-center">
+  <input 
+    type="checkbox" 
+    className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary accent-primary cursor-pointer"
+    checked={currentItems.length > 0 && currentItems.every(log => selectedIds.includes(log.id))}
+    onChange={handleSelectAll} 
+  />
+</th>
 <th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Waktu</th>
 <th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Peserta</th>
 <th className="py-4 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Gugus</th>
@@ -311,6 +360,14 @@ export default function AdminRiwayat() {
   {currentItems.length > 0 ? (
     currentItems.map((log) => (
       <tr key={log.id} className="hover:bg-surface-container-lowest transition-colors group cursor-pointer">
+      <td className="py-4 px-6 w-12 text-center" onClick={(e) => e.stopPropagation()}>
+        <input 
+          type="checkbox" 
+          className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary accent-primary cursor-pointer"
+          checked={selectedIds.includes(log.id)}
+          onChange={(e) => handleSelectOne(log.id, e.target.checked)} 
+        />
+      </td>
       <td className="py-4 px-6">
       <div className="flex flex-col">
       <span className="font-body-md text-body-md text-on-surface font-medium">{log.timestamp}</span>
@@ -394,7 +451,7 @@ export default function AdminRiwayat() {
     ))
   ) : (
     <tr>
-      <td colSpan="6" className="text-center py-10 text-on-surface-variant">Tidak ada log.</td>
+      <td colSpan="8" className="text-center py-10 text-on-surface-variant">Tidak ada log.</td>
     </tr>
   )}
 </tbody>
@@ -408,6 +465,12 @@ export default function AdminRiwayat() {
       <div key={log.id} className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/40 flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
+            <input 
+              type="checkbox" 
+              className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary accent-primary cursor-pointer shrink-0"
+              checked={selectedIds.includes(log.id)}
+              onChange={(e) => handleSelectOne(log.id, e.target.checked)} 
+            />
             <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold ${
               log.status === 'Valid' ? 'bg-primary-fixed-dim/20 text-primary' : 'bg-error-container text-error'
             }`}>

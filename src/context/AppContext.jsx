@@ -12,10 +12,26 @@ import {
 
 export const AppContext = createContext();
 
+// Helper to parse DB date strings safely as UTC if they lack timezone offsets
+const parseDbDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  let formatted = dateStr;
+  if (typeof dateStr === 'string') {
+    formatted = dateStr.replace(' ', 'T');
+    const hasTimezone = formatted.includes('Z') || 
+                        /[+-]\d{2}(:\d{2})?$/.test(formatted) ||
+                        /\+\d{2}$/.test(formatted);
+    if (!hasTimezone && (formatted.includes('T') || formatted.includes(':'))) {
+      formatted += 'Z';
+    }
+  }
+  return new Date(formatted);
+};
+
 // Helper to format Date to YYYY-MM-DD in local timezone
 const getLocalDateFormat = (dateVal) => {
   if (!dateVal) return '';
-  const date = new Date(dateVal);
+  const date = parseDbDate(dateVal);
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -66,7 +82,7 @@ const transformClaim = (c) => ({
 const transformLog = (l) => ({
   id: l.id,
   waktu: l.waktu,
-  timestamp: l.waktu ? new Date(l.waktu).toTimeString().split(' ')[0] : '',
+  timestamp: l.waktu ? parseDbDate(l.waktu).toTimeString().split(' ')[0] : '',
   date: l.waktu ? getLocalDateFormat(l.waktu) : '',
   name: l.peserta_nama || '',
   nim: l.peserta_nim || '',
@@ -211,7 +227,6 @@ export function AppContextProvider({ children }) {
           qrSessionsDb.fetchAll(),
           locationSettingsDb.fetch()
         ]);
-        setPeserta(pData);
         setMentors(mData);
         setGugus(gData);
         setClaims(cData);
@@ -219,6 +234,26 @@ export function AppContextProvider({ children }) {
         setQrCodes(qrData);
         if (locData) {
           setLocationSettings(locData);
+        }
+
+        // Sync peserta status with logs to correct any database discrepancies
+        const discrepancies = pData.filter(p => {
+          if (p.status !== 'Hadir Penuh') return false;
+          const hasValidLog = lData.some(l => String(l.nim) === String(p.id) && l.status === 'Valid');
+          return !hasValidLog;
+        });
+
+        if (discrepancies.length > 0) {
+          console.log(`Menyelaraskan data: status ${discrepancies.length} peserta diset kembali ke 'Belum Hadir' karena tidak memiliki log absensi.`);
+          Promise.all(discrepancies.map(p => pesertaDb.update(p.id, { status: 'Belum Hadir' })))
+            .catch(err => console.error("Gagal menyelaraskan status peserta di DB:", err));
+
+          setPeserta(pData.map(p => {
+            const isDisc = discrepancies.some(d => d.id === p.id);
+            return isDisc ? { ...p, status: 'Belum Hadir' } : p;
+          }));
+        } else {
+          setPeserta(pData);
         }
       } catch (err) {
         console.error('Error fetching data from Supabase:', err);
@@ -257,18 +292,24 @@ export function AppContextProvider({ children }) {
     const pesertaChannel = supabase
       .channel('peserta-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'peserta' }, async (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const transformed = transformPeserta(payload.new);
-          setPeserta(prev => {
-            if (prev.some(p => p.id === transformed.id)) return prev;
-            return [...prev, transformed];
-          });
-        } else if (payload.eventType === 'UPDATE') {
-          const transformed = transformPeserta(payload.new);
-          setPeserta(prev => prev.map(p => p.id === transformed.id ? transformed : p));
-        } else if (payload.eventType === 'DELETE') {
-          const nim = payload.old.nim;
-          setPeserta(prev => prev.filter(p => p.id !== nim));
+        try {
+          if (payload.eventType === 'INSERT') {
+            const transformed = transformPeserta(payload.new);
+            setPeserta(prev => {
+              if (prev.some(p => p.id === transformed.id)) return prev;
+              return [...prev, transformed];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const transformed = transformPeserta(payload.new);
+            setPeserta(prev => prev.map(p => p.id === transformed.id ? transformed : p));
+          } else if (payload.eventType === 'DELETE') {
+            const nim = payload.old?.nim || payload.old?.id;
+            if (nim) {
+              setPeserta(prev => prev.filter(p => p.id !== nim));
+            }
+          }
+        } catch (err) {
+          console.error("Error in peserta Realtime listener:", err);
         }
       })
       .subscribe();
@@ -276,35 +317,42 @@ export function AppContextProvider({ children }) {
     const gugusChannel = supabase
       .channel('gugus-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'gugus' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const transformed = transformGugus(payload.new);
-          setGugus(prev => {
-            if (prev.some(g => g.id === transformed.id)) return prev;
-            return [...prev, transformed];
-          });
-        } else if (payload.eventType === 'UPDATE') {
-          const transformed = transformGugus(payload.new);
-          setGugus(prev => prev.map(g => g.id === transformed.id ? transformed : g));
+        try {
+          if (payload.eventType === 'INSERT') {
+            const transformed = transformGugus(payload.new);
+            setGugus(prev => {
+              if (prev.some(g => g.id === transformed.id)) return prev;
+              return [...prev, transformed];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const transformed = transformGugus(payload.new);
+            setGugus(prev => prev.map(g => g.id === transformed.id ? transformed : g));
 
-          // If this gugus assignment change affects the logged-in mentor, update their gugusId
-          setMentorUser(prev => {
-            if (!prev) return prev;
-            // New mentor assigned to this gugus
-            if (payload.new.mentor_id === prev.id) {
-              const updated = { ...prev, gugusId: payload.new.id };
-              localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(updated));
-              return updated;
+            // If this gugus assignment change affects the logged-in mentor, update their gugusId
+            setMentorUser(prev => {
+              if (!prev) return prev;
+              // New mentor assigned to this gugus
+              if (payload.new?.mentor_id === prev.id) {
+                const updated = { ...prev, gugusId: payload.new.id };
+                localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(updated));
+                return updated;
+              }
+              // Old mentor removed from this gugus
+              if (payload.old?.mentor_id === prev.id && prev.gugusId === payload.new?.id) {
+                const updated = { ...prev, gugusId: '' };
+                localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(updated));
+                return updated;
+              }
+              return prev;
+            });
+          } else if (payload.eventType === 'DELETE') {
+            const id = payload.old?.id;
+            if (id) {
+              setGugus(prev => prev.filter(g => g.id !== id));
             }
-            // Old mentor removed from this gugus
-            if (payload.old.mentor_id === prev.id && prev.gugusId === payload.new.id) {
-              const updated = { ...prev, gugusId: '' };
-              localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(updated));
-              return updated;
-            }
-            return prev;
-          });
-        } else if (payload.eventType === 'DELETE') {
-          setGugus(prev => prev.filter(g => g.id !== payload.old.id));
+          }
+        } catch (err) {
+          console.error("Error in gugus Realtime listener:", err);
         }
       })
       .subscribe();
@@ -312,32 +360,39 @@ export function AppContextProvider({ children }) {
     const profilesChannel = supabase
       .channel('profiles-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
-        // Only process mentors
-        if (payload.new && payload.new.role !== 'mentor') return;
-        if (payload.eventType === 'INSERT') {
-          const transformed = transformMentor(payload.new);
-          setMentors(prev => {
-            if (prev.some(m => m.id === transformed.id)) return prev;
-            return [...prev, transformed];
-          });
-        } else if (payload.eventType === 'UPDATE') {
-          const transformed = transformMentor(payload.new);
-          setMentors(prev => prev.map(m => m.id === transformed.id ? transformed : m));
+        try {
+          // Only process mentors
+          if (payload.new && payload.new.role !== 'mentor') return;
+          if (payload.eventType === 'INSERT') {
+            const transformed = transformMentor(payload.new);
+            setMentors(prev => {
+              if (prev.some(m => m.id === transformed.id)) return prev;
+              return [...prev, transformed];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const transformed = transformMentor(payload.new);
+            setMentors(prev => prev.map(m => m.id === transformed.id ? transformed : m));
 
-          // Also update mentorUser if it's the currently logged-in mentor
-          setMentorUser(prev => {
-            if (!prev || prev.id !== payload.new.id) return prev;
-            const updated = {
-              ...prev,
-              name: payload.new.full_name || payload.new.email,
-              email: payload.new.email,
-              gugusId: payload.new.gugus_id || prev.gugusId || ''
-            };
-            localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(updated));
-            return updated;
-          });
-        } else if (payload.eventType === 'DELETE') {
-          setMentors(prev => prev.filter(m => m.id !== payload.old.id));
+            // Also update mentorUser if it's the currently logged-in mentor
+            setMentorUser(prev => {
+              if (!prev || prev.id !== payload.new?.id) return prev;
+              const updated = {
+                ...prev,
+                name: payload.new.full_name || payload.new.email,
+                email: payload.new.email,
+                gugusId: payload.new.gugus_id || prev.gugusId || ''
+              };
+              localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(updated));
+              return updated;
+            });
+          } else if (payload.eventType === 'DELETE') {
+            const id = payload.old?.id;
+            if (id) {
+              setMentors(prev => prev.filter(m => m.id !== id));
+            }
+          }
+        } catch (err) {
+          console.error("Error in profiles Realtime listener:", err);
         }
       })
       .subscribe();
@@ -345,21 +400,28 @@ export function AppContextProvider({ children }) {
     const claimsChannel = supabase
       .channel('claims-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'approval_manual' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const transformed = transformClaim(payload.new);
-          setClaims(prev => {
-            if (prev.some(c => c.id === transformed.id)) return prev;
-            return [...prev, transformed];
-          });
-        } else if (payload.eventType === 'UPDATE') {
-          if (payload.new.status !== 'pending') {
-            setClaims(prev => prev.filter(c => c.id !== payload.new.id));
-          } else {
+        try {
+          if (payload.eventType === 'INSERT') {
             const transformed = transformClaim(payload.new);
-            setClaims(prev => prev.map(c => c.id === transformed.id ? transformed : c));
+            setClaims(prev => {
+              if (prev.some(c => c.id === transformed.id)) return prev;
+              return [...prev, transformed];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            if (payload.new?.status !== 'pending') {
+              setClaims(prev => prev.filter(c => c.id !== payload.new?.id));
+            } else {
+              const transformed = transformClaim(payload.new);
+              setClaims(prev => prev.map(c => c.id === transformed.id ? transformed : c));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const id = payload.old?.id;
+            if (id) {
+              setClaims(prev => prev.filter(c => c.id !== id));
+            }
           }
-        } else if (payload.eventType === 'DELETE') {
-          setClaims(prev => prev.filter(c => c.id !== payload.old.id));
+        } catch (err) {
+          console.error("Error in claims Realtime listener:", err);
         }
       })
       .subscribe();
@@ -367,17 +429,24 @@ export function AppContextProvider({ children }) {
     const logsChannel = supabase
       .channel('logs-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'absensi' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const transformed = transformLog(payload.new);
-          setLogs(prev => {
-            if (prev.some(l => l.id === transformed.id)) return prev;
-            return [transformed, ...prev];
-          });
-        } else if (payload.eventType === 'UPDATE') {
-          const transformed = transformLog(payload.new);
-          setLogs(prev => prev.map(l => l.id === transformed.id ? transformed : l));
-        } else if (payload.eventType === 'DELETE') {
-          setLogs(prev => prev.filter(l => l.id !== payload.old.id));
+        try {
+          if (payload.eventType === 'INSERT') {
+            const transformed = transformLog(payload.new);
+            setLogs(prev => {
+              if (prev.some(l => l.id === transformed.id)) return prev;
+              return [transformed, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const transformed = transformLog(payload.new);
+            setLogs(prev => prev.map(l => l.id === transformed.id ? transformed : l));
+          } else if (payload.eventType === 'DELETE') {
+            const id = payload.old?.id;
+            if (id) {
+              setLogs(prev => prev.filter(l => l.id !== id));
+            }
+          }
+        } catch (err) {
+          console.error("Error in logs Realtime listener:", err);
         }
       })
       .subscribe();
@@ -385,17 +454,24 @@ export function AppContextProvider({ children }) {
     const qrChannel = supabase
       .channel('qr-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'qr_sessions' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const transformed = transformQr(payload.new);
-          setQrCodes(prev => {
-            if (prev.some(q => q.id === transformed.id)) return prev;
-            return [...prev, transformed];
-          });
-        } else if (payload.eventType === 'UPDATE') {
-          const transformed = transformQr(payload.new);
-          setQrCodes(prev => prev.map(q => q.id === transformed.id ? transformed : q));
-        } else if (payload.eventType === 'DELETE') {
-          setQrCodes(prev => prev.filter(q => q.id !== payload.old.kode));
+        try {
+          if (payload.eventType === 'INSERT') {
+            const transformed = transformQr(payload.new);
+            setQrCodes(prev => {
+              if (prev.some(q => q.id === transformed.id)) return prev;
+              return [...prev, transformed];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const transformed = transformQr(payload.new);
+            setQrCodes(prev => prev.map(q => q.id === transformed.id ? transformed : q));
+          } else if (payload.eventType === 'DELETE') {
+            const kode = payload.old?.kode || payload.old?.id;
+            if (kode) {
+              setQrCodes(prev => prev.filter(q => q.id !== kode));
+            }
+          }
+        } catch (err) {
+          console.error("Error in qr Realtime listener:", err);
         }
       })
       .subscribe();
@@ -403,14 +479,18 @@ export function AppContextProvider({ children }) {
     const locationChannel = supabase
       .channel('location-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'location_settings' }, (payload) => {
-        if (payload.new) {
-          setLocationSettings({
-            latitude: payload.new.latitude,
-            longitude: payload.new.longitude,
-            radiusMeters: payload.new.radius_meters,
-            locationName: payload.new.location_name,
-            updatedAt: payload.new.updated_at
-          });
+        try {
+          if (payload.new) {
+            setLocationSettings({
+              latitude: payload.new.latitude,
+              longitude: payload.new.longitude,
+              radiusMeters: payload.new.radius_meters,
+              locationName: payload.new.location_name,
+              updatedAt: payload.new.updated_at
+            });
+          }
+        } catch (err) {
+          console.error("Error in location Realtime listener:", err);
         }
       })
       .subscribe();
@@ -469,7 +549,7 @@ export function AppContextProvider({ children }) {
         if (student) return;
         const group = gugus.find(g => g.id === item.gugusId);
         const groupName = group ? group.name : '-';
-        await claimsDb.add(
+        const newClaim = await claimsDb.add(
           item.id,
           'Tambah Peserta',
           `Pengajuan tambah peserta baru`,
@@ -479,8 +559,22 @@ export function AppContextProvider({ children }) {
           currentUser,
           JSON.stringify(item)
         );
+        if (newClaim) {
+          const transformed = transformClaim(newClaim);
+          setClaims(prev => {
+            if (prev.some(c => c.id === transformed.id)) return prev;
+            return [...prev, transformed];
+          });
+        }
       } else {
-        await pesertaDb.add(item);
+        const added = await pesertaDb.add(item);
+        if (added) {
+          const transformed = transformPeserta(added);
+          setPeserta(prev => {
+            if (prev.some(p => p.id === transformed.id)) return prev;
+            return [...prev, transformed];
+          });
+        }
       }
     } catch (err) {
       console.error("Error adding peserta:", err);
@@ -510,7 +604,7 @@ export function AppContextProvider({ children }) {
       if (currentUser?.role === 'mentor') {
         const group = gugus.find(g => g.id === student.gugusId);
         const groupName = group ? group.name : '-';
-        await claimsDb.add(
+        const newClaim = await claimsDb.add(
           id,
           'Edit Peserta',
           `Pengajuan ubah data peserta`,
@@ -520,8 +614,46 @@ export function AppContextProvider({ children }) {
           currentUser,
           JSON.stringify({ ...fields, id })
         );
+        if (newClaim) {
+          const transformed = transformClaim(newClaim);
+          setClaims(prev => {
+            if (prev.some(c => c.id === transformed.id)) return prev;
+            return [...prev, transformed];
+          });
+        }
       } else {
-        await pesertaDb.update(id, fields);
+        // Direct status sync with attendance logs
+        if (fields.status !== undefined && fields.status !== student.status) {
+          const newStatus = fields.status;
+          const group = gugus.find(g => g.id === (fields.gugusId || student.gugusId));
+          const groupName = group ? group.name : '-';
+          const scannerName = currentUser?.name || 'Admin PKKMB';
+
+          if (newStatus === 'Hadir Penuh' || newStatus === 'Hadir Sebagian') {
+            const hasValidLog = logs.some(l => String(l.nim) === String(id) && l.status === 'Valid');
+            if (!hasValidLog) {
+              await addLog(fields.name || student.name, id, groupName, scannerName, 'Valid', `Ubah Status Manual ke ${newStatus}`);
+            }
+          } else if (newStatus === 'Belum Hadir' || newStatus === 'Alpha' || newStatus === 'Sakit' || newStatus === 'Izin') {
+            // Delete any existing valid logs first to prevent sync conflicts
+            const studentLogs = logs.filter(l => String(l.nim) === String(id) && l.status === 'Valid');
+            if (studentLogs.length > 0) {
+              await Promise.all(studentLogs.map(l => deleteLog(l.id)));
+            }
+            // Add a status change log in history (Invalid status since they are absent)
+            await addLog(fields.name || student.name, id, groupName, scannerName, 'Invalid', `Ubah Status Manual ke ${newStatus}`);
+          }
+        }
+
+        setPeserta(prev => prev.map(p => p.id === id ? { ...p, ...fields } : p));
+        try {
+          await pesertaDb.update(id, fields);
+        } catch (err) {
+          // Rollback on error
+          const pData = await pesertaDb.fetchAll();
+          setPeserta(pData);
+          throw err;
+        }
       }
     } catch (err) {
       console.error("Error updating peserta:", err);
@@ -531,17 +663,34 @@ export function AppContextProvider({ children }) {
   };
 
   const deletePeserta = async (id) => {
+    // Optimistic local state update
+    setPeserta(prev => prev.filter(p => p.id !== id));
     try {
       await pesertaDb.delete(id);
     } catch (err) {
       console.error("Error deleting peserta:", err);
       alert(err.message || "Gagal menghapus peserta.");
+      // Rollback
+      const pData = await pesertaDb.fetchAll();
+      setPeserta(pData);
     }
   };
 
   const addMentor = async (item) => {
     try {
-      await mentorsDb.add(item);
+      const added = await mentorsDb.add(item);
+      if (added) {
+        const transformed = transformMentor(added);
+        setMentors(prev => {
+          if (prev.some(m => m.id === transformed.id)) return prev;
+          return [...prev, transformed];
+        });
+
+        // Sync the gugus side in local state
+        if (item.gugusId && item.gugusId !== 'Unassigned') {
+          setGugus(prev => prev.map(g => g.id === item.gugusId ? { ...g, mentorId: transformed.id } : g));
+        }
+      }
     } catch (err) {
       console.error("Error adding mentor:", err);
       alert(err.message || "Gagal menambahkan mentor.");
@@ -550,27 +699,65 @@ export function AppContextProvider({ children }) {
   };
 
   const updateMentor = async (id, fields) => {
+    // Optimistic local state update
+    setMentors(prev => prev.map(m => m.id === id ? { ...m, ...fields } : m));
+    if (fields.gugusId !== undefined) {
+      const newGugusId = fields.gugusId && fields.gugusId !== 'Unassigned' ? fields.gugusId : null;
+      setGugus(prev => prev.map(g => {
+        if (newGugusId && g.id === newGugusId) return { ...g, mentorId: id };
+        if (g.mentorId === id && g.id !== newGugusId) return { ...g, mentorId: 'Unassigned' };
+        return g;
+      }));
+    }
+
     try {
-      await mentorsDb.update(id, fields);
+      const updated = await mentorsDb.update(id, fields);
+      if (updated) {
+        const transformed = transformMentor(updated);
+        setMentors(prev => prev.map(m => m.id === id ? transformed : m));
+      }
     } catch (err) {
       console.error("Error updating mentor:", err);
       alert(err.message || "Gagal memperbarui mentor.");
+      // Rollback
+      const [mData, gData] = await Promise.all([mentorsDb.fetchAll(), gugusDb.fetchAll()]);
+      setMentors(mData);
+      setGugus(gData);
       throw err;
     }
   };
 
   const deleteMentor = async (id) => {
+    // Optimistic local state update
+    setMentors(prev => prev.filter(m => m.id !== id));
+    setGugus(prev => prev.map(g => g.mentorId === id ? { ...g, mentorId: 'Unassigned' } : g));
     try {
       await mentorsDb.delete(id);
     } catch (err) {
       console.error("Error deleting mentor:", err);
       alert(err.message || "Gagal menghapus mentor.");
+      // Rollback
+      const [mData, gData] = await Promise.all([mentorsDb.fetchAll(), gugusDb.fetchAll()]);
+      setMentors(mData);
+      setGugus(gData);
     }
   };
 
   const addGugus = async (item) => {
     try {
-      await gugusDb.add(item);
+      const added = await gugusDb.add(item);
+      if (added) {
+        const transformed = transformGugus(added);
+        setGugus(prev => {
+          if (prev.some(g => g.id === transformed.id)) return prev;
+          return [...prev, transformed];
+        });
+
+        // Sync the mentor side in local state
+        if (item.mentorId && item.mentorId !== 'Unassigned') {
+          setMentors(prev => prev.map(m => m.id === item.mentorId ? { ...m, gugusId: transformed.id } : m));
+        }
+      }
     } catch (err) {
       console.error("Error adding gugus:", err);
       alert(err.message || "Gagal menambahkan gugus.");
@@ -578,37 +765,95 @@ export function AppContextProvider({ children }) {
   };
 
   const updateGugus = async (id, fields) => {
+    // Optimistic local state update
+    setGugus(prev => prev.map(g => g.id === id ? {
+      ...g,
+      name: fields.name !== undefined ? fields.name : g.name,
+      capacity: fields.capacity !== undefined ? fields.capacity : g.capacity,
+      mentorId: fields.mentorId !== undefined ? fields.mentorId : g.mentorId
+    } : g));
+
+    if (fields.mentorId !== undefined) {
+      const newMentorId = fields.mentorId && fields.mentorId !== 'Unassigned' ? fields.mentorId : null;
+      setMentors(prev => prev.map(m => {
+        if (newMentorId && m.id === newMentorId) return { ...m, gugusId: id };
+        if (m.gugusId === id && m.id !== newMentorId) return { ...m, gugusId: 'Unassigned' };
+        return m;
+      }));
+    }
+
     try {
       await gugusDb.update(id, fields);
     } catch (err) {
       console.error("Error updating gugus:", err);
       alert(err.message || "Gagal memperbarui gugus.");
+      // Rollback
+      const [mData, gData] = await Promise.all([mentorsDb.fetchAll(), gugusDb.fetchAll()]);
+      setMentors(mData);
+      setGugus(gData);
     }
   };
 
   const deleteGugus = async (id) => {
+    // Optimistic local state update
+    setGugus(prev => prev.filter(g => g.id !== id));
+    setMentors(prev => prev.map(m => m.gugusId === id ? { ...m, gugusId: 'Unassigned' } : m));
     try {
       await gugusDb.delete(id);
     } catch (err) {
       console.error("Error deleting gugus:", err);
       alert(err.message || "Gagal menghapus gugus.");
+      // Rollback
+      const [mData, gData] = await Promise.all([mentorsDb.fetchAll(), gugusDb.fetchAll()]);
+      setMentors(mData);
+      setGugus(gData);
     }
   };
 
   const addLog = async (name, nim, gugusName, scanner, status = 'Valid', note = '', locationData = null) => {
     try {
       const student = peserta.find(p => p.id === nim);
-      await logsDb.add(name, nim, gugusName, scanner, status, note, student?.uuid, currentUser?.id, locationData);
+      const inserted = await logsDb.add(name, nim, gugusName, scanner, status, note, student?.uuid, currentUser?.id, locationData);
+      if (inserted) {
+        const transformed = transformLog(inserted);
+        setLogs(prev => {
+          if (prev.some(l => l.id === transformed.id)) return prev;
+          return [transformed, ...prev];
+        });
+      }
     } catch (err) {
       console.error("Error writing scan log:", err);
     }
   };
 
   const deleteLog = async (id) => {
+    const logToDelete = logs.find(l => l.id === id);
+    // Optimistic local state update
+    setLogs(prev => prev.filter(l => l.id !== id));
+
+    if (logToDelete && logToDelete.status === 'Valid') {
+      const studentNim = logToDelete.nim;
+      const otherValidLogs = logs.filter(l => l.id !== id && l.nim === studentNim && l.status === 'Valid');
+      if (otherValidLogs.length === 0) {
+        setPeserta(prev => prev.map(p => String(p.id) === String(studentNim) ? { ...p, status: 'Belum Hadir' } : p));
+      }
+    }
+
     try {
       await logsDb.delete(id);
+      if (logToDelete && logToDelete.status === 'Valid') {
+        const studentNim = logToDelete.nim;
+        const otherValidLogs = logs.filter(l => l.id !== id && l.nim === studentNim && l.status === 'Valid');
+        if (otherValidLogs.length === 0) {
+          await pesertaDb.update(studentNim, { status: 'Belum Hadir' });
+        }
+      }
     } catch (err) {
       console.error("Error deleting scan log:", err);
+      // Rollback
+      const [lData, pData] = await Promise.all([logsDb.fetchAll(), pesertaDb.fetchAll()]);
+      setLogs(lData);
+      setPeserta(pData);
     }
   };
 
@@ -638,8 +883,16 @@ export function AppContextProvider({ children }) {
       const group = gugus.find(g => g.id === student.gugusId);
       const groupName = group ? group.name : '-';
 
-      await claimsDb.add(pesertaId, issue, note, requestedStatus, student, groupName, currentUser);
+      const added = await claimsDb.add(pesertaId, issue, note, requestedStatus, student, groupName, currentUser);
+      if (added) {
+        const transformed = transformClaim(added);
+        setClaims(prev => {
+          if (prev.some(c => c.id === transformed.id)) return prev;
+          return [...prev, transformed];
+        });
+      }
       await pesertaDb.update(pesertaId, { status: 'Manual (Pending)' });
+      setPeserta(prev => prev.map(p => p.id === pesertaId ? { ...p, status: 'Manual (Pending)' } : p));
     } catch (err) {
       console.error("Error creating claim:", err);
       alert("Gagal mengirim pengajuan absensi manual.");
@@ -653,18 +906,28 @@ export function AppContextProvider({ children }) {
 
       if (claim.issue === 'Tambah Peserta') {
         const studentData = JSON.parse(claim.catatan);
-        await pesertaDb.add(studentData);
+        const added = await pesertaDb.add(studentData);
+        if (added) {
+          const transformed = transformPeserta(added);
+          setPeserta(prev => {
+            if (prev.some(p => p.id === transformed.id)) return prev;
+            return [...prev, transformed];
+          });
+        }
         await addLog(studentData.name, studentData.id, claim.gugusName, 'Admin PKKMB', 'Valid', 'Persetujuan Tambah Peserta');
       } else if (claim.issue === 'Edit Peserta') {
         const studentData = JSON.parse(claim.catatan);
         await pesertaDb.update(claim.nim, studentData);
+        setPeserta(prev => prev.map(p => p.id === claim.nim ? { ...p, ...studentData } : p));
         await addLog(studentData.name, claim.nim, claim.gugusName, 'Admin PKKMB', 'Valid', 'Persetujuan Edit Peserta');
       } else {
         const targetStatus = claim.requestedStatus || 'Hadir Penuh';
         await pesertaDb.update(claim.nim, { status: targetStatus });
+        setPeserta(prev => prev.map(p => p.id === claim.nim ? { ...p, status: targetStatus } : p));
         await addLog(claim.name, claim.nim, claim.gugusName, 'Admin PKKMB', 'Valid');
       }
       await claimsDb.updateStatus(claimId, 'approved');
+      setClaims(prev => prev.filter(c => c.id !== claimId));
     } catch (err) {
       console.error("Error approving claim:", err);
       alert("Gagal menyetujui klaim.");
@@ -680,9 +943,11 @@ export function AppContextProvider({ children }) {
         await addLog(claim.name, claim.nim, claim.gugusName, 'Admin (Tolak)', 'Tidak Valid', `Persetujuan ditolak: ${reason}`);
       } else {
         await pesertaDb.update(claim.nim, { status: 'Manual (Ditolak)' });
+        setPeserta(prev => prev.map(p => p.id === claim.nim ? { ...p, status: 'Manual (Ditolak)' } : p));
         await addLog(claim.name, claim.nim, claim.gugusName, 'Admin (Tolak Manual)', 'Tidak Valid', reason);
       }
       await claimsDb.updateStatus(claimId, 'rejected');
+      setClaims(prev => prev.filter(c => c.id !== claimId));
     } catch (err) {
       console.error("Error rejecting claim:", err);
       alert("Gagal menolak klaim.");
@@ -691,7 +956,14 @@ export function AppContextProvider({ children }) {
 
   const generateQr = async (item) => {
     try {
-      await qrSessionsDb.add(item, currentUser?.id);
+      const added = await qrSessionsDb.add(item, currentUser?.id);
+      if (added) {
+        const transformed = transformQr(added);
+        setQrCodes(prev => {
+          if (prev.some(q => q.id === transformed.id)) return prev;
+          return [...prev, transformed];
+        });
+      }
     } catch (err) {
       console.error("Error creating QR session:", err);
       alert("Gagal membuat sesi QR.");
@@ -701,6 +973,7 @@ export function AppContextProvider({ children }) {
   const expireQr = async (id) => {
     try {
       await qrSessionsDb.expire(id);
+      setQrCodes(prev => prev.map(q => q.id === id ? { ...q, status: 'Expired' } : q));
     } catch (err) {
       console.error("Error expiring QR session:", err);
     }
@@ -709,6 +982,7 @@ export function AppContextProvider({ children }) {
   const deleteQr = async (id) => {
     try {
       await qrSessionsDb.delete(id);
+      setQrCodes(prev => prev.filter(q => q.id !== id));
     } catch (err) {
       console.error("Error deleting QR session:", err);
     }
@@ -723,6 +997,7 @@ export function AppContextProvider({ children }) {
 
     try {
       await pesertaDb.update(studentId, { status: 'Hadir Penuh' });
+      setPeserta(prev => prev.map(p => String(p.id) === String(studentId) ? { ...p, status: 'Hadir Penuh' } : p));
       await addLog(student.name, student.id, groupName, currentUser ? currentUser.name : 'Mentor', 'Valid', '', locationData);
       return true;
     } catch (err) {
@@ -845,7 +1120,8 @@ export function AppContextProvider({ children }) {
       hasMentorNotifications,
       setAdminNotificationsCleared,
       setMentorNotificationsCleared,
-      loading
+      loading,
+      parseDbDate
     }}>
       {children}
     </AppContext.Provider>

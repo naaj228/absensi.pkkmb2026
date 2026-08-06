@@ -1,14 +1,30 @@
 import { supabase } from './supabase';
 import { createClient } from '@supabase/supabase-js';
 
+// Helper to parse DB date strings safely as UTC if they lack timezone offsets
+function parseDbDate(dateStr) {
+  if (!dateStr) return new Date();
+  let formatted = dateStr;
+  if (typeof dateStr === 'string') {
+    formatted = dateStr.replace(' ', 'T');
+    const hasTimezone = formatted.includes('Z') || 
+                        /[+-]\d{2}(:\d{2})?$/.test(formatted) ||
+                        /\+\d{2}$/.test(formatted);
+    if (!hasTimezone && (formatted.includes('T') || formatted.includes(':'))) {
+      formatted += 'Z';
+    }
+  }
+  return new Date(formatted);
+}
+
 // Helper to convert date to Indonesian time string
 function getIndoTime(dateString) {
-  const date = dateString ? new Date(dateString) : new Date();
+  const date = dateString ? parseDbDate(dateString) : new Date();
   return date.toTimeString().split(' ')[0]; // HH:MM:SS
 }
 
 function getIndoDate(dateString) {
-  const date = dateString ? new Date(dateString) : new Date();
+  const date = dateString ? parseDbDate(dateString) : new Date();
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { isHadir } from '../../utils/statusHelper';
 
 export default function AdminDashboard() {
-  const { peserta, mentors, gugus, logs, hasAdminNotifications } = useContext(AppContext);
+  const { peserta, mentors, gugus, logs, hasAdminNotifications, parseDbDate } = useContext(AppContext);
   const [chartFilter, setChartFilter] = useState('day');
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const navigate = useNavigate();
@@ -42,7 +42,7 @@ export default function AdminDashboard() {
       const value = logs.filter(l => {
         if (!l.waktu) return false;
         if (l.status !== 'Valid') return false;
-        const logTime = new Date(l.waktu).getTime();
+        const logTime = parseDbDate(l.waktu).getTime();
         return logTime >= startTime.getTime() && logTime < endTime.getTime();
       }).length;
 

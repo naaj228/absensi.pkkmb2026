@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import { isHadir, getStatusBadge, STATUS_OPTIONS } from '../../utils/statusHelper';
 
 export default function AdminPeserta() {
-  const { peserta, gugus, addPeserta, updatePeserta, deletePeserta, hasAdminNotifications } = useContext(AppContext);
+  const { peserta, gugus, logs, addPeserta, updatePeserta, deletePeserta, hasAdminNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
   // Filter & Search states
@@ -598,12 +598,34 @@ export default function AdminPeserta() {
                 </div>
                 <div>
                   <label className="block text-label-md font-label-md text-on-surface mb-1">Status Kehadiran</label>
-                  <select className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary cursor-pointer font-body-md" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-                    {STATUS_OPTIONS.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                    <option value="Manual (Pending)">⏳ Manual (Pending)</option>
-                  </select>
+                  {(() => {
+                    const editedStudentHasLogs = logs.some(l => String(l.nim) === String(editStudentId));
+                    return (
+                      <>
+                        <select 
+                          disabled={!editedStudentHasLogs}
+                          className={`w-full p-3 rounded-xl border font-body-md ${
+                            editedStudentHasLogs 
+                              ? 'bg-surface-container text-on-surface border-outline-variant focus:outline-none focus:border-primary cursor-pointer' 
+                              : 'bg-surface-container-low text-on-surface-variant/40 border-outline-variant/30 cursor-not-allowed'
+                          }`}
+                          value={formData.status} 
+                          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                        >
+                          {STATUS_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                          <option value="Manual (Pending)">⏳ Manual (Pending)</option>
+                        </select>
+                        {!editedStudentHasLogs && (
+                          <p className="text-[12px] text-error/85 mt-1.5 font-sans font-medium flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: "'FILL' 1" }}>info</span>
+                            Status tidak dapat diubah karena belum ada riwayat log.
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               <div className="p-6 bg-surface-container-low flex justify-end gap-3 border-t border-outline-variant/30">
