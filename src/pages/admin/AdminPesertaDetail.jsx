@@ -2,7 +2,7 @@ import { useContext, useCallback, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
 import { sendQrEmail } from '../../lib/emailService';
-import { isHadir, STATUS_OPTIONS } from '../../utils/statusHelper';
+import { isHadir, STATUS_OPTIONS, getStatusBadge } from '../../utils/statusHelper';
 
 export default function AdminPesertaDetail() {
   const { id } = useParams();
@@ -90,14 +90,7 @@ export default function AdminPesertaDetail() {
     });
   };
 
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case 'Hadir': return 'bg-[#ecfdf5] text-[#059669] border-[#a7f3d0]';
-      case 'Alpa': return 'bg-[#fef2f2] text-[#dc2626] border-[#fecaca]';
-      case 'Izin': return 'bg-[#fffbeb] text-[#d97706] border-[#fde68a]';
-      default: return 'bg-surface-container-highest text-on-surface-variant border-outline-variant';
-    }
-  };
+
 
   return (
     <div className="w-full">
@@ -125,9 +118,16 @@ export default function AdminPesertaDetail() {
               <div className="text-center sm:text-left space-y-2">
                 <div className="flex flex-col sm:flex-row items-center gap-3">
                   <h2 className="text-headline-lg font-headline-md text-on-surface leading-tight">{student.name}</h2>
-                  <span className={`px-3 py-1 rounded-full text-label-md font-label-md border font-semibold ${getStatusBadgeClass(student.status)}`}>
-                    {student.status}
-                  </span>
+                  {(() => {
+                    const badge = getStatusBadge(student.status);
+                    const borderColor = badge.text.replace('text-', 'border-');
+                    return (
+                      <span className={`px-3 py-1 rounded-full text-label-md font-label-md border font-semibold flex items-center gap-1.5 ${badge.bg} ${badge.text} ${borderColor}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`}></span>
+                        {student.status}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <p className="text-body-md text-on-surface-variant font-mono">{student.email} • NIM: {student.id}</p>
               </div>
