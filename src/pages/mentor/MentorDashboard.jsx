@@ -1,8 +1,7 @@
-import { useContext, useState } from 'react';
+import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
-import { isHadir } from '../../utils/statusHelper';
-import { STATUS } from '../../utils/statusHelper';
+import { isHadir, STATUS } from '../../utils/statusHelper';
 
 export default function MentorDashboard() {
   const { peserta, gugus, currentUser, hasMentorNotifications } = useContext(AppContext);
@@ -18,9 +17,6 @@ export default function MentorDashboard() {
   // Stats
   const totalStudents = gugusStudents.length;
   const hadirCount = gugusStudents.filter(p => isHadir(p.status)).length;
-  const hadirPenuhCount = gugusStudents.filter(p => p.status === STATUS.HADIR_PENUH).length;
-  const hadirSebagianCount = gugusStudents.filter(p => p.status === STATUS.HADIR_SEBAGIAN).length;
-  const izinCount = gugusStudents.filter(p => p.status === STATUS.IZIN).length;
   const alphaCount = gugusStudents.filter(p => p.status === STATUS.ALPHA || !p.status).length;
   const pendingCount = gugusStudents.filter(p => p.status === STATUS.PENDING).length;
 

@@ -12,6 +12,16 @@ import {
 
 export const AppContext = createContext();
 
+// Helper to format Date to YYYY-MM-DD in local timezone
+const getLocalDateFormat = (dateVal) => {
+  if (!dateVal) return '';
+  const date = new Date(dateVal);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // ----------------------------------------------------
 // DB to App State Transformers
 // ----------------------------------------------------
@@ -22,7 +32,7 @@ const transformPeserta = (p) => ({
   email: p.email,
   gugusId: p.gugus_id || '',
   fakultas: p.jurusan || '',
-  status: p.status || 'Alpha',
+  status: p.status || 'Belum Hadir',
   fotoUrl: p.foto_url || ''
 });
 
@@ -55,8 +65,9 @@ const transformClaim = (c) => ({
 
 const transformLog = (l) => ({
   id: l.id,
+  waktu: l.waktu,
   timestamp: l.waktu ? new Date(l.waktu).toTimeString().split(' ')[0] : '',
-  date: l.waktu ? new Date(l.waktu).toISOString().split('T')[0] : '',
+  date: l.waktu ? getLocalDateFormat(l.waktu) : '',
   name: l.peserta_nama || '',
   nim: l.peserta_nim || '',
   gugusName: l.gugus_nama || '-',
@@ -442,7 +453,20 @@ export function AppContextProvider({ children }) {
   // ----------------------------------------------------
   const addPeserta = async (item) => {
     try {
+      // Validate gugus capacity
+      if (item.gugusId && item.gugusId !== 'Unassigned') {
+        const targetGugus = gugus.find(g => g.id === item.gugusId);
+        if (targetGugus) {
+          const currentCount = peserta.filter(p => p.gugusId === item.gugusId).length;
+          if (currentCount >= targetGugus.capacity) {
+            throw new Error(`Gugus ${targetGugus.name} sudah penuh (kapasitas maksimal ${targetGugus.capacity} peserta).`);
+          }
+        }
+      }
+
       if (currentUser?.role === 'mentor') {
+        const student = peserta.find(p => p.id === item.id);
+        if (student) return;
         const group = gugus.find(g => g.id === item.gugusId);
         const groupName = group ? group.name : '-';
         await claimsDb.add(
@@ -461,14 +485,29 @@ export function AppContextProvider({ children }) {
     } catch (err) {
       console.error("Error adding peserta:", err);
       alert(err.message || "Gagal menambahkan peserta.");
+      throw err;
     }
   };
 
   const updatePeserta = async (id, fields) => {
     try {
+      const student = peserta.find(p => p.id === id);
+      if (!student) return;
+
+      // Validate gugus capacity on update if changing gugus
+      if (fields.gugusId !== undefined && fields.gugusId !== student.gugusId) {
+        if (fields.gugusId && fields.gugusId !== 'Unassigned') {
+          const targetGugus = gugus.find(g => g.id === fields.gugusId);
+          if (targetGugus) {
+            const currentCount = peserta.filter(p => p.gugusId === fields.gugusId).length;
+            if (currentCount >= targetGugus.capacity) {
+              throw new Error(`Gugus ${targetGugus.name} sudah penuh (kapasitas maksimal ${targetGugus.capacity} peserta).`);
+            }
+          }
+        }
+      }
+
       if (currentUser?.role === 'mentor') {
-        const student = peserta.find(p => p.id === id);
-        if (!student) return;
         const group = gugus.find(g => g.id === student.gugusId);
         const groupName = group ? group.name : '-';
         await claimsDb.add(
@@ -487,6 +526,7 @@ export function AppContextProvider({ children }) {
     } catch (err) {
       console.error("Error updating peserta:", err);
       alert(err.message || "Gagal memperbarui peserta.");
+      throw err;
     }
   };
 
@@ -505,6 +545,7 @@ export function AppContextProvider({ children }) {
     } catch (err) {
       console.error("Error adding mentor:", err);
       alert(err.message || "Gagal menambahkan mentor.");
+      throw err;
     }
   };
 
@@ -514,6 +555,7 @@ export function AppContextProvider({ children }) {
     } catch (err) {
       console.error("Error updating mentor:", err);
       alert(err.message || "Gagal memperbarui mentor.");
+      throw err;
     }
   };
 
@@ -703,7 +745,7 @@ export function AppContextProvider({ children }) {
         if (data?.email) {
           email = data.email;
         } else {
-          throw new Error('NIP tidak ditemukan. Coba gunakan email kamu.');
+          throw new Error('NIM tidak ditemukan. Coba gunakan email kamu.');
         }
       } else {
         throw new Error('Masukkan email admin yang valid (contoh: admin@univ.ac.id).');

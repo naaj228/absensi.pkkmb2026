@@ -6,7 +6,6 @@ export default function MentorNotifikasi() {
   const { 
     logs, 
     claims, 
-    peserta, 
     gugus, 
     currentUser, 
     setMentorNotificationsCleared,

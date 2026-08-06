@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { createClient } from '@supabase/supabase-js';
 
 // Helper to convert date to Indonesian time string
 function getIndoTime(dateString) {
@@ -30,7 +31,7 @@ export const pesertaDb = {
       email: p.email,
       gugusId: p.gugus_id || '',
       fakultas: p.jurusan || '', // Map jurusan to .fakultas
-      status: p.status || 'Alpha',
+      status: p.status || 'Belum Hadir',
       fotoUrl: p.foto_url || ''
     }));
   },
@@ -44,7 +45,7 @@ export const pesertaDb = {
         email: item.email,
         gugus_id: item.gugusId || null,
         jurusan: item.fakultas,
-        status: item.status || 'Alpha'
+        status: item.status || 'Belum Hadir'
       })
       .select()
       .single();
@@ -78,6 +79,52 @@ export const pesertaDb = {
   }
 };
 
+// Helper to keep gugus.mentor_id and profiles.gugus_id bidirectionally in sync
+async function syncGugusAndMentor(mentorId, newGugusId) {
+  const gugusIdVal = newGugusId && newGugusId !== 'Unassigned' ? newGugusId : null;
+
+  if (gugusIdVal) {
+    // 1. Clear this mentor from any other gugus
+    await supabase
+      .from('gugus')
+      .update({ mentor_id: null })
+      .eq('mentor_id', mentorId)
+      .neq('id', gugusIdVal);
+
+    // 2. Clear this gugus from any other mentor
+    await supabase
+      .from('profiles')
+      .update({ gugus_id: null })
+      .eq('gugus_id', gugusIdVal)
+      .neq('id', mentorId);
+
+    // 3. Set the new mentor on the target gugus
+    await supabase
+      .from('gugus')
+      .update({ mentor_id: mentorId })
+      .eq('id', gugusIdVal);
+
+    // 4. Set the new gugus on the mentor profile
+    await supabase
+      .from('profiles')
+      .update({ gugus_id: gugusIdVal })
+      .eq('id', mentorId);
+  } else {
+    // If setting to unassigned:
+    // 1. Clear this mentor from any gugus
+    await supabase
+      .from('gugus')
+      .update({ mentor_id: null })
+      .eq('mentor_id', mentorId);
+
+    // 2. Clear gugus from the mentor profile
+    await supabase
+      .from('profiles')
+      .update({ gugus_id: null })
+      .eq('id', mentorId);
+  }
+}
+
 // ----------------------------------------------------
 // GUGUS SERVICE
 // ----------------------------------------------------
@@ -106,33 +153,39 @@ export const gugusDb = {
       .select()
       .single();
     if (error) throw error;
+
+    // Sync the other side (profiles.gugus_id)
+    if (item.mentorId && item.mentorId !== 'Unassigned') {
+      await syncGugusAndMentor(item.mentorId, data.id);
+    }
+
     return data;
   },
 
   async update(id, fields) {
     const payload = {};
     if (fields.name !== undefined) payload.nama = fields.name;
+    if (fields.capacity !== undefined) payload.kuota = fields.capacity;
+
     if (fields.mentorId !== undefined) {
       const newMentorId = fields.mentorId && fields.mentorId !== 'Unassigned' ? fields.mentorId : null;
       payload.mentor_id = newMentorId;
 
-      // Sync profiles.gugus_id: clear old mentor, set new mentor
-      // 1. Clear gugus_id from any mentor currently assigned to this gugus
-      await supabase
-        .from('profiles')
-        .update({ gugus_id: null })
-        .eq('gugus_id', id)
-        .eq('role', 'mentor');
-
-      // 2. Set gugus_id on the newly assigned mentor
       if (newMentorId) {
-        await supabase
-          .from('profiles')
-          .update({ gugus_id: id })
-          .eq('id', newMentorId);
+        await syncGugusAndMentor(newMentorId, id);
+      } else {
+        // If removing mentor from this gugus:
+        // Find the current mentor of this gugus and clear their gugus_id
+        const { data: currentGugus } = await supabase
+          .from('gugus')
+          .select('mentor_id')
+          .eq('id', id)
+          .single();
+        if (currentGugus?.mentor_id) {
+          await syncGugusAndMentor(currentGugus.mentor_id, null);
+        }
       }
     }
-    if (fields.capacity !== undefined) payload.kuota = fields.capacity;
 
     const { data, error } = await supabase
       .from('gugus')
@@ -143,6 +196,12 @@ export const gugusDb = {
   },
 
   async delete(id) {
+    // Clear gugus_id on any mentor currently assigned to this gugus
+    await supabase
+      .from('profiles')
+      .update({ gugus_id: null })
+      .eq('gugus_id', id);
+
     const { error } = await supabase
       .from('gugus')
       .delete()
@@ -171,11 +230,46 @@ export const mentorsDb = {
   },
 
   async add(item) {
-    // Note: Creating a user with credentials requires admin/auth.signUp
-    // For general database profiles updates, we insert/upsert profile
-    const { data, error } = await supabase
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    // Create a temporary Supabase client with persistSession: false to avoid signing out the current admin session
+    const tempSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        storageKey: 'temp-auth-token',
+        storage: {
+          getItem: () => null,
+          setItem: () => {},
+          removeItem: () => {}
+        }
+      }
+    });
+
+    // 1. Sign up the user in Supabase Auth
+    const { data: signUpData, error: signUpError } = await tempSupabase.auth.signUp({
+      email: item.email,
+      password: item.password || 'pkkmb2026',
+      options: {
+        data: {
+          role: 'mentor',
+          full_name: item.name
+        }
+      }
+    });
+
+    if (signUpError) throw signUpError;
+
+    const user = signUpData.user;
+    if (!user) throw new Error("Gagal membuat user auth Supabase.");
+
+    // 2. Upsert the profile in public.profiles using admin privileges (main client)
+    const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .insert({
+      .upsert({
+        id: user.id,
         email: item.email,
         full_name: item.name,
         role: 'mentor',
@@ -184,8 +278,15 @@ export const mentorsDb = {
       })
       .select()
       .single();
-    if (error) throw error;
-    return data;
+
+    if (profileError) throw profileError;
+
+    // Sync the other side (gugus.mentor_id)
+    if (item.gugusId && item.gugusId !== 'Unassigned') {
+      await syncGugusAndMentor(user.id, item.gugusId);
+    }
+
+    return profileData;
   },
 
   async update(id, fields) {
@@ -200,12 +301,26 @@ export const mentorsDb = {
     const { data, error } = await supabase
       .from('profiles')
       .update(payload)
-      .eq('id', id);
+      .eq('id', id)
+      .select()
+      .single();
     if (error) throw error;
+
+    // Sync the other side (gugus.mentor_id)
+    if (fields.gugusId !== undefined) {
+      await syncGugusAndMentor(id, fields.gugusId);
+    }
+
     return data;
   },
 
   async delete(id) {
+    // Clear mentor from any gugus
+    await supabase
+      .from('gugus')
+      .update({ mentor_id: null })
+      .eq('mentor_id', id);
+
     const { error } = await supabase
       .from('profiles')
       .delete()

@@ -257,8 +257,8 @@ export default function MentorRiwayat() {
               </div>
             </div>
 
-            {/* Table Area */}
-            <div className="w-full overflow-x-auto lg:overflow-visible">
+            {/* Desktop View: Table Area */}
+            <div className="hidden md:block w-full overflow-x-auto lg:overflow-visible">
               <table className="w-full text-left table-auto">
                 <thead className="bg-surface-container-highest">
                   <tr>
@@ -293,11 +293,47 @@ export default function MentorRiwayat() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="5" className="text-center py-12 text-on-surface-variant">Tidak ada riwayat pemindaian.</td>
+                      <td colSpan="5" className="text-center py-8 text-on-surface-variant">Tidak ada log pemindaian hari ini.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile View: Card List */}
+            <div className="block md:hidden space-y-4 p-4">
+              {currentItems.length > 0 ? (
+                currentItems.map((log) => (
+                  <div key={log.id} className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/40 flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-on-surface leading-snug">{log.name}</p>
+                        <span className="text-label-sm text-on-surface-variant font-mono">NIM: {log.nim}</span>
+                      </div>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label-sm font-label-sm font-semibold ${
+                        log.status === 'Valid' ? 'bg-green-500/15 text-green-700' : 'bg-red-500/15 text-red-700'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${log.status === 'Valid' ? 'bg-green-600' : 'bg-red-600'}`}></span>
+                        {log.status}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 border-t border-outline-variant/20 pt-2.5 mt-1 text-body-sm text-on-surface-variant">
+                      <div>
+                        <span className="text-label-sm text-on-surface-variant/60 block mb-0.5">Waktu Scan</span>
+                        <span className="text-on-surface font-medium block leading-tight">{log.date}</span>
+                        <span className="text-label-sm text-on-surface-variant/60 font-medium block mt-0.5">{log.timestamp}</span>
+                      </div>
+                      <div>
+                        <span className="text-label-sm text-on-surface-variant/60 block mb-0.5">Pemindai</span>
+                        <span className="text-on-surface font-medium block truncate">{log.scanner}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-10 text-on-surface-variant text-body-md bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/60">Tidak ada log pemindaian hari ini.</div>
+              )}
             </div>
 
             {/* Pagination / Total Footer */}

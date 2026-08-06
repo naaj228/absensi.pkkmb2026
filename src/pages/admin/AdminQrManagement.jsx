@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { sendQrEmail, sendBulkQrEmail, checkEmailServerHealth } from '../../lib/emailService';
 
 export default function AdminQrManagement() {
-  const { peserta, gugus, updatePeserta, hasAdminNotifications } = useContext(AppContext);
+  const { peserta, gugus, hasAdminNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
   // Search & Filter states
@@ -42,11 +42,11 @@ export default function AdminQrManagement() {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredStudents.slice(indexOfFirstItem, indexOfLastItem);
 
-  const getGugusName = (gugusId) => {
+  const getGugusName = useCallback((gugusId) => {
     if (!gugusId) return 'Belum Ditentukan';
     const g = gugus.find(item => item.id === gugusId);
     return g ? g.name : gugusId;
-  };
+  }, [gugus]);
 
   // Download QR Code PNG untuk peserta tertentu
   const handleDownloadQr = useCallback(async (student) => {
@@ -84,7 +84,7 @@ export default function AdminQrManagement() {
     });
     setEmailSending(false);
     alert(result.message);
-  }, [emailSending]);
+  }, [emailSending, getGugusName]);
 
   // ── Bulk QR email send ────────────────────────────────────────────────────
   const [showBulkModal, setShowBulkModal] = useState(false);

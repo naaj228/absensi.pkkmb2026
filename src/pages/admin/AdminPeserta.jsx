@@ -92,7 +92,7 @@ export default function AdminPeserta() {
       email: '',
       gugusId: gugus[0]?.id || '',
       fakultas: 'Informatika',
-      status: 'Alpha'
+      status: 'Belum Hadir'
     });
     setShowAddModal(true);
   };
@@ -110,20 +110,24 @@ export default function AdminPeserta() {
     setShowEditModal(true);
   };
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-    if (showAddModal) {
-      if (peserta.some(p => p.id === formData.id)) {
-        alert("NIM sudah digunakan!");
-        return;
+    try {
+      if (showAddModal) {
+        if (peserta.some(p => p.id === formData.id)) {
+          alert("NIM sudah digunakan!");
+          return;
+        }
+        await addPeserta(formData);
+        setShowAddModal(false);
+        alert("Peserta berhasil ditambahkan.");
+      } else if (showEditModal) {
+        await updatePeserta(editStudentId, formData);
+        setShowEditModal(false);
+        alert("Peserta berhasil diperbarui.");
       }
-      addPeserta(formData);
-      setShowAddModal(false);
-      alert("Peserta berhasil ditambahkan.");
-    } else if (showEditModal) {
-      updatePeserta(editStudentId, formData);
-      setShowEditModal(false);
-      alert("Peserta berhasil diperbarui.");
+    } catch {
+      // Error is already alerted by AppContext
     }
   };
 
@@ -153,20 +157,31 @@ export default function AdminPeserta() {
           // Detect header row (row index 0)
           const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
 
-          // Helper: find column index by possible names
-          const col = (...names) => {
-            for (const n of names) {
-              const idx = headers.findIndex(h => h.includes(n.toLowerCase()));
+          // Helper: find column index by possible names, prioritizing exact matches and allowing exclusions
+          const findColIdx = (targetNames, excludeKeywords = []) => {
+            // First pass: try exact match
+            for (const name of targetNames) {
+              const idx = headers.findIndex(h => h === name.toLowerCase());
+              if (idx !== -1) return idx;
+            }
+            // Second pass: check if header includes one of targetNames and does NOT include any of excludeKeywords
+            for (const name of targetNames) {
+              const idx = headers.findIndex(h => {
+                const normalized = h.toLowerCase();
+                const matches = normalized.includes(name.toLowerCase());
+                const excluded = excludeKeywords.some(ex => normalized.includes(ex.toLowerCase()));
+                return matches && !excluded;
+              });
               if (idx !== -1) return idx;
             }
             return -1;
           };
 
-          const iNama = col('nama');
-          const iNIM = col('nim', 'no. induk', 'nomorinduk');
-          const iEmail = col('email');
-          const iGugus = col('gugus');
-          const iFakultas = col('jurusan', 'fakultas', 'program studi', 'prodi');
+          const iNama = findColIdx(['nama peserta', 'nama lengkap', 'nama maba', 'nama'], ['gugus']);
+          const iNIM = findColIdx(['nim', 'no. induk', 'nomor induk', 'nomorinduk', 'id']);
+          const iEmail = findColIdx(['email']);
+          const iGugus = findColIdx(['nama gugus', 'gugus']);
+          const iFakultas = findColIdx(['program studi', 'prodi', 'jurusan', 'fakultas']);
 
           if (iNama === -1 || iNIM === -1) {
             alert('Format kolom tidak dikenali. Pastikan file memiliki kolom "Nama" dan "NIM".');
@@ -352,7 +367,8 @@ export default function AdminPeserta() {
             )}
           </div>
         </div>
-        <div className="overflow-x-auto">
+        {/* Desktop View: Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface/50 border-b border-surface-variant">
@@ -423,6 +439,60 @@ export default function AdminPeserta() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View: Card List */}
+        <div className="block md:hidden space-y-4 p-4">
+          {currentItems.length > 0 ? (
+            currentItems.map((student) => (
+              <div key={student.id} className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/40 flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <input className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary accent-primary cursor-pointer shrink-0" type="checkbox" checked={selectedIds.includes(student.id)} onChange={(e) => handleSelectOne(student.id, e.target.checked)} />
+                    <div className="w-10 h-10 rounded-full bg-secondary-container/50 text-secondary font-headline-sm flex items-center justify-center border border-secondary/10 shrink-0 font-bold">
+                      {student.name.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-body-md font-semibold text-on-surface truncate">{student.name}</p>
+                      <p className="text-label-sm text-on-surface-variant truncate">{student.fakultas}</p>
+                    </div>
+                  </div>
+                  {(() => { const b = getStatusBadge(student.status); return (
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label-sm font-medium shrink-0 ${b.bg} ${b.text}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span>
+                      {b.label}
+                    </span>
+                  ); })()}
+                </div>
+                <div className="grid grid-cols-2 gap-2 border-t border-b border-outline-variant/20 py-2.5 my-1 text-body-sm text-on-surface-variant">
+                  <div>
+                    <span className="text-label-sm text-on-surface-variant/60 block mb-0.5">NIM</span>
+                    <span className="font-mono text-on-surface font-medium bg-surface px-1.5 py-0.5 rounded border border-outline-variant/20">{student.id}</span>
+                  </div>
+                  <div>
+                    <span className="text-label-sm text-on-surface-variant/60 block mb-0.5">Gugus</span>
+                    <span className="text-on-surface font-medium">{getGugusName(student.gugusId)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button onClick={() => navigate(`/admin/peserta/${student.id}`)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-on-surface-variant hover:text-primary hover:bg-primary/5 rounded-lg border border-outline-variant/30 transition-colors cursor-pointer">
+                    <span className="material-symbols-outlined text-[16px]">visibility</span>
+                    Detail
+                  </button>
+                  <button onClick={() => handleOpenEditModal(student)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-on-surface-variant hover:text-secondary hover:bg-secondary/5 rounded-lg border border-outline-variant/30 transition-colors cursor-pointer">
+                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                    Edit
+                  </button>
+                  <button onClick={() => handleDeleteOne(student.id)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-error hover:bg-error/5 rounded-lg border border-error/10 transition-colors cursor-pointer">
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    Hapus
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-10 text-on-surface-variant text-body-md bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/60">Tidak ada data peserta ditemukan.</div>
+          )}
         </div>
         <div className="p-4 border-t border-surface-variant flex items-center justify-between bg-surface/30">
           <span className="text-body-sm font-body-sm text-on-surface-variant">Menampilkan {indexOfFirstItem + 1} sampai {Math.min(indexOfLastItem, totalItems)} dari {totalItems} entri</span>

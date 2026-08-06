@@ -3,7 +3,7 @@ import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminApproval() {
-  const { claims, gugus, peserta, approveClaim, rejectClaim, hasAdminNotifications } = useContext(AppContext);
+  const { claims, peserta, approveClaim, rejectClaim, hasAdminNotifications } = useContext(AppContext);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGugus, setSelectedGugus] = useState('all');
@@ -79,126 +79,239 @@ export default function AdminApproval() {
 ))}
 </div>
 </div>
-<div className="w-full overflow-x-auto lg:overflow-visible">
-<table className="w-full text-left table-auto">
-<thead className="bg-surface-container-highest">
-<tr>
-<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Peserta</th>
-<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">NIM</th>
-<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Gugus</th>
-<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Kendala / Tipe</th>
-<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Status / Aksi</th>
-<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Waktu</th>
-<th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider text-right">Aksi</th>
-</tr>
-</thead>
-<tbody className="bg-surface-container" id="approvalTableBody">
-  {filteredClaims.length > 0 ? (
-    filteredClaims.map((c) => {
-      let detailsText = '';
-      if (c.issue === 'Edit Peserta' && c.catatan) {
-        try {
-          const updated = JSON.parse(c.catatan);
-          const original = peserta.find(p => p.id === c.nim);
-          if (original) {
-            const changes = [];
-            if (original.name !== updated.name) changes.push(`Nama: ${original.name} ➔ ${updated.name}`);
-            if (original.email !== updated.email) changes.push(`Email: ${original.email || '-'} ➔ ${updated.email || '-'}`);
-            if (original.fakultas !== updated.fakultas) changes.push(`Jurusan: ${original.fakultas || '-'} ➔ ${updated.fakultas || '-'}`);
-            if (original.status !== updated.status) changes.push(`Status: ${original.status} ➔ ${updated.status}`);
-            detailsText = changes.join(', ');
-          } else {
-            detailsText = `Nama: ${updated.name}, Email: ${updated.email}`;
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      } else if (c.issue === 'Tambah Peserta' && c.catatan) {
-        try {
-          const data = JSON.parse(c.catatan);
-          detailsText = `Jurusan: ${data.fakultas || '-'} • Email: ${data.email || '-'}`;
-        } catch (err) {
-          console.error(err);
-        }
-      }
+            {/* Desktop View: Table */}
+            <div className="hidden md:block w-full overflow-x-auto lg:overflow-visible">
+              <table className="w-full text-left table-auto">
+                <thead className="bg-surface-container-highest">
+                  <tr>
+                    <th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Peserta</th>
+                    <th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">NIM</th>
+                    <th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Gugus</th>
+                    <th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Kendala / Tipe</th>
+                    <th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Status / Aksi</th>
+                    <th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Waktu</th>
+                    <th className="px-3 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-surface-container" id="approvalTableBody">
+                  {filteredClaims.length > 0 ? (
+                    filteredClaims.map((c) => {
+                      let detailsText = '';
+                      if (c.issue === 'Edit Peserta' && c.catatan) {
+                        try {
+                          const updated = JSON.parse(c.catatan);
+                          const original = peserta.find(p => p.id === c.nim);
+                          if (original) {
+                            const changes = [];
+                            if (original.name !== updated.name) changes.push(`Nama: ${original.name} ➔ ${updated.name}`);
+                            if (original.email !== updated.email) changes.push(`Email: ${original.email || '-'} ➔ ${updated.email || '-'}`);
+                            if (original.fakultas !== updated.fakultas) changes.push(`Jurusan: ${original.fakultas || '-'} ➔ ${updated.fakultas || '-'}`);
+                            if (original.status !== updated.status) changes.push(`Status: ${original.status} ➔ ${updated.status}`);
+                            detailsText = changes.join(', ');
+                          } else {
+                            detailsText = `Nama: ${updated.name}, Email: ${updated.email}`;
+                          }
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      } else if (c.issue === 'Tambah Peserta' && c.catatan) {
+                        try {
+                          const data = JSON.parse(c.catatan);
+                          detailsText = `Jurusan: ${data.fakultas || '-'} • Email: ${data.email || '-'}`;
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }
 
-      return (
-        <tr key={c.id} className="group hover:bg-surface-container-high transition-colors approval-row">
-        <td className="px-3 py-4">
-        <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-secondary text-on-secondary flex items-center justify-center font-bold text-headline-sm shadow-sm relative">
-            {c.name.substring(0, 2).toUpperCase()}
-            <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-error rounded-full border-2 border-surface-container"></span>
-        </div>
-        <div className="flex flex-col">
-        <span className="font-headline-sm text-body-md text-on-surface leading-snug">{c.name}</span>
-        {detailsText ? (
-          <span className="text-[10px] text-primary font-medium mt-0.5 bg-primary/5 px-2 py-0.5 rounded w-max whitespace-normal max-w-[220px] leading-tight">{detailsText}</span>
-        ) : (
-          <span className="font-body-sm text-body-sm text-on-surface-variant leading-none">{c.fakultas}</span>
-        )}
-        </div>
-        </div>
-        </td>
-        <td className="px-3 py-4 font-body-md text-body-md text-on-surface">{c.nim}</td>
-        <td className="px-3 py-4">
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-tertiary-container text-on-tertiary-container">
-                                        {c.gugusName}
-                                    </span>
-        </td>
-        <td className="px-3 py-4">
-        {c.issue === 'Tambah Peserta' ? (
-          <div className="flex items-center gap-1.5 text-primary font-semibold">
-            <span className="material-symbols-outlined text-[16px]">person_add</span>
-            <span className="font-body-sm text-body-sm">Tambah Peserta</span>
-          </div>
-        ) : c.issue === 'Edit Peserta' ? (
-          <div className="flex items-center gap-1.5 text-secondary font-semibold">
-            <span className="material-symbols-outlined text-[16px]">edit_note</span>
-            <span className="font-body-sm text-body-sm">Ubah Profil</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 text-error">
-            <span className="material-symbols-outlined text-[16px]">warning</span>
-            <span className="font-body-sm text-body-sm">{c.issue}</span>
-          </div>
-        )}
-        </td>
-        <td className="px-3 py-4">
-        {c.issue === 'Tambah Peserta' ? (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-primary/10 text-primary">Registrasi</span>
-        ) : c.issue === 'Edit Peserta' ? (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-secondary/10 text-secondary">Ubah Data</span>
-        ) : (
-          (() => {
-            const s = c.requestedStatus || 'Hadir Penuh';
-            const colors = s === 'Hadir Penuh' ? 'bg-green-500/15 text-green-700' : s === 'Hadir Sebagian' ? 'bg-amber-500/15 text-amber-700' : 'bg-blue-500/15 text-blue-700';
-            return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm ${colors}`}>{s}</span>;
-          })()
-        )}
-        </td>
-        <td className="px-3 py-4 font-body-sm text-body-sm text-on-surface-variant">{c.time}</td>
-        <td className="px-3 py-4 text-right">
-        <div className="flex justify-end gap-1.5">
-        <button onClick={() => handleReject(c.id, c.name)} className="action-btn reject-btn w-9 h-9 rounded-lg bg-surface text-error hover:bg-error-container hover:text-on-error-container shadow-sm flex items-center justify-center transition-colors cursor-pointer" title="Tolak">
-        <span className="material-symbols-outlined text-[18px]">close</span>
-        </button>
-        <button onClick={() => handleApprove(c.id, c.name)} className="action-btn approve-btn w-9 h-9 rounded-lg bg-primary text-on-primary shadow-sm hover:scale-105 flex items-center justify-center transition-all cursor-pointer" title="Setujui">
-        <span className="material-symbols-outlined text-[18px]">check</span>
-        </button>
-        </div>
-        </td>
-        </tr>
-      );
-    })
-  ) : (
-    <tr>
-      <td colSpan="7" className="text-center py-10 text-on-surface-variant">Tidak ada klaim manual yang tertunda.</td>
-    </tr>
-  )}
-</tbody>
-</table>
-</div>
+                      return (
+                        <tr key={c.id} className="group hover:bg-surface-container-high transition-colors approval-row">
+                          <td className="px-3 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-secondary text-on-secondary flex items-center justify-center font-bold text-headline-sm shadow-sm relative">
+                                {c.name.substring(0, 2).toUpperCase()}
+                                <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-error rounded-full border-2 border-surface-container"></span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-headline-sm text-body-md text-on-surface leading-snug">{c.name}</span>
+                                {detailsText ? (
+                                  <span className="text-[10px] text-primary font-medium mt-0.5 bg-primary/5 px-2 py-0.5 rounded w-max whitespace-normal max-w-[220px] leading-tight">{detailsText}</span>
+                                ) : (
+                                  <span className="font-body-sm text-body-sm text-on-surface-variant leading-none">{c.fakultas}</span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-4 font-body-md text-body-md text-on-surface">{c.nim}</td>
+                          <td className="px-3 py-4">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-tertiary-container text-on-tertiary-container">
+                              {c.gugusName}
+                            </span>
+                          </td>
+                          <td className="px-3 py-4">
+                            {c.issue === 'Tambah Peserta' ? (
+                              <div className="flex items-center gap-1.5 text-primary font-semibold">
+                                <span className="material-symbols-outlined text-[16px]">person_add</span>
+                                <span className="font-body-sm text-body-sm">Tambah Peserta</span>
+                              </div>
+                            ) : c.issue === 'Edit Peserta' ? (
+                              <div className="flex items-center gap-1.5 text-secondary font-semibold">
+                                <span className="material-symbols-outlined text-[16px]">edit_note</span>
+                                <span className="font-body-sm text-body-sm">Ubah Profil</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-error">
+                                <span className="material-symbols-outlined text-[16px]">warning</span>
+                                <span className="font-body-sm text-body-sm">{c.issue}</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-4">
+                            {c.issue === 'Tambah Peserta' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-primary/10 text-primary">Registrasi</span>
+                            ) : c.issue === 'Edit Peserta' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-secondary/10 text-secondary">Ubah Data</span>
+                            ) : (
+                              (() => {
+                                const s = c.requestedStatus || 'Hadir Penuh';
+                                const colors = s === 'Hadir Penuh' ? 'bg-green-500/15 text-green-700' : s === 'Hadir Sebagian' ? 'bg-amber-500/15 text-amber-700' : 'bg-blue-500/15 text-blue-700';
+                                return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm ${colors}`}>{s}</span>;
+                              })()
+                            )}
+                          </td>
+                          <td className="px-3 py-4 font-body-sm text-body-sm text-on-surface-variant">{c.time}</td>
+                          <td className="px-3 py-4 text-right">
+                            <div className="flex justify-end gap-1.5">
+                              <button onClick={() => handleReject(c.id, c.name)} className="action-btn reject-btn w-9 h-9 rounded-lg bg-surface text-error hover:bg-error-container hover:text-on-error-container shadow-sm flex items-center justify-center transition-colors cursor-pointer" title="Tolak">
+                                <span className="material-symbols-outlined text-[18px]">close</span>
+                              </button>
+                              <button onClick={() => handleApprove(c.id, c.name)} className="action-btn approve-btn w-9 h-9 rounded-lg bg-primary text-on-primary shadow-sm hover:scale-105 flex items-center justify-center transition-all cursor-pointer" title="Setujui">
+                                <span className="material-symbols-outlined text-[18px]">check</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="7" className="text-center py-10 text-on-surface-variant">Tidak ada klaim manual yang tertunda.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile View: Card List */}
+            <div className="block md:hidden space-y-4 p-4">
+              {filteredClaims.length > 0 ? (
+                filteredClaims.map((c) => {
+                  let detailsText = '';
+                  if (c.issue === 'Edit Peserta' && c.catatan) {
+                    try {
+                      const updated = JSON.parse(c.catatan);
+                      const original = peserta.find(p => p.id === c.nim);
+                      if (original) {
+                        const changes = [];
+                        if (original.name !== updated.name) changes.push(`Nama: ${original.name} ➔ ${updated.name}`);
+                        if (original.email !== updated.email) changes.push(`Email: ${original.email || '-'} ➔ ${updated.email || '-'}`);
+                        if (original.fakultas !== updated.fakultas) changes.push(`Jurusan: ${original.fakultas || '-'} ➔ ${updated.fakultas || '-'}`);
+                        if (original.status !== updated.status) changes.push(`Status: ${original.status} ➔ ${updated.status}`);
+                        detailsText = changes.join(', ');
+                      } else {
+                        detailsText = `Nama: ${updated.name}, Email: ${updated.email}`;
+                      }
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  } else if (c.issue === 'Tambah Peserta' && c.catatan) {
+                    try {
+                      const data = JSON.parse(c.catatan);
+                      detailsText = `Jurusan: ${data.fakultas || '-'} • Email: ${data.email || '-'}`;
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }
+
+                  return (
+                    <div key={c.id} className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/40 flex flex-col gap-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-secondary text-on-secondary flex items-center justify-center font-bold text-headline-sm shadow-sm relative">
+                            {c.name.substring(0, 2).toUpperCase()}
+                            <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-error rounded-full border-2 border-surface-container"></span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-on-surface leading-snug">{c.name}</p>
+                            <span className="text-label-sm text-on-surface-variant font-mono">NIM: {c.nim}</span>
+                          </div>
+                        </div>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-tertiary-container text-on-tertiary-container">
+                          {c.gugusName}
+                        </span>
+                      </div>
+
+                      <div className="border-t border-b border-outline-variant/20 py-2.5 my-1 text-body-sm text-on-surface-variant flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-label-sm text-on-surface-variant/60">Tipe Pengajuan:</span>
+                          {c.issue === 'Tambah Peserta' ? (
+                            <span className="flex items-center gap-1 text-primary font-semibold">
+                              <span className="material-symbols-outlined text-[14px]">person_add</span> Registrasi
+                            </span>
+                          ) : c.issue === 'Edit Peserta' ? (
+                            <span className="flex items-center gap-1 text-secondary font-semibold">
+                              <span className="material-symbols-outlined text-[14px]">edit_note</span> Ubah Profil
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-error">
+                              <span className="material-symbols-outlined text-[14px]">warning</span> {c.issue}
+                            </span>
+                          )}
+                        </div>
+
+                        {detailsText && (
+                          <div className="bg-primary/5 p-2 rounded text-[11px] text-primary leading-tight">
+                            <strong>Detail Perubahan:</strong> {detailsText}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-label-sm text-on-surface-variant/60">Status Diajukan:</span>
+                          {c.issue === 'Tambah Peserta' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded bg-primary/10 text-primary text-[11px]">Registrasi</span>
+                          ) : c.issue === 'Edit Peserta' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded bg-secondary/10 text-secondary text-[11px]">Ubah Data</span>
+                          ) : (
+                            (() => {
+                              const s = c.requestedStatus || 'Hadir Penuh';
+                              const colors = s === 'Hadir Penuh' ? 'bg-green-500/15 text-green-700' : s === 'Hadir Sebagian' ? 'bg-amber-500/15 text-amber-700' : 'bg-blue-500/15 text-blue-700';
+                              return <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${colors}`}>{s}</span>;
+                            })()
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-on-surface-variant/60">
+                          <span>Waktu Pengajuan:</span>
+                          <span>{c.time}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <button onClick={() => handleReject(c.id, c.name)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-error hover:bg-error/5 rounded-lg border border-error/10 transition-colors cursor-pointer">
+                          <span className="material-symbols-outlined text-[16px]">close</span>
+                          Tolak
+                        </button>
+                        <button onClick={() => handleApprove(c.id, c.name)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-on-primary bg-primary hover:bg-primary-fixed rounded-lg transition-colors cursor-pointer shadow-sm">
+                          <span className="material-symbols-outlined text-[16px]">check</span>
+                          Setujui
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-10 text-on-surface-variant text-body-md bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/60">Tidak ada klaim manual yang tertunda.</div>
+              )}
+            </div>
 <div className="bg-surface-container-high px-6 py-4 flex items-center justify-between mt-auto">
 <span className="font-body-sm text-body-sm text-on-surface-variant">Menampilkan {filteredClaims.length} dari {claims.length} klaim tertunda</span>
 </div>

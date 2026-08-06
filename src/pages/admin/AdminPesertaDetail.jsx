@@ -12,32 +12,23 @@ export default function AdminPesertaDetail() {
   // Find the student
   const student = peserta.find(p => p.id === id);
 
-  if (!student) {
-    return (
-      <div className="w-full min-h-screen flex flex-col items-center justify-center bg-background text-on-background">
-        <span className="material-symbols-outlined text-[64px] text-error mb-4">person_off</span>
-        <h2 className="text-headline-lg font-headline-lg mb-2">Tidak Ditemukan</h2>
-        <button onClick={() => navigate('/admin/peserta')} className="bg-primary text-on-primary px-6 py-3 rounded-xl hover:bg-primary-fixed shadow-md transition-all font-label-md cursor-pointer">
-          Kembali
-        </button>
-      </div>
-    );
-  }
-
-  // Find gugus & mentor details
-  const group = gugus.find(g => g.id === student.gugusId);
-  const groupName = group ? group.name : '-';
-  const mentor = mentors.find(m => m.gugusId === student.gugusId || (group && m.id === group.mentorId));
-  const mentorName = mentor ? mentor.name : 'Belum Ditentukan';
-
-  // QR Code URL — same format as AdminQrManagement: NIM encoded into QR
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(student.id)}`;
-
   // Email sending state
   const [emailSending, setEmailSending] = useState(false);
 
+  // QR Code URL — same format as AdminQrManagement: NIM encoded into QR
+  const qrUrl = student 
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(student.id)}`
+    : '';
+
+  // Find gugus & mentor details
+  const group = student ? gugus.find(g => g.id === student.gugusId) : null;
+  const groupName = group ? group.name : '-';
+  const mentor = student ? mentors.find(m => m.gugusId === student.gugusId || (group && m.id === group.mentorId)) : null;
+  const mentorName = mentor ? mentor.name : 'Belum Ditentukan';
+
   // Download QR Code PNG
   const handleDownloadQr = useCallback(async () => {
+    if (!student) return;
     try {
       const response = await fetch(qrUrl);
       const blob = await response.blob();
@@ -52,11 +43,11 @@ export default function AdminPesertaDetail() {
     } catch {
       alert('Gagal mengunduh QR Code. Pastikan koneksi internet tersedia.');
     }
-  }, [qrUrl, student.name, student.id]);
+  }, [qrUrl, student]);
 
   // Kirim QR Code otomatis via EmailJS
   const handleEmailQr = useCallback(async () => {
-    if (emailSending) return;
+    if (!student || emailSending) return;
     setEmailSending(true);
     const result = await sendQrEmail({
       toEmail: student.email,
@@ -69,6 +60,18 @@ export default function AdminPesertaDetail() {
     setEmailSending(false);
     alert(result.message);
   }, [student, groupName, mentorName, qrUrl, emailSending]);
+
+  if (!student) {
+    return (
+      <div className="w-full min-h-screen flex flex-col items-center justify-center bg-background text-on-background">
+        <span className="material-symbols-outlined text-[64px] text-error mb-4">person_off</span>
+        <h2 className="text-headline-lg font-headline-lg mb-2">Tidak Ditemukan</h2>
+        <button onClick={() => navigate('/admin/peserta')} className="bg-primary text-on-primary px-6 py-3 rounded-xl hover:bg-primary-fixed shadow-md transition-all font-label-md cursor-pointer">
+          Kembali
+        </button>
+      </div>
+    );
+  }
 
   // Find attendance logs for this student
   const studentLogs = logs.filter(log => log.nim === student.id);

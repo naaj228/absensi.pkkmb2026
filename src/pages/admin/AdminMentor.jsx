@@ -21,7 +21,8 @@ export default function AdminMentor() {
     gugusId: 'Unassigned',
     email: '',
     phone: '',
-    role: 'mentor'
+    role: 'mentor',
+    password: ''
   });
 
   // Pagination
@@ -49,7 +50,8 @@ export default function AdminMentor() {
       gugusId: 'Unassigned',
       email: '',
       phone: '',
-      role: 'mentor'
+      role: 'mentor',
+      password: ''
     });
     setShowAddModal(true);
   };
@@ -62,21 +64,26 @@ export default function AdminMentor() {
       gugusId: m.gugusId,
       email: m.email,
       phone: m.phone || '',
-      role: m.role || 'mentor'
+      role: m.role || 'mentor',
+      password: ''
     });
     setShowEditModal(true);
   };
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-    if (showAddModal) {
-      addMentor(formData);
-      setShowAddModal(false);
-      alert("Mentor berhasil ditambahkan.");
-    } else if (showEditModal) {
-      updateMentor(editMentorId, formData);
-      setShowEditModal(false);
-      alert("Mentor berhasil diperbarui.");
+    try {
+      if (showAddModal) {
+        await addMentor(formData);
+        setShowAddModal(false);
+        alert("Mentor berhasil ditambahkan.");
+      } else if (showEditModal) {
+        await updateMentor(editMentorId, formData);
+        setShowEditModal(false);
+        alert("Mentor berhasil diperbarui.");
+      }
+    } catch {
+      // Error is already alerted by AppContext
     }
   };
 
@@ -174,7 +181,8 @@ export default function AdminMentor() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Desktop View: Table */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-surface-container-low text-label-md font-label-md text-on-surface-variant">
@@ -232,11 +240,60 @@ export default function AdminMentor() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="4" className="text-center py-8 text-on-surface-variant">Tidak ada data mentor.</td>
+                      <td colSpan="4" className="text-center py-10 text-on-surface-variant text-body-md">Tidak ada data mentor.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile View: Card List */}
+            <div className="block md:hidden space-y-4 p-4">
+              {currentItems.length > 0 ? (
+                currentItems.map((m) => (
+                  <div key={m.id} className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/40 flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                          {m.name.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-on-surface">{m.name}</p>
+                          <span className="text-label-sm text-on-surface-variant">NIP: {m.nip || '-'}</span>
+                        </div>
+                      </div>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-label-sm font-label-sm ${
+                        m.gugusId === 'Unassigned' ? 'bg-surface-variant text-on-surface-variant' : 'bg-secondary/10 text-secondary'
+                      }`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                        {getGugusName(m.gugusId)}
+                      </span>
+                    </div>
+                    <div className="border-t border-b border-outline-variant/20 py-2.5 my-1 text-body-sm text-on-surface-variant flex flex-col gap-1">
+                      {m.email ? (
+                        <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px] text-on-surface-variant/60">mail</span> {m.email}</span>
+                      ) : (
+                        <span className="text-error flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">warning</span> Tidak Ada Email</span>
+                      )}
+                      {m.phone && (
+                        <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px] text-on-surface-variant/60">call</span> {m.phone}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button onClick={() => handleOpenEditModal(m)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-on-surface-variant hover:text-primary hover:bg-primary/5 rounded-lg border border-outline-variant/30 transition-colors cursor-pointer">
+                        <span className="material-symbols-outlined text-[16px]">edit</span>
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(m.id, m.name)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-error hover:bg-error/5 rounded-lg border border-error/10 transition-colors cursor-pointer">
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                        Hapus
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-10 text-on-surface-variant text-body-md bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/60">Tidak ada data mentor.</div>
+              )}
             </div>
 
             <div className="p-4 border-t border-outline-variant/20 bg-surface-container-low flex items-center justify-between">
@@ -267,15 +324,25 @@ export default function AdminMentor() {
                 <h3 className="text-headline-md font-headline-md">{showAddModal ? 'Tambah Mentor' : 'Edit Mentor'}</h3>
               </div>
               <form onSubmit={handleFormSubmit}>
-                <div className="p-6 space-y-4">
+                <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
                   <div>
                     <label className="block text-label-md font-label-md text-on-surface mb-1">Nama Lengkap</label>
                     <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="Nama..." value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
                   </div>
                   <div>
+                    <label className="block text-label-md font-label-md text-on-surface mb-1">NIM (Nomor Induk Mahasiswa)</label>
+                    <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="Masukkan NIM..." value={formData.nip} onChange={(e) => setFormData({...formData, nip: e.target.value})} />
+                  </div>
+                  <div>
                     <label className="block text-label-md font-label-md text-on-surface mb-1">Email</label>
                     <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="email" placeholder="mentor@univ.ac.id" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
                   </div>
+                  {showAddModal && (
+                    <div>
+                      <label className="block text-label-md font-label-md text-on-surface mb-1">Password Mentor</label>
+                      <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" type="password" placeholder="Password (default: pkkmb2026)..." value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+                    </div>
+                  )}
                   <div>
                     <label className="block text-label-md font-label-md text-on-surface mb-1">Nomor Telepon</label>
                     <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" type="text" placeholder="+62 812..." value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />

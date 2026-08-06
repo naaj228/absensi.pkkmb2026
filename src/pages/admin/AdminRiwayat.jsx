@@ -293,8 +293,8 @@ export default function AdminRiwayat() {
 }`}>Invalid</button>
 </div>
 </div>
-{/* Table Wrapper for scrolling */}
-<div className="overflow-x-auto">
+{/* Desktop View: Table */}
+<div className="hidden md:block overflow-x-auto">
 <table className="w-full text-left border-collapse min-w-[900px]">
 <thead>
 <tr className="bg-surface-container-low">
@@ -399,6 +399,93 @@ export default function AdminRiwayat() {
   )}
 </tbody>
 </table>
+</div>
+
+{/* Mobile View: Card List */}
+<div className="block md:hidden space-y-4 p-4">
+  {currentItems.length > 0 ? (
+    currentItems.map((log) => (
+      <div key={log.id} className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/40 flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold ${
+              log.status === 'Valid' ? 'bg-primary-fixed-dim/20 text-primary' : 'bg-error-container text-error'
+            }`}>
+              {log.status === 'Valid' ? log.name.substring(0, 2).toUpperCase() : <span className="material-symbols-outlined text-[20px]">qr_code</span>}
+            </div>
+            <div className="min-w-0">
+              <p className={`font-semibold text-on-surface truncate ${log.status === 'Valid' ? '' : 'text-on-surface-variant italic'}`}>{log.name}</p>
+              <p className="text-label-sm text-on-surface-variant font-mono">NIM: {log.nim}</p>
+            </div>
+          </div>
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label-sm font-semibold shrink-0 ${
+            log.status === 'Valid' ? 'bg-[#E6F4EA] text-[#137333]' : 'bg-error-container text-on-error-container'
+          }`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+            {log.status}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 border-t border-b border-outline-variant/20 py-2.5 my-1 text-body-sm text-on-surface-variant">
+          <div>
+            <span className="text-label-sm text-on-surface-variant/60 block mb-0.5">Waktu Scan</span>
+            <span className="text-on-surface font-medium block leading-tight">{log.date}</span>
+            <span className="text-label-sm text-on-surface-variant/60 font-medium block mt-0.5">{log.timestamp}</span>
+          </div>
+          <div>
+            <span className="text-label-sm text-on-surface-variant/60 block mb-0.5">Gugus & Pemindai</span>
+            <span className="text-on-surface font-medium block truncate">{log.gugusName}</span>
+            <span className="text-label-sm text-on-surface-variant/60 font-medium block mt-0.5 truncate">Oleh: {log.scanner}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 text-body-sm">
+          <div>
+            {log.latitude && log.longitude ? (
+              <a
+                href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-label-sm font-medium transition-all bg-green-500/10 text-green-700 hover:bg-green-500/20"
+                title={`Latitude: ${log.latitude}, Longitude: ${log.longitude}`}
+              >
+                <span className="material-symbols-outlined text-[14px]">pin_drop</span>
+                {log.locationStatus || 'Dalam Area'} {log.distanceMeters ? `(${log.distanceMeters}m)` : ''}
+              </a>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-label-sm font-medium bg-slate-500/10 text-slate-600">
+                <span className="material-symbols-outlined text-[14px]">location_off</span>
+                {log.scanner.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi'}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={() => navigate(`/admin/peserta/${log.nim}`)}
+              className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
+              title="Lihat Detail Peserta"
+            >
+              <span className="material-symbols-outlined text-[18px]">visibility</span>
+            </button>
+            <button 
+              onClick={() => {
+                window.confirmAction(`Hapus log absensi untuk ${log.name} (${log.nim})?`, () => {
+                  deleteLog(log.id);
+                  alert("Log absensi berhasil dihapus.");
+                });
+              }}
+              className="p-1.5 text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
+              title="Hapus Log Absensi"
+            >
+              <span className="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    ))
+  ) : (
+    <div className="text-center py-10 text-on-surface-variant text-body-md bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/60">Tidak ada log.</div>
+  )}
 </div>
 {/* Pagination Footer */}
 <div className="px-6 py-4 border-t border-surface-variant bg-surface-container-lowest flex items-center justify-between">

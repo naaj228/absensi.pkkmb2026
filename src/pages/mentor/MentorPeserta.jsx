@@ -118,7 +118,7 @@ export default function MentorPeserta() {
       email: '',
       gugusId: mentorGugusId,
       fakultas: '',
-      status: 'Alpha'
+      status: 'Belum Hadir'
     });
     setShowAddModal(true);
   };
@@ -141,20 +141,24 @@ export default function MentorPeserta() {
     setShowQrModal(true);
   };
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-    if (showAddModal) {
-      if (peserta.some(p => p.id === formData.id)) {
-        alert("NIM sudah digunakan!");
-        return;
+    try {
+      if (showAddModal) {
+        if (peserta.some(p => p.id === formData.id)) {
+          alert("NIM sudah digunakan!");
+          return;
+        }
+        await addPeserta(formData);
+        setShowAddModal(false);
+        alert("Pengajuan tambah peserta baru berhasil dikirim ke Admin.");
+      } else if (showEditModal) {
+        await updatePeserta(editStudentId, formData);
+        setShowEditModal(false);
+        alert("Pengajuan edit data peserta berhasil dikirim ke Admin.");
       }
-      addPeserta(formData);
-      setShowAddModal(false);
-      alert("Pengajuan tambah peserta baru berhasil dikirim ke Admin.");
-    } else if (showEditModal) {
-      updatePeserta(editStudentId, formData);
-      setShowEditModal(false);
-      alert("Pengajuan edit data peserta berhasil dikirim ke Admin.");
+    } catch {
+      // Error is already alerted by AppContext
     }
   };
 
@@ -211,7 +215,8 @@ export default function MentorPeserta() {
 </div>
 </div>
 {/* Data Table */}
-<div className="overflow-x-auto flex-1">
+{/* Desktop View: Data Table */}
+<div className="hidden md:block overflow-x-auto flex-1">
 <table className="w-full text-left border-collapse min-w-[900px]">
 <thead>
 <tr className="bg-surface/50 border-b border-outline-variant/30">
@@ -269,6 +274,56 @@ export default function MentorPeserta() {
   )}
 </tbody>
 </table>
+</div>
+
+{/* Mobile View: Card List */}
+<div className="block md:hidden space-y-4 p-4">
+  {filteredStudents.length > 0 ? (
+    filteredStudents.map((student) => (
+      <div key={student.id} className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/40 flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold shadow-inner shrink-0">
+              {student.name.substring(0, 2).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="text-body-md font-semibold text-on-surface truncate">{student.name}</p>
+              <p className="text-label-sm text-outline truncate">{student.email}</p>
+            </div>
+          </div>
+          {(() => { const b = getStatusBadge(student.status); return (
+            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${b.bg} ${b.text} text-label-sm font-label-sm shrink-0`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span> {b.label}
+            </span>
+          ); })()}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 border-t border-b border-outline-variant/20 py-2.5 my-1 text-body-sm text-on-surface-variant">
+          <div>
+            <span className="text-label-sm text-outline block mb-0.5">NIM</span>
+            <span className="font-mono text-on-surface font-medium bg-surface px-1.5 py-0.5 rounded border border-outline-variant/20">{student.id}</span>
+          </div>
+          <div>
+            <span className="text-label-sm text-outline block mb-0.5">Jurusan</span>
+            <span className="text-on-surface font-medium block truncate">{student.fakultas}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button onClick={() => handleOpenQrModal(student)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-primary hover:bg-primary/10 rounded-lg border border-primary/10 transition-colors cursor-pointer">
+            <span className="material-symbols-outlined text-[16px]">qr_code</span>
+            QR Code
+          </button>
+          <button onClick={() => handleOpenEditModal(student)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-on-surface-variant hover:text-primary hover:bg-primary/5 rounded-lg border border-outline-variant/30 transition-colors cursor-pointer">
+            <span className="material-symbols-outlined text-[16px]">edit</span>
+            Ubah Data
+          </button>
+        </div>
+      </div>
+    ))
+  ) : (
+    <div className="text-center py-10 text-on-surface-variant text-body-md bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/60">Tidak ada data anggota gugus.</div>
+  )}
 </div>
 </div>
 </div>

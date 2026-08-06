@@ -6,7 +6,7 @@ import { isHadir, getStatusBadge } from '../../utils/statusHelper';
 export default function AdminGugusDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { peserta, gugus, mentors, updatePeserta, deletePeserta, hasAdminNotifications } = useContext(AppContext);
+  const { peserta, gugus, mentors, deletePeserta, hasAdminNotifications } = useContext(AppContext);
 
   // Search state
   const [searchTerm, setSearchTerm] = useState('');
@@ -31,7 +31,6 @@ export default function AdminGugusDetail() {
   // Find mentor details
   const mentor = mentors.find(m => m.gugusId === group.id || m.id === group.mentorId);
   const mentorName = mentor ? mentor.name : 'Belum Ditentukan';
-  const mentorNip = mentor ? mentor.nip : '-';
 
   // Get participants of this gugus
   const gugusStudents = peserta.filter(p => p.gugusId === group.id);
@@ -39,8 +38,6 @@ export default function AdminGugusDetail() {
   // Stats calculation
   const totalStudents = gugusStudents.length;
   const totalHadir = gugusStudents.filter(p => isHadir(p.status)).length;
-  const totalHadirPenuh = gugusStudents.filter(p => p.status === 'Hadir Penuh').length;
-  const totalHadirSebagian = gugusStudents.filter(p => p.status === 'Hadir Sebagian').length;
   const totalIzin = gugusStudents.filter(p => p.status === 'Izin').length;
   const totalAlpha = gugusStudents.filter(p => p.status === 'Alpha' || !p.status).length;
   const persentaseKehadiran = totalStudents > 0 ? ((totalHadir / totalStudents) * 100).toFixed(1) : '0';
