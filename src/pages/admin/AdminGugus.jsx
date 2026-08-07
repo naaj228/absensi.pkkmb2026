@@ -2,6 +2,16 @@ import { useContext, useState } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
+const displayGugusId = (id) => {
+  if (!id) return '';
+  if (id.startsWith('00000000-0000-0000-0000-')) {
+    const parts = id.split('-');
+    const lastPart = parts[parts.length - 1];
+    return parseInt(lastPart, 10).toString();
+  }
+  return id.length > 8 ? id.substring(0, 8) : id;
+};
+
 export default function AdminGugus() {
   const { gugus, mentors, peserta, addGugus, updateGugus, deleteGugus, hasAdminNotifications } = useContext(AppContext);
   const navigate = useNavigate();
@@ -20,8 +30,13 @@ export default function AdminGugus() {
   });
 
   const handleOpenAddModal = () => {
+    // Generate a simple number-like UUID for the new Gugus
+    const randomNum = Math.floor(100000 + Math.random() * 900000); // 6-digit random number
+    const padded = String(randomNum).padStart(12, '0');
+    const autoId = `00000000-0000-0000-0000-${padded}`;
+
     setFormData({
-      id: '',
+      id: autoId,
       name: '',
       mentorId: 'Unassigned',
       capacity: 50
@@ -43,10 +58,6 @@ export default function AdminGugus() {
   const handleFormSubmit = (e) => {
     e.preventDefault();
     if (showAddModal) {
-      if (gugus.some(g => g.id === formData.id)) {
-        alert("ID Gugus sudah digunakan!");
-        return;
-      }
       addGugus(formData);
       setShowAddModal(false);
       alert("Gugus baru berhasil ditambahkan.");
@@ -141,8 +152,8 @@ export default function AdminGugus() {
       </svg>
       <div className="flex justify-between items-start mb-6">
       <div>
-      <h3 className="font-headline-md text-headline-md text-on-surface">{g.name}</h3>
-      <p className="font-body-sm text-body-sm text-on-surface-variant font-mono mt-1">ID: {g.id}</p>
+       <h3 className="font-headline-md text-headline-md text-on-surface">{g.name}</h3>
+      <p className="font-body-sm text-body-sm text-on-surface-variant font-mono mt-1">ID: {displayGugusId(g.id)}</p>
       </div>
       <div className="flex gap-1 relative z-20">
         <button onClick={() => handleOpenEditModal(g)} className="p-2 text-on-surface-variant hover:bg-surface-container hover:text-primary rounded-full transition-colors cursor-pointer" title="Edit">
@@ -202,10 +213,12 @@ export default function AdminGugus() {
       </div>
       <form onSubmit={handleFormSubmit}>
         <div className="p-6 space-y-4">
-          <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">ID Gugus</label>
-            <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="ID (Contoh: G-05-FT)..." disabled={showEditModal} value={formData.id} onChange={(e) => setFormData({...formData, id: e.target.value})} />
-          </div>
+          {(showAddModal || showEditModal) && (
+            <div>
+              <label className="block text-label-md font-label-md text-on-surface mb-1">ID Gugus {showAddModal ? '(Otomatis)' : '(Permanen)'}</label>
+              <input className="w-full bg-surface-container/50 text-on-surface-variant p-3 rounded-xl border border-outline-variant font-mono text-body-sm cursor-not-allowed" disabled value={displayGugusId(formData.id)} />
+            </div>
+          )}
           <div>
             <label className="block text-label-md font-label-md text-on-surface mb-1">Nama Gugus</label>
             <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="Nama..." value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />

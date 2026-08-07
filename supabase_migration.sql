@@ -20,6 +20,7 @@ ALTER TABLE public.approval_manual
 -- 3. Tambah kolom yang kurang di tabel profiles
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS nip text,
+  ADD COLUMN IF NOT EXISTS phone text,
   ADD COLUMN IF NOT EXISTS gugus_id uuid REFERENCES public.gugus(id);
 
 -- 4. Tambah kolom denormalisasi di tabel absensi (untuk query log lebih cepat)
@@ -81,17 +82,17 @@ ALTER TABLE public.absensi
 -- 9. Buat tabel location_settings untuk konfigurasi absensi
 CREATE TABLE IF NOT EXISTS public.location_settings (
   id integer PRIMARY KEY DEFAULT 1,
-  latitude double precision NOT NULL DEFAULT -6.2088,
-  longitude double precision NOT NULL DEFAULT 106.8456,
+  latitude double precision NOT NULL DEFAULT -6.966748,
+  longitude double precision NOT NULL DEFAULT 107.672466,
   radius_meters integer NOT NULL DEFAULT 150,
-  location_name text NOT NULL DEFAULT 'Gedung Utama',
+  location_name text NOT NULL DEFAULT 'Gedung Utama PKKMB (Digitech University)',
   updated_at timestamptz DEFAULT now(),
   CONSTRAINT one_row CHECK (id = 1)
 );
 
 -- Seed data awal koordinat
 INSERT INTO public.location_settings (id, latitude, longitude, radius_meters, location_name)
-VALUES (1, -6.2088, 106.8456, 150, 'Gedung Utama')
+VALUES (1, -6.966748, 107.672466, 150, 'Gedung Utama PKKMB (Digitech University)')
 ON CONFLICT (id) DO NOTHING;
 
 -- Disable RLS sementara untuk lokalan
@@ -248,22 +249,19 @@ CREATE POLICY "Allow admin all approval_manual" ON public.approval_manual FOR AL
   )
 );
 
--- 8. Kebijakan Tabel: LOCATION_SETTINGS
-DROP POLICY IF EXISTS "Authenticated full access" ON public.location_settings;
-DROP POLICY IF EXISTS "Allow authenticated users read and write location_settings" ON public.location_settings;
+-- 8. Kebijakan Tabel: LOCATION_SETTINGS (Diaktifkan dan diamankan: semua user authenticated bisa membaca, hanya admin yang bisa mengubah)
+ALTER TABLE public.location_settings ENABLE ROW LEVEL SECURITY;
+
 DROP POLICY IF EXISTS "Allow authenticated read location_settings" ON public.location_settings;
+CREATE POLICY "Allow authenticated read location_settings" ON public.location_settings FOR SELECT TO authenticated USING (true);
+
 DROP POLICY IF EXISTS "Allow admin all location_settings" ON public.location_settings;
-
-CREATE POLICY "Allow authenticated read location_settings" ON public.location_settings 
-  FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "Allow admin all location_settings" ON public.location_settings 
-  FOR ALL TO authenticated USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role::text = 'admin'
-    )
-  );
+CREATE POLICY "Allow admin all location_settings" ON public.location_settings FOR ALL TO authenticated USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role::text = 'admin'
+  )
+);
 
 -- Hapus juga kebijakan default "Authenticated full access" dari tabel lain jika ada
 DROP POLICY IF EXISTS "Authenticated full access" ON public.peserta;

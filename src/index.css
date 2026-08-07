@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -8,12 +8,12 @@
   --color-on-tertiary-fixed: #320146;
   --color-on-secondary-container: #132b8e;
   --color-background: #fbf8fd;
-  --color-outline: #767680;
+  --color-outline: #7b7b7b;
   --color-on-primary-container: #7884bc;
   --color-on-background: #1b1b1f;
   --color-surface-container-highest: #e4e1e7;
   --color-on-surface-variant: #45464f;
-  --color-primary: #000423;
+  --color-primary: #012060;
   --color-on-tertiary: #ffffff;
   --color-on-secondary-fixed-variant: #283d9d;
   --color-secondary-container: #869aff;
@@ -25,11 +25,11 @@
   --color-on-error: #ffffff;
   --color-error-container: #ffdad6;
   --color-inverse-surface: #303034;
-  --color-tertiary: #12001c;
+  --color-tertiary: #c5a86d;
   --color-on-primary-fixed-variant: #374477;
   --color-on-primary: #ffffff;
   --color-on-secondary-fixed: #001159;
-  --color-error: #ba1a1a;
+  --color-error: #a50022;
   --color-surface-dim: #dbd9de;
   --color-on-secondary: #ffffff;
   --color-surface-variant: #e4e1e7;
@@ -39,8 +39,8 @@
   --color-inverse-primary: #b8c4ff;
   --color-primary-fixed-dim: #b8c4ff;
   --color-surface-container-lowest: #ffffff;
-  --color-primary-container: #0d1b4d;
-  --color-secondary: #4256b7;
+  --color-primary-container: #081126;
+  --color-secondary: #a50022;
   --color-surface: #fbf8fd;
   --color-outline-variant: #c6c5d0;
   --color-tertiary-container: #36054a;
@@ -62,16 +62,16 @@
   --spacing-margin-desktop: 32px;
   --spacing-container-max: 1440px;
 
-  --font-body-lg: "Poppins", sans-serif;
-  --font-headline-md: "Poppins", sans-serif;
-  --font-body-md: "Poppins", sans-serif;
-  --font-label-sm: "Poppins", sans-serif;
-  --font-label-md: "Poppins", sans-serif;
-  --font-display-lg: "Poppins", sans-serif;
-  --font-headline-lg-mobile: "Poppins", sans-serif;
-  --font-headline-lg: "Poppins", sans-serif;
-  --font-headline-sm: "Poppins", sans-serif;
-  --font-body-sm: "Poppins", sans-serif;
+  --font-body-lg: "Montserrat", sans-serif;
+  --font-headline-md: "Montserrat", sans-serif;
+  --font-body-md: "Montserrat", sans-serif;
+  --font-label-sm: "Montserrat", sans-serif;
+  --font-label-md: "Montserrat", sans-serif;
+  --font-display-lg: "Montserrat", sans-serif;
+  --font-headline-lg-mobile: "Montserrat", sans-serif;
+  --font-headline-lg: "Montserrat", sans-serif;
+  --font-headline-sm: "Montserrat", sans-serif;
+  --font-body-sm: "Montserrat", sans-serif;
 
   --text-body-lg: 16px;
   --text-body-lg--line-height: 1.5;
@@ -116,9 +116,9 @@
 ::-webkit-scrollbar { display: none; }
 
 .bg-pkkmb-gradient {
-  background: radial-gradient(circle at top right, #36054a, transparent),
-    radial-gradient(circle at bottom left, #0d1b4d, transparent),
-    linear-gradient(135deg, #000423 0%, #142c8e 100%);
+  background: radial-gradient(circle at top right, rgba(165, 0, 34, 0.25), transparent),
+    radial-gradient(circle at bottom left, rgba(1, 32, 96, 0.25), transparent),
+    linear-gradient(135deg, #012060 0%, #051026 50%, #a50022 100%);
 }
 
 .geometric-overlay {

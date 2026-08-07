@@ -64,6 +64,7 @@ const transformMentor = (m) => ({
   name: m.full_name || m.email,
   email: m.email,
   nip: m.nip || '',
+  phone: m.phone || '',
   gugusId: m.gugus_id || 'Unassigned'
 });
 
@@ -118,10 +119,10 @@ export function AppContextProvider({ children }) {
   
   // Geofencing Location settings state
   const [locationSettings, setLocationSettings] = useState({
-    latitude: -6.2088,
-    longitude: 106.8456,
+    latitude: -6.966748,
+    longitude: 107.672466,
     radiusMeters: 150,
-    locationName: 'Gedung Utama'
+    locationName: 'Gedung Utama PKKMB (Digitech University)'
   });
 
   const [adminUser, setAdminUser] = useState(() => {

@@ -40,7 +40,8 @@ export default function AdminPeserta() {
   const filteredPeserta = peserta.filter((student) => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.id.includes(searchTerm);
-    const matchesGugus = selectedGugus === '' || student.gugusId === selectedGugus;
+    const matchesGugus = selectedGugus === '' || 
+      (selectedGugus === 'unassigned' ? (!student.gugusId || student.gugusId === 'Unassigned') : student.gugusId === selectedGugus);
     const matchesStatus = selectedStatus === '' || student.status === selectedStatus;
     return matchesSearch && matchesGugus && matchesStatus;
   });
@@ -341,6 +342,7 @@ export default function AdminPeserta() {
             <div className="relative">
               <select className="w-full sm:w-40 appearance-none pl-4 pr-10 py-2.5 bg-surface rounded-lg text-body-sm font-body-sm text-on-surface border border-outline-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors cursor-pointer" value={selectedGugus} onChange={(e) => { setSelectedGugus(e.target.value); setCurrentPage(1); }}>
                 <option value="">Semua Gugus</option>
+                <option value="unassigned">Belum Masuk Gugus</option>
                 {gugus.map(g => (
                   <option key={g.id} value={g.id}>{g.name}</option>
                 ))}
@@ -350,6 +352,7 @@ export default function AdminPeserta() {
             <div className="relative">
               <select className="w-full sm:w-44 appearance-none pl-4 pr-10 py-2.5 bg-surface rounded-lg text-body-sm font-body-sm text-on-surface border border-outline-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors cursor-pointer" value={selectedStatus} onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}>
                 <option value="">Semua Status</option>
+                <option value="Belum Hadir">⚪ Belum Hadir</option>
                 <option value="Hadir Penuh">✅ Hadir Penuh</option>
                 <option value="Hadir Sebagian">🟡 Hadir Sebagian</option>
                 <option value="Izin">📄 Izin</option>

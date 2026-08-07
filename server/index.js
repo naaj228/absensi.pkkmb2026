@@ -34,7 +34,19 @@ transporter.verify((error) => {
 });
 
 // ─── Template HTML Email ─────────────────────────────────────────────────────
-function buildEmailHtml({ toName, nim, gugus, mentor, qrUrl, appName }) {
+// ─── Template HTML Email ─────────────────────────────────────────────────────
+function buildEmailHtml({ toName, nim, gugus, mentor, qrUrl, appName, hasIdCards }) {
+  const idCardHtml = hasIdCards ? `
+      <!-- ID Card Section -->
+      <div style="text-align: center; margin-bottom: 28px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px 20px;">
+        <p style="color: #64748b; font-size: 11px; font-weight: 700; margin-top: 0; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.08em; font-family: 'Segoe UI', Arial, sans-serif;">ID CARD PKKMB KAMU</p>
+        <div style="text-align: center;">
+          <img src="cid:idcardfront" alt="ID Card Depan" style="width: 100%; max-width: 320px; border-radius: 12px; border: 1px solid #e2e8f0; margin: 0 auto 16px auto; display: block; box-shadow: 0 4px 12px rgba(0,0,0,0.05);" />
+          <img src="cid:idcardback" alt="ID Card Belakang" style="width: 100%; max-width: 320px; border-radius: 12px; border: 1px solid #e2e8f0; margin: 0 auto; display: block; box-shadow: 0 4px 12px rgba(0,0,0,0.05);" />
+        </div>
+      </div>
+  ` : '';
+
   return `
 <!DOCTYPE html>
 <html lang="id">
@@ -45,7 +57,7 @@ function buildEmailHtml({ toName, nim, gugus, mentor, qrUrl, appName }) {
   <style>
     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f7fa; margin: 0; padding: 0; }
     .wrapper { max-width: 560px; margin: 40px auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
-    .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px 40px; text-align: center; }
+    .header { background: linear-gradient(135deg, #012060 0%, #a50022 100%); padding: 32px 40px; text-align: center; }
     .header h1 { color: #fff; margin: 0; font-size: 22px; font-weight: 700; }
     .header p { color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 14px; }
     .body { padding: 32px 40px; }
@@ -70,9 +82,10 @@ function buildEmailHtml({ toName, nim, gugus, mentor, qrUrl, appName }) {
   <div class="wrapper">
     <div class="header">
       <h1>🎓 ${appName || 'Absensi PKKMB 2026'}</h1>
-      <p>QR Code Absensi Resmi</p>
+      <p>ID Card & QR Code Absensi Resmi</p>
     </div>
     <div class="body">
+      ${idCardHtml}
       <p class="greeting">Halo, <strong>${toName}</strong>! 👋</p>
       <p style="color:#475569;font-size:14px;margin-bottom:20px;">
         Berikut adalah QR Code absensi resmi kamu untuk kegiatan PKKMB. Simpan email ini dan tunjukkan kepada mentor saat proses absensi berlangsung.
@@ -127,12 +140,14 @@ app.post('/api/send-qr-email', async (req, res) => {
   try {
     // Generate ID card (depan + belakang)
     let attachments = [];
+    let hasIdCards = false;
     try {
       const { front, back } = await generateIdCard(toName, nim, gugus);
       attachments = [
-        { filename: `ID-Card-Depan-${nim}.png`, content: front, contentType: 'image/png' },
-        { filename: `ID-Card-Belakang-${nim}.png`, content: back, contentType: 'image/png' },
+        { filename: `ID-Card-Depan-${nim}.png`, content: front, contentType: 'image/png', cid: 'idcardfront' },
+        { filename: `ID-Card-Belakang-${nim}.png`, content: back, contentType: 'image/png', cid: 'idcardback' },
       ];
+      hasIdCards = true;
       console.log(`🎨 ID card generated for ${nim}`);
     } catch (cardErr) {
       console.warn(`⚠️  ID card gagal di-generate (${cardErr.message}) — tetap kirim email tanpa attachment.`);
@@ -142,7 +157,7 @@ app.post('/api/send-qr-email', async (req, res) => {
       from: `"${process.env.EMAIL_FROM_NAME || 'Panitia PKKMB'}" <${process.env.GMAIL_USER}>`,
       to: toEmail,
       subject: `ID Card & QR Code Absensi PKKMB - ${toName}`,
-      html: buildEmailHtml({ toName, nim, gugus, mentor, qrUrl, appName: process.env.VITE_APP_NAME }),
+      html: buildEmailHtml({ toName, nim, gugus, mentor, qrUrl, appName: process.env.VITE_APP_NAME, hasIdCards }),
       attachments,
     });
 
@@ -193,12 +208,14 @@ app.post('/api/send-bulk-qr-email', async (req, res) => {
     try {
       // Generate ID card
       let attachments = [];
+      let hasIdCards = false;
       try {
         const { front, back } = await generateIdCard(toName, nim, gugus);
         attachments = [
-          { filename: `ID-Card-Depan-${nim}.png`, content: front, contentType: 'image/png' },
-          { filename: `ID-Card-Belakang-${nim}.png`, content: back, contentType: 'image/png' },
+          { filename: `ID-Card-Depan-${nim}.png`, content: front, contentType: 'image/png', cid: 'idcardfront' },
+          { filename: `ID-Card-Belakang-${nim}.png`, content: back, contentType: 'image/png', cid: 'idcardback' },
         ];
+        hasIdCards = true;
       } catch (cardErr) {
         console.warn(`⚠️  [${i + 1}] ID card gagal: ${cardErr.message}`);
       }
@@ -207,7 +224,7 @@ app.post('/api/send-bulk-qr-email', async (req, res) => {
         from: `"${process.env.EMAIL_FROM_NAME || 'Panitia PKKMB'}" <${process.env.GMAIL_USER}>`,
         to: toEmail,
         subject: `ID Card & QR Code Absensi PKKMB - ${toName}`,
-        html: buildEmailHtml({ toName, nim, gugus, mentor, qrUrl, appName: process.env.VITE_APP_NAME }),
+        html: buildEmailHtml({ toName, nim, gugus, mentor, qrUrl, appName: process.env.VITE_APP_NAME, hasIdCards }),
         attachments,
       });
       sent++;

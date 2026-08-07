@@ -159,13 +159,17 @@ export const gugusDb = {
   },
 
   async add(item) {
+    const payload = {
+      nama: item.name,
+      mentor_id: item.mentorId && item.mentorId !== 'Unassigned' ? item.mentorId : null,
+      kuota: item.capacity || 30
+    };
+    if (item.id) {
+      payload.id = item.id;
+    }
     const { data, error } = await supabase
       .from('gugus')
-      .insert({
-        nama: item.name,
-        mentor_id: item.mentorId && item.mentorId !== 'Unassigned' ? item.mentorId : null,
-        kuota: item.capacity || 30
-      })
+      .insert(payload)
       .select()
       .single();
     if (error) throw error;
@@ -241,6 +245,7 @@ export const mentorsDb = {
       name: m.full_name || m.email,
       email: m.email,
       nip: m.nip || '',
+      phone: m.phone || '',
       gugusId: m.gugus_id || 'Unassigned'
     }));
   },
@@ -290,6 +295,7 @@ export const mentorsDb = {
         full_name: item.name,
         role: 'mentor',
         nip: item.nip || '',
+        phone: item.phone || '',
         gugus_id: item.gugusId && item.gugusId !== 'Unassigned' ? item.gugusId : null
       })
       .select()
@@ -310,6 +316,7 @@ export const mentorsDb = {
     if (fields.name !== undefined) payload.full_name = fields.name;
     if (fields.email !== undefined) payload.email = fields.email;
     if (fields.nip !== undefined) payload.nip = fields.nip;
+    if (fields.phone !== undefined) payload.phone = fields.phone;
     if (fields.gugusId !== undefined) {
       payload.gugus_id = fields.gugusId && fields.gugusId !== 'Unassigned' ? fields.gugusId : null;
     }

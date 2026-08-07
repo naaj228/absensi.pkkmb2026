@@ -3,6 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
 import { isHadir, getStatusBadge } from '../../utils/statusHelper';
 
+const displayGugusId = (id) => {
+  if (!id) return '';
+  if (id.startsWith('00000000-0000-0000-0000-')) {
+    const parts = id.split('-');
+    const lastPart = parts[parts.length - 1];
+    return parseInt(lastPart, 10).toString();
+  }
+  return id.length > 8 ? id.substring(0, 8) : id;
+};
+
 export default function AdminGugusDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -92,7 +102,7 @@ export default function AdminGugusDetail() {
               </div>
               <div className="text-center sm:text-left space-y-2">
                 <h2 className="text-headline-lg font-headline-md text-on-surface leading-tight">{group.name}</h2>
-                <p className="text-body-md text-on-surface-variant font-mono">ID Gugus: {group.id} • Kapasitas: {group.capacity} Mahasiswa</p>
+                <p className="text-body-md text-on-surface-variant font-mono">ID Gugus: {displayGugusId(group.id)} • Kapasitas: {group.capacity} Mahasiswa</p>
                 <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
                   <span className="px-3 py-1 rounded-full text-label-md bg-secondary-container text-on-secondary-container font-semibold">
                     Mentor: {mentorName}

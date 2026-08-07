@@ -8,6 +8,12 @@ export default function AdminMentor() {
 
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'aktif' | 'unassigned' | 'alerts'
+  
+  const handleFilterToggle = (filterType) => {
+    setActiveFilter(prev => prev === filterType ? 'all' : filterType);
+    setCurrentPage(1);
+  };
   
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -33,7 +39,13 @@ export default function AdminMentor() {
     const term = searchTerm.toLowerCase();
     const matchesSearch = m.name.toLowerCase().includes(term) || 
                           m.email.toLowerCase().includes(term);
-    return matchesSearch;
+    if (!matchesSearch) return false;
+
+    if (activeFilter === 'aktif') return m.gugusId !== 'Unassigned';
+    if (activeFilter === 'unassigned') return m.gugusId === 'Unassigned';
+    if (activeFilter === 'alerts') return !m.email || !m.phone;
+
+    return true;
   });
 
   // Pagination calculation
@@ -133,7 +145,12 @@ export default function AdminMentor() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-surface-container rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
+            <div 
+              onClick={() => handleFilterToggle('aktif')}
+              className={`bg-surface-container rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all cursor-pointer ${
+                activeFilter === 'aktif' ? 'ring-2 ring-primary bg-primary/5' : ''
+              }`}
+            >
               <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-colors"></div>
               <div className="flex items-center justify-between mb-4 relative z-10">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -146,7 +163,12 @@ export default function AdminMentor() {
               </div>
             </div>
 
-            <div className="bg-surface-container rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
+            <div 
+              onClick={() => handleFilterToggle('unassigned')}
+              className={`bg-surface-container rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all cursor-pointer ${
+                activeFilter === 'unassigned' ? 'ring-2 ring-secondary bg-secondary/5' : ''
+              }`}
+            >
               <div className="absolute -right-6 -top-6 w-24 h-24 bg-secondary/5 rounded-full blur-xl group-hover:bg-secondary/10 transition-colors"></div>
               <div className="flex items-center justify-between mb-4 relative z-10">
                 <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
@@ -159,7 +181,12 @@ export default function AdminMentor() {
               </div>
             </div>
 
-            <div className="bg-surface-container rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
+            <div 
+              onClick={() => handleFilterToggle('alerts')}
+              className={`bg-surface-container rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all cursor-pointer ${
+                activeFilter === 'alerts' ? 'ring-2 ring-error bg-error/5' : ''
+              }`}
+            >
               <div className="absolute -right-6 -top-6 w-24 h-24 bg-error/5 rounded-full blur-xl group-hover:bg-error/10 transition-colors"></div>
               <div className="flex items-center justify-between mb-4 relative z-10">
                 <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center text-error">
@@ -174,11 +201,33 @@ export default function AdminMentor() {
           </div>
 
           <div className="bg-surface-container rounded-2xl shadow-sm overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between bg-surface-container-low">
+            <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between bg-surface-container-low flex-wrap gap-4">
               <div className="relative w-64">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-[20px]">search</span>
                 <input className="w-full pl-10 pr-4 py-2 bg-surface rounded-xl text-body-sm font-body-sm text-on-background placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" placeholder="Cari mentor..." type="text" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
               </div>
+              
+              {(activeFilter !== 'all' || searchTerm) && (
+                <div className="flex items-center gap-2">
+                  {activeFilter !== 'all' && (
+                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-label-sm font-label-sm font-medium ${
+                      activeFilter === 'aktif' ? 'bg-primary/10 text-primary' :
+                      activeFilter === 'unassigned' ? 'bg-secondary/10 text-secondary' :
+                      'bg-error/10 text-error'
+                    }`}>
+                      Filter: {
+                        activeFilter === 'aktif' ? 'Aktif' :
+                        activeFilter === 'unassigned' ? 'Belum Ditugaskan' :
+                        'Alerts'
+                      }
+                    </span>
+                  )}
+                  <button onClick={() => { setActiveFilter('all'); setSearchTerm(''); setCurrentPage(1); }} className="flex items-center gap-1 px-3 py-1 bg-surface hover:bg-surface-variant text-on-surface-variant border border-outline-variant/40 rounded-full text-label-sm font-label-sm transition-all cursor-pointer">
+                    <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+                    Reset
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Desktop View: Table */}
@@ -345,7 +394,7 @@ export default function AdminMentor() {
                   )}
                   <div>
                     <label className="block text-label-md font-label-md text-on-surface mb-1">Nomor Telepon</label>
-                    <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" type="text" placeholder="+62 812..." value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+                    <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="+62 812..." value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
                   </div>
                   <div>
                     <label className="block text-label-md font-label-md text-on-surface mb-1">Gugus yang Ditugaskan</label>
