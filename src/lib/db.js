@@ -81,8 +81,12 @@ export const pesertaDb = {
     const { data, error } = await supabase
       .from('peserta')
       .update(payload)
-      .eq('nim', nim);
+      .eq('nim', nim)
+      .select();
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error("Gagal memperbarui status peserta di database. Anda mungkin tidak memiliki izin RLS.");
+    }
     return data;
   },
 
@@ -210,8 +214,12 @@ export const gugusDb = {
     const { data, error } = await supabase
       .from('gugus')
       .update(payload)
-      .eq('id', id);
+      .eq('id', id)
+      .select();
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error("Gagal memperbarui data gugus. Anda mungkin tidak memiliki izin RLS.");
+    }
     return data;
   },
 
@@ -369,7 +377,7 @@ export const claimsDb = {
       nim: c.nim,
       gugusName: c.gugus_nama || '-',
       issue: c.issue,
-      catatan: c.catatan || '',
+      catatan: c.catatan || c.alasan || '',
       time: c.waktu || new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
       requestedStatus: c.requested_status || 'Hadir Penuh'
     }));
@@ -402,8 +410,12 @@ export const claimsDb = {
     const { data, error } = await supabase
       .from('approval_manual')
       .update({ status: newStatus })
-      .eq('id', id);
+      .eq('id', id)
+      .select();
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error("Gagal memperbarui status pengajuan. Anda mungkin tidak memiliki izin RLS.");
+    }
     return data;
   }
 };

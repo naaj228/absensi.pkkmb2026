@@ -75,7 +75,7 @@ const transformClaim = (c) => ({
   nim: c.nim,
   gugusName: c.gugus_nama || '-',
   issue: c.issue,
-  catatan: c.catatan || '',
+  catatan: c.catatan || c.alasan || '',
   time: c.waktu || new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
   requestedStatus: c.requested_status || 'Hadir Penuh'
 });
@@ -931,7 +931,8 @@ export function AppContextProvider({ children }) {
       setClaims(prev => prev.filter(c => c.id !== claimId));
     } catch (err) {
       console.error("Error approving claim:", err);
-      alert("Gagal menyetujui klaim.");
+      alert("Gagal menyetujui klaim: " + (err.message || err));
+      throw err;
     }
   };
 
@@ -951,7 +952,8 @@ export function AppContextProvider({ children }) {
       setClaims(prev => prev.filter(c => c.id !== claimId));
     } catch (err) {
       console.error("Error rejecting claim:", err);
-      alert("Gagal menolak klaim.");
+      alert("Gagal menolak klaim: " + (err.message || err));
+      throw err;
     }
   };
 

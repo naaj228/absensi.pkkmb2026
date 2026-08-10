@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate, Navigate } from 'react-router-dom';
 import { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
+import logo from '../assets/logo.png';
 
 const navItems = [
   { to: '/admin/dashboard', icon: 'dashboard', label: 'Dashboard' },
@@ -38,12 +39,12 @@ export default function AdminLayout() {
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}>
         <div className="p-gutter mb-6 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center">
-            <span className="material-symbols-outlined text-white">badge</span>
+          <div className="h-10 w-10 flex items-center justify-center overflow-hidden">
+            <img src={logo} alt="Logo" className="w-full h-full object-contain" />
           </div>
           <div className="flex flex-col">
             <span className="text-white font-headline-sm leading-tight">PKKMB</span>
-            <span className="text-on-primary-container text-label-sm">ATTENDANCE</span>
+            <span className="text-on-primary-container text-label-sm">ACCESS</span>
           </div>
         </div>
         <div className="flex-1 px-4 overflow-y-auto space-y-6 pb-8">

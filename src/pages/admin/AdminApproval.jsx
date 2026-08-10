@@ -9,17 +9,30 @@ export default function AdminApproval() {
   const [selectedGugus, setSelectedGugus] = useState('all');
 
   const handleApprove = (id, name) => {
-    approveClaim(id);
-    alert(`Pengajuan ${name} telah DISETUJUI.`);
+    window.confirmAction(
+      `Apakah Anda yakin ingin menyetujui pengajuan absensi manual dari ${name}?`,
+      async () => {
+        try {
+          await approveClaim(id);
+          alert(`Pengajuan ${name} telah DISETUJUI.`);
+        } catch (err) {
+          // error is already handled and alerted in context
+        }
+      }
+    );
   };
 
   const handleReject = (id, name) => {
     window.promptAction(
       `Tolak pengajuan dari ${name}?`,
       "Berkas pendukung kurang lengkap / kurang valid",
-      (reason) => {
-        rejectClaim(id, reason || "Ditolak oleh Admin");
-        alert(`Pengajuan ${name} telah DITOLAK.`);
+      async (reason) => {
+        try {
+          await rejectClaim(id, reason || "Ditolak oleh Admin");
+          alert(`Pengajuan ${name} telah DITOLAK.`);
+        } catch (err) {
+          // error is already handled and alerted in context
+        }
       }
     );
   };
@@ -159,9 +172,16 @@ export default function AdminApproval() {
                                 <span className="font-body-sm text-body-sm">Ubah Profil</span>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1.5 text-error">
-                                <span className="material-symbols-outlined text-[16px]">warning</span>
-                                <span className="font-body-sm text-body-sm">{c.issue}</span>
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-1.5 text-error">
+                                  <span className="material-symbols-outlined text-[16px]">warning</span>
+                                  <span className="font-body-sm text-body-sm font-semibold">{c.issue}</span>
+                                </div>
+                                {c.catatan && (
+                                  <span className="text-[10.5px] text-on-surface-variant/80 italic font-medium pl-5 max-w-[250px] break-words whitespace-normal block" title={c.catatan}>
+                                    "{c.catatan}"
+                                  </span>
+                                )}
                               </div>
                             )}
                           </td>
@@ -271,6 +291,12 @@ export default function AdminApproval() {
                         {detailsText && (
                           <div className="bg-primary/5 p-2 rounded text-[11px] text-primary leading-tight">
                             <strong>Detail Perubahan:</strong> {detailsText}
+                          </div>
+                        )}
+
+                        {c.issue !== 'Tambah Peserta' && c.issue !== 'Edit Peserta' && c.catatan && (
+                          <div className="bg-error/5 p-2 rounded text-[11px] text-error leading-tight">
+                            <strong>Catatan Kendala:</strong> "{c.catatan}"
                           </div>
                         )}
 

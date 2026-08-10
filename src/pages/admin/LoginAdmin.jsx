@@ -1,6 +1,7 @@
 import { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
+import logo from '../../assets/logo.png';
 
 export default function LoginAdmin() {
   const { login, currentUser } = useContext(AppContext);
@@ -44,10 +45,10 @@ export default function LoginAdmin() {
             <div className="absolute -left-24 -bottom-24 w-96 h-96 bg-[#ffffff]/10 rounded-full blur-[100px] pointer-events-none animate-float-2"></div>
             
             <div className="relative z-10 flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#012060] to-[#c5a86d] flex items-center justify-center shadow-lg shadow-[#012060]/30 transform hover:scale-105 transition-transform duration-300">
-                <span className="material-symbols-outlined text-[26px] text-white">qr_code_2</span>
+              <div className="w-12 h-12 flex items-center justify-center overflow-hidden transform hover:scale-105 transition-transform duration-300">
+                <img src={logo} alt="Logo" className="w-full h-full object-contain" />
               </div>
-              <span className="font-display-lg text-headline-sm font-bold tracking-wider">PKKMB ABSENSI</span>
+              <span className="font-display-lg text-headline-sm font-bold tracking-wider">PKKMB Access</span>
             </div>
             
             <div className="relative z-10 space-y-5 max-w-md">
@@ -69,9 +70,9 @@ export default function LoginAdmin() {
 
             <div className="w-full max-w-md relative z-10">
               <div className="flex flex-col gap-2 mb-10 text-center lg:text-left">
-                <span className="lg:hidden w-12 h-12 rounded-xl bg-gradient-to-br from-[#012060] to-[#a50022] flex items-center justify-center mx-auto mb-4">
-                  <span className="material-symbols-outlined text-white text-[24px]">qr_code_2</span>
-                </span>
+                <div className="lg:hidden w-12 h-12 rounded-xl bg-[#0d1b4d] flex items-center justify-center overflow-hidden p-1.5 mx-auto mb-4 border border-slate-800 shadow-sm">
+                  <img src={logo} alt="Logo" className="w-full h-full object-contain" />
+                </div>
                 <span className="lg:hidden text-[#c5a86d] text-label-sm font-bold tracking-widest uppercase mb-1">Portal Administrator</span>
                 <h2 className="text-headline-lg font-bold font-display-lg text-[#012060] tracking-tight" id="login-title">Login Admin</h2>
               </div>

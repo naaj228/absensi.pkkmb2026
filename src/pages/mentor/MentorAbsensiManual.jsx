@@ -48,9 +48,17 @@ export default function MentorAbsensiManual() {
   const handleModalSubmit = (e) => {
     e.preventDefault();
     if (!selectedStudent) return;
+
+    if (reason === 'lainnya' && !note.trim()) {
+      alert("Catatan wajib diisi jika memilih alasan kendala 'Lainnya'.");
+      return;
+    }
+
     let reasonLabel = 'Jaringan Tidak Stabil';
     if (reason === 'kamera') reasonLabel = 'Kamera / Scanner Rusak';
     if (reason === 'qr_error') reasonLabel = 'QR Code Tidak Terbaca';
+    if (reason === 'lainnya') reasonLabel = 'Lainnya';
+
     addClaim(selectedStudent.id, reasonLabel, note, requestedStatus);
     setShowModal(false);
     alert(`Pengajuan absensi manual untuk ${selectedStudent.name} dikirim.`);
@@ -228,24 +236,25 @@ export default function MentorAbsensiManual() {
                 {/* Alasan */}
                 <div className="flex flex-col gap-2">
                   <label className="text-label-md font-semibold text-on-surface">Alasan Kendala</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-4 gap-2">
                     {[
                       { key: 'kamera', icon: 'no_photography', label: 'Kamera Rusak' },
                       { key: 'jaringan', icon: 'wifi_off', label: 'Jaringan Lambat' },
                       { key: 'qr_error', icon: 'qr_code_2', label: 'QR Error' },
+                      { key: 'lainnya', icon: 'more_horiz', label: 'Lainnya' },
                     ].map(opt => (
                       <button
                         key={opt.key}
                         type="button"
                         onClick={() => setReason(opt.key)}
-                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                        className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border-2 transition-all cursor-pointer ${
                           reason === opt.key ? 'border-primary bg-primary/5' : 'border-outline-variant/30 bg-surface-container hover:bg-surface-container-high'
                         }`}
                       >
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center ${reason === opt.key ? 'bg-primary/10 text-primary' : 'bg-surface-container-highest text-on-surface-variant'}`}>
-                          <span className="material-symbols-outlined text-[20px]">{opt.icon}</span>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${reason === opt.key ? 'bg-primary/10 text-primary' : 'bg-surface-container-highest text-on-surface-variant'}`}>
+                          <span className="material-symbols-outlined text-[18px]">{opt.icon}</span>
                         </div>
-                        <span className="text-[11px] font-medium text-on-surface text-center leading-tight">{opt.label}</span>
+                        <span className="text-[10px] font-medium text-on-surface text-center leading-tight">{opt.label}</span>
                       </button>
                     ))}
                   </div>
@@ -277,14 +286,26 @@ export default function MentorAbsensiManual() {
 
                 {/* Catatan */}
                 <div className="flex flex-col gap-2">
-                  <label className="text-label-md font-semibold text-on-surface">Catatan <span className="font-normal text-on-surface-variant">(opsional)</span></label>
+                  <label className="text-label-md font-semibold text-on-surface">
+                    Catatan {reason === 'lainnya' ? <span className="text-error font-bold">*</span> : <span className="font-normal text-on-surface-variant">(opsional)</span>}
+                  </label>
                   <input
                     className="w-full bg-surface-container text-on-surface text-body-sm p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all placeholder:text-on-surface-variant/50"
-                    placeholder="Tuliskan detail jika diperlukan..."
+                    placeholder={reason === 'lainnya' ? "Tuliskan alasan kendala kustom Anda (wajib)..." : "Tuliskan detail jika diperlukan..."}
+                    required={reason === 'lainnya'}
+                    maxLength={100}
                     type="text"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                   />
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] text-on-surface-variant/60">
+                      {reason === 'lainnya' && <span className="text-error font-medium">* Wajib diisi</span>}
+                    </span>
+                    <span className="text-[10px] text-on-surface-variant/60 font-mono">
+                      {note.length}/100
+                    </span>
+                  </div>
                 </div>
               </div>
 
