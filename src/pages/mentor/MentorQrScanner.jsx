@@ -26,7 +26,7 @@ export default function MentorQrScanner() {
 
   const mentorGugusId = currentUser?.gugusId || '';
   const mentorGugus   = gugus.find(g => g.id === mentorGugusId);
-  const mentorGugusName = mentorGugus?.name || '';
+  const mentorGugusName = mentorGugus?.name || 'Gugus Saya';
 
   const [showFeedback, setShowFeedback]   = useState(false);
   const [feedbackType, setFeedbackType]   = useState('success');
@@ -55,7 +55,7 @@ export default function MentorQrScanner() {
   useEffect(() => { mentorCoordsRef.current = mentorCoords; }, [mentorCoords]);
   useEffect(() => { distanceToCenterRef.current = distanceToCenter; }, [distanceToCenter]);
 
-  // ── Keep latest context values accessible inside the rAF loop via refs ──────
+  // Keep latest context values accessible inside the rAF loop via refs
   const pesertaRef       = useRef(peserta);
   const logsRef          = useRef(logs);
   const mentorGugusIdRef = useRef(mentorGugusId);
@@ -71,7 +71,7 @@ export default function MentorQrScanner() {
 
   const gugusLogs = logs.filter(log => log.gugusName === mentorGugusName);
 
-  // ── Audio beep ───────────────────────────────────────────────────────────────
+  // Audio beep
   const playBeep = (type) => {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -80,17 +80,16 @@ export default function MentorQrScanner() {
       osc.connect(gain); gain.connect(ctx.destination);
       osc.type = 'sine';
       
-      // High pitch for success, medium warning pitch for already, low flat pitch for error/invalid
       const freq = type === 'success' ? 1200 : type === 'already' ? 700 : 400;
       osc.frequency.setValueAtTime(freq, ctx.currentTime);
       gain.gain.setValueAtTime(0.1, ctx.currentTime);
       
       osc.start(); 
       osc.stop(ctx.currentTime + (type === 'success' ? 0.12 : 0.25));
-    } catch (_) { /* silent */ }
+    } catch { /* silent */ }
   };
 
-  // ── Show result banner ───────────────────────────────────────────────────────
+  // Show result banner
   const showResult = (type, name, msg) => {
     setFeedbackType(type);
     setScannedName(name);
@@ -106,7 +105,7 @@ export default function MentorQrScanner() {
     }, 2200);
   };
 
-  // ── Process a scanned / typed NIM — always reads from refs ──────────────────
+  // Process a scanned / typed NIM
   const processNim = (nim) => {
     if (!nim) return;
     const students = pesertaRef.current;
@@ -148,10 +147,10 @@ export default function MentorQrScanner() {
       distanceMeters: distanceToCenterRef.current || 0
     };
     recordScanRef.current(student.id, locationData);
-    showResult('success', student.name, '✅ Berhasil');
+    showResult('success', student.name, '✅ Berhasil Absen');
   };
 
-  // ── rAF scan loop — uses refs so it never goes stale ────────────────────────
+  // rAF scan loop
   const scanLoop = () => {
     const video  = videoRef.current;
     const canvas = canvasRef.current;
@@ -165,7 +164,7 @@ export default function MentorQrScanner() {
       if (isReadyRef.current && gpsStatusRef.current === 'active') {
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const code = jsQR(imgData.data, imgData.width, imgData.height, {
-          inversionAttempts: 'attemptBoth',   // covers dark-on-light AND light-on-dark
+          inversionAttempts: 'attemptBoth',
         });
         if (code?.data) {
           processNim(code.data);
@@ -176,9 +175,8 @@ export default function MentorQrScanner() {
     rafRef.current = requestAnimationFrame(scanLoop);
   };
 
-  // ── Start / restart camera ───────────────────────────────────────────────────
+  // Start / restart camera
   const startCamera = async (mode) => {
-    // Stop old stream & rAF
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
     if (rafRef.current)   cancelAnimationFrame(rafRef.current);
     setCameraActive(false);
@@ -191,7 +189,6 @@ export default function MentorQrScanner() {
       const video = videoRef.current;
       if (video) {
         video.srcObject = stream;
-        // Wait until frames are actually available
         video.oncanplay = () => {
           video.play().catch(() => {});
           setCameraActive(true);
@@ -230,7 +227,6 @@ export default function MentorQrScanner() {
               setGpsStatus('out-of-range');
             }
           } else {
-            // If location settings are not fetched yet, wait in active state
             setGpsStatus('active');
           }
         },
@@ -247,12 +243,6 @@ export default function MentorQrScanner() {
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
       };
     }
-
-    return () => {
-      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-      if (rafRef.current)   cancelAnimationFrame(rafRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationSettings]);
 
   const handleSwitchCamera = () => {
@@ -269,176 +259,249 @@ export default function MentorQrScanner() {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="w-full">
-      {/* Header */}
-      <header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
-        <h1 className="text-headline-sm font-headline-md text-on-surface">Scanner QR</h1>
-        <div className="flex items-center gap-6">
-          <div className="relative">
-            <span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/mentor/notifikasi')}>notifications</span>
-            {hasMentorNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white" />}
+    <div className="w-full bg-[#f8fafc] min-h-screen pb-16">
+      {/* Header - Fixed to top, padded for mobile hamburger menu */}
+      <header className="fixed top-0 left-0 lg:left-[280px] right-0 h-16 bg-white/90 backdrop-blur-md z-40 flex items-center justify-between pl-16 pr-4 sm:px-6 lg:px-8 shadow-[0_1px_8px_rgba(0,0,0,0.03)] border-b border-slate-100">
+        <div className="flex items-center gap-2.5 overflow-hidden">
+          <span className="material-symbols-outlined text-[#012060] text-[22px] sm:text-[24px] shrink-0">qr_code_scanner</span>
+          <h1 className="text-body-md sm:text-title-md font-bold text-[#012060] font-sans truncate">
+            Scanner QR Absensi
+          </h1>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <div 
+            className="relative group cursor-pointer p-2 rounded-xl hover:bg-slate-100 transition-colors"
+            onClick={() => navigate('/mentor/notifikasi')}
+            title="Notifikasi Mentor"
+          >
+            <span className="material-symbols-outlined text-slate-600 group-hover:text-primary transition-colors text-[22px] sm:text-[24px]">notifications</span>
+            {hasMentorNotifications && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}
           </div>
-          
         </div>
       </header>
 
-      <main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto">
-        <div className="flex flex-col md:flex-row gap-gutter">
+      {/* Main Content */}
+      <main className="relative pt-20 px-3 sm:px-6 lg:px-8 max-w-container-max mx-auto space-y-4 sm:space-y-6">
+        
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
 
-          {/* ── Scanner panel ── */}
-          <div className="w-full md:w-2/3 flex flex-col rounded-2xl bg-surface/5 backdrop-blur-2xl shadow-xl overflow-hidden border border-white/5">
-
-            {/* Top bar */}
-            <div className="p-6 flex items-center justify-between z-10 bg-gradient-to-b from-primary/80 to-transparent">
-              <div>
-                <h2 className="text-headline-md font-headline-md text-on-primary">Scanner</h2>
-                <p className="text-body-sm text-on-primary/70">
-                  {cameraActive ? 'Arahkan kamera ke QR Code' : 'Menginisialisasi kamera…'}
-                </p>
+          {/* Scanner Panel */}
+          <div className="w-full lg:w-2/3 bg-[#012060] rounded-2xl sm:rounded-3xl shadow-lg overflow-hidden flex flex-col border border-[#022b80] text-white">
+            
+            {/* Top Bar Info */}
+            <div className="p-3.5 sm:p-5 flex items-center justify-between z-10 bg-gradient-to-b from-black/40 via-black/20 to-transparent border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/15">
+                  <span className="material-symbols-outlined text-[20px] text-amber-300">crop_free</span>
+                </div>
+                <div>
+                  <h2 className="text-body-md sm:text-body-lg font-bold">Pemindai QR</h2>
+                  <p className="text-[10.5px] sm:text-[11px] text-white/70">
+                    {cameraActive ? 'Posisikan QR di dalam bingkai' : 'Memuat kamera…'}
+                  </p>
+                </div>
               </div>
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${isReady ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                <span className={`w-2 h-2 rounded-full bg-current ${isReady ? 'animate-pulse' : ''}`} />
-                <span className="text-label-md">{isReady ? 'Siap' : 'Memproses…'}</span>
+
+              {/* Status Badge */}
+              <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-body-xs font-bold border backdrop-blur-md ${
+                isReady ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' : 'bg-amber-500/20 text-amber-300 border-amber-400/30'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isReady ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span>{isReady ? 'Kamera Aktif' : 'Memproses…'}</span>
               </div>
             </div>
 
-            {/* Video area */}
-            <div className="flex-1 relative flex items-center justify-center min-h-[350px]">
-              <video ref={videoRef} autoPlay playsInline muted
-                className="absolute inset-0 w-full h-full object-cover z-0" />
+            {/* Video Viewfinder Box */}
+            <div className="relative w-full aspect-square sm:aspect-video min-h-[300px] sm:min-h-[380px] bg-slate-950 flex items-center justify-center overflow-hidden">
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted
+                className="absolute inset-0 w-full h-full object-cover z-0" 
+              />
               <canvas ref={canvasRef} className="hidden" />
-              <div className="absolute inset-0 bg-primary/10 z-10" />
+              <div className="absolute inset-0 bg-blue-950/20 z-10 pointer-events-none" />
 
               {!cameraActive && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center z-20 gap-3 bg-black/40">
-                  <span className="material-symbols-outlined text-white/50 text-[64px]">no_photography</span>
-                  <p className="text-white/60 text-body-md">Izinkan akses kamera di browser</p>
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-20 gap-2 bg-slate-950/80 p-4 text-center">
+                  <span className="material-symbols-outlined text-white/40 text-[56px]">no_photography</span>
+                  <p className="text-white/70 text-body-sm font-semibold">Aktifkan izin kamera pada peramban Anda</p>
                 </div>
               )}
 
-              {/* GPS / Geofencing Block Overlays (Pilihan A) */}
+              {/* GPS Overlay Notifications */}
               {gpsStatus === 'checking' && (
-                <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center z-40 gap-4 text-white p-6 text-center">
-                  <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-primary animate-spin"></div>
+                <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center z-40 gap-3 text-white p-6 text-center">
+                  <div className="w-10 h-10 rounded-full border-3 border-white/20 border-t-white animate-spin"></div>
                   <div>
-                    <p className="font-semibold text-body-lg">Menghubungkan GPS...</p>
-                    <p className="text-white/60 text-body-sm mt-1">Sistem sedang memverifikasi lokasi absensi Anda.</p>
+                    <p className="font-bold text-body-md">Menghubungkan GPS...</p>
+                    <p className="text-white/60 text-[11px] mt-0.5">Memverifikasi titik lokasi absensi Anda.</p>
                   </div>
                 </div>
               )}
 
               {gpsStatus === 'denied' && (
-                <div className="absolute inset-0 bg-red-950/95 flex flex-col items-center justify-center z-40 gap-4 text-white p-6 text-center">
-                  <span className="material-symbols-outlined text-error text-[54px] animate-pulse">location_off</span>
+                <div className="absolute inset-0 bg-rose-950/95 flex flex-col items-center justify-center z-40 gap-3 text-white p-6 text-center">
+                  <span className="material-symbols-outlined text-rose-400 text-[48px] animate-pulse">location_off</span>
                   <div>
-                    <p className="font-semibold text-body-lg text-red-300">Akses GPS Diperlukan!</p>
-                    <p className="text-white/80 text-body-sm mt-2 max-w-sm mx-auto leading-relaxed">
-                      Sesuai peraturan, absensi wajib memverifikasi lokasi. Silakan aktifkan GPS perangkat Anda dan berikan izin lokasi pada browser untuk melanjutkan.
+                    <p className="font-bold text-body-md text-rose-300">Akses GPS Diperlukan!</p>
+                    <p className="text-white/80 text-[11px] mt-1 max-w-xs mx-auto leading-relaxed">
+                      Wajib mengaktifkan izin GPS pada peramban untuk dapat melakukan absensi QR.
                     </p>
                   </div>
                 </div>
               )}
 
               {gpsStatus === 'out-of-range' && (
-                <div className="absolute inset-0 bg-amber-950/95 flex flex-col items-center justify-center z-40 gap-4 text-white p-6 text-center">
-                  <span className="material-symbols-outlined text-amber-400 text-[54px]">explore_off</span>
+                <div className="absolute inset-0 bg-amber-950/95 flex flex-col items-center justify-center z-40 gap-3 text-white p-6 text-center">
+                  <span className="material-symbols-outlined text-amber-400 text-[48px]">explore_off</span>
                   <div>
-                    <p className="font-semibold text-body-lg text-amber-300">Di Luar Area Absensi!</p>
-                    <p className="text-white/85 text-body-sm mt-2 max-w-sm mx-auto leading-relaxed">
-                      Anda terdeteksi berada <strong className="text-amber-400 font-bold">{distanceToCenter} meter</strong> dari pusat acara <strong>{locationSettings?.locationName || 'Gedung Utama'}</strong>.
-                    </p>
-                    <p className="text-white/60 text-body-xs mt-1">
-                      (Batas radius absensi: {locationSettings?.radiusMeters || 150} meter)
+                    <p className="font-bold text-body-md text-amber-300">Di Luar Radius Absensi!</p>
+                    <p className="text-white/85 text-[11px] mt-1 max-w-xs mx-auto leading-relaxed">
+                      Jarak Anda <strong className="text-amber-300 font-bold">{distanceToCenter} m</strong> dari <strong className="text-white">{locationSettings?.locationName || 'Gedung Utama'}</strong>.
+                      (Maksimal radius {locationSettings?.radiusMeters || 150} m).
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* Viewfinder */}
-              <div className="relative w-64 h-64 md:w-80 md:h-80 z-20">
+              {/* Viewfinder Target Box */}
+              <div className="relative w-52 h-52 sm:w-64 sm:h-64 md:w-72 md:h-72 z-20">
                 <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                  <path d="M0,20 L0,0 L20,0"  fill="none" stroke="#BE112D" strokeWidth="4" strokeLinecap="round" />
-                  <path d="M80,0 L100,0 L100,20" fill="none" stroke="#BE112D" strokeWidth="4" strokeLinecap="round" />
-                  <path d="M100,80 L100,100 L80,100" fill="none" stroke="#BE112D" strokeWidth="4" strokeLinecap="round" />
-                  <path d="M20,100 L0,100 L0,80" fill="none" stroke="#BE112D" strokeWidth="4" strokeLinecap="round" />
+                  <path d="M0,20 L0,0 L20,0" fill="none" stroke="#38bdf8" strokeWidth="4.5" strokeLinecap="round" />
+                  <path d="M80,0 L100,0 L100,20" fill="none" stroke="#38bdf8" strokeWidth="4.5" strokeLinecap="round" />
+                  <path d="M100,80 L100,100 L80,100" fill="none" stroke="#38bdf8" strokeWidth="4.5" strokeLinecap="round" />
+                  <path d="M20,100 L0,100 L0,80" fill="none" stroke="#38bdf8" strokeWidth="4.5" strokeLinecap="round" />
                 </svg>
                 {cameraActive && (
-                  <div className="absolute left-0 w-full h-1 bg-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.8)] animate-[scan_2s_ease-in-out_infinite_alternate]" />
+                  <div className="absolute left-0 w-full h-1 bg-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.9)] animate-[scan_2s_ease-in-out_infinite_alternate]" />
                 )}
               </div>
 
-              {/* Feedback overlay */}
-              <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 z-30 transition-all duration-300 border border-white/10
-                ${feedbackType === 'success' ? 'bg-green-600/95' : feedbackType === 'already' ? 'bg-amber-500/95' : 'bg-red-600/95'} text-white
-                ${showFeedback ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
-                <span className="material-symbols-outlined text-[36px]" style={{fontVariationSettings:"'FILL' 1"}}>
+              {/* Scan Feedback Dialog */}
+              <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-30 transition-all duration-300 border border-white/20 max-w-[90%] ${
+                feedbackType === 'success' ? 'bg-emerald-600/95' : feedbackType === 'already' ? 'bg-amber-600/95' : 'bg-rose-600/95'
+              } text-white ${showFeedback ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
+                <span className="material-symbols-outlined text-[32px] shrink-0">
                   {feedbackType === 'success' ? 'check_circle' : feedbackType === 'already' ? 'warning' : 'cancel'}
                 </span>
-                <div>
-                  <p className="text-label-sm opacity-90 font-medium">{feedbackMsg}</p>
-                  <p className="text-headline-sm font-bold">{scannedName}</p>
+                <div className="overflow-hidden">
+                  <p className="text-[10px] uppercase tracking-wider font-extrabold opacity-85">{feedbackMsg}</p>
+                  <p className="text-body-md font-extrabold truncate">{scannedName}</p>
                 </div>
               </div>
+
             </div>
 
-            {/* Bottom controls */}
-            <div className="p-4 z-10 bg-gradient-to-t from-primary/95 via-primary/80 to-transparent flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex gap-2 w-full sm:w-auto">
-                <input
-                  id="sim-nim-input"
-                  type="text"
-                  placeholder="Ketik / Paste NIM…"
-                  onKeyDown={e => e.key === 'Enter' && handleManualScan()}
-                  className="bg-white/10 border border-white/20 text-white placeholder:text-white/40 text-body-sm px-4 py-2.5 rounded-xl focus:outline-none w-full sm:w-44"
-                />
-                <button onClick={handleManualScan}
-                  className="bg-primary-container text-on-primary-container px-4 py-2.5 rounded-xl text-label-md hover:scale-105 transition-transform">
+            {/* Bottom Input & Action Controls */}
+            <div className="p-3.5 sm:p-5 bg-black/40 border-t border-white/10 flex flex-col gap-3">
+              {/* Input Scan Manual Bar */}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    id="sim-nim-input"
+                    type="text"
+                    placeholder="Input / Paste NIM Manual…"
+                    onKeyDown={e => e.key === 'Enter' && handleManualScan()}
+                    className="w-full bg-white/10 border border-white/20 text-white placeholder:text-white/50 text-body-sm font-semibold pl-9 pr-3 py-2 rounded-xl focus:outline-none focus:border-sky-400 transition-all"
+                  />
+                  <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-white/50 text-[16px]">badge</span>
+                </div>
+                <button 
+                  onClick={handleManualScan}
+                  className="bg-sky-500 hover:bg-sky-400 active:scale-95 text-slate-950 font-extrabold px-4 py-2 rounded-xl text-body-sm transition-all shadow-xs cursor-pointer shrink-0"
+                >
                   Scan
                 </button>
               </div>
-              <div className="flex gap-3 w-full sm:w-auto">
-                <button onClick={handleSwitchCamera}
-                  className="flex-1 sm:flex-initial flex items-center gap-2 bg-[#BE112D] text-white px-6 py-3 rounded-xl hover:scale-105 transition-transform">
-                  <span className="material-symbols-outlined text-[20px]">cameraswitch</span>
-                  <span className="text-label-md">Kamera</span>
+
+              {/* Camera Switch & Manual Absensi Link */}
+              <div className="flex gap-2">
+                <button 
+                  onClick={handleSwitchCamera}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white py-2 rounded-xl text-body-sm font-bold border border-white/15 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">cameraswitch</span>
+                  <span>Putar Kamera</span>
                 </button>
-                <button onClick={() => navigate('/mentor/absensi-manual')}
-                  className="flex-1 sm:flex-initial flex items-center gap-2 border border-[#142C8E] text-white bg-[#142C8E]/20 px-6 py-3 rounded-xl hover:bg-[#142C8E]/40 transition-colors">
-                  <span className="material-symbols-outlined text-[20px]">keyboard</span>
-                  <span className="text-label-md">Manual</span>
+
+                <button 
+                  onClick={() => navigate('/mentor/absensi-manual')}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 text-emerald-300 py-2 rounded-xl text-body-sm font-bold border border-emerald-400/30 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">edit_square</span>
+                  <span>Absensi Manual</span>
                 </button>
               </div>
             </div>
+
           </div>
 
-          {/* ── Recent scans sidebar ── */}
-          <div className="w-full md:w-1/3 flex flex-col rounded-2xl bg-surface-container/90 backdrop-blur-md shadow-lg overflow-hidden border border-white/10">
-            <div className="p-6 border-b border-outline-variant/30 bg-surface-container">
-              <h3 className="text-headline-sm text-on-surface">Scan Terbaru</h3>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {gugusLogs.length > 0 ? gugusLogs.map(log => (
-                <div key={log.id} className="flex items-center gap-4 p-4 rounded-xl bg-surface hover:bg-surface-container-high transition-colors shadow-sm border border-outline-variant/20">
-                  <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-600">
-                    <span className="material-symbols-outlined text-[20px]" style={{fontVariationSettings:"'FILL' 1"}}>check_circle</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-label-md text-on-surface truncate">{log.name}</p>
-                    <p className="text-body-sm text-on-surface-variant">NIM: {log.nim}</p>
-                  </div>
-                  <span className="text-label-sm text-on-surface-variant">{log.timestamp}</span>
+          {/* Recent Scans List Sidebar */}
+          <div className="w-full lg:w-1/3 bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-2.5 sm:p-3 border-b border-slate-100 flex items-center justify-between bg-[#f8fafc]">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-lg bg-[#012060]/5 text-[#012060] flex items-center justify-center border border-[#012060]/10">
+                  <span className="material-symbols-outlined text-[14px]">history</span>
                 </div>
-              )) : (
-                <div className="text-center py-8 text-on-surface-variant">Belum ada scan.</div>
+                <h3 className="text-body-xs font-bold text-[#012060]">Scan Terbaru</h3>
+              </div>
+              <span className="text-[8.5px] font-extrabold text-slate-400 uppercase tracking-wider bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60">
+                Hari Ini
+              </span>
+            </div>
+
+            {/* List */}
+            <div className="p-2 sm:p-2.5 space-y-1.5 max-h-[280px] lg:max-h-[400px] overflow-y-auto bg-slate-50/40">
+              {gugusLogs.length > 0 ? (
+                gugusLogs.map(log => (
+                  <div 
+                    key={log.id} 
+                    className="p-2 bg-white rounded-xl border border-slate-100 shadow-2xs hover:shadow-xs transition-all flex items-center justify-between gap-2 group"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200/80 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-body-xs font-bold text-slate-800 truncate leading-snug group-hover:text-[#012060] transition-colors">{log.name}</p>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[7.5px] font-extrabold uppercase text-slate-400">NIM</span>
+                          <span className="text-[9px] font-mono font-bold text-slate-500">{log.nim}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <span className="text-[9px] font-bold text-[#012060] bg-[#012060]/5 border border-[#012060]/10 px-1.5 py-0.5 rounded-md shrink-0 font-mono">
+                      {log.timestamp}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6 text-slate-400 text-body-xs font-medium">
+                  Belum ada riwayat scan hari ini.
+                </div>
               )}
             </div>
-            <div className="p-4 bg-surface border-t border-outline-variant/30 flex justify-between items-center">
-              <span className="text-body-sm text-on-surface-variant">Total Scan: <strong className="text-on-surface">{gugusLogs.length}</strong></span>
-              <button onClick={() => navigate('/mentor/riwayat')} className="text-[#142C8E] text-label-sm hover:underline">Lihat Semua</button>
+
+            {/* Footer */}
+            <div className="p-2.5 sm:p-3 border-t border-slate-100 flex justify-between items-center bg-[#f8fafc]">
+              <span className="text-[10px] font-medium text-slate-500">
+                Total Scan: <strong className="text-[#012060] font-bold">{gugusLogs.length}</strong>
+              </span>
+              <button 
+                onClick={() => navigate('/mentor/riwayat')} 
+                className="bg-[#012060] hover:bg-[#022b80] active:scale-95 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+              >
+                <span>Lihat Semua</span>
+                <span className="material-symbols-outlined text-[12px]">arrow_forward</span>
+              </button>
             </div>
           </div>
+
         </div>
 
         <style>{`

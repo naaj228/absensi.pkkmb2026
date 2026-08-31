@@ -143,18 +143,7 @@ export default function LoginMentor() {
                 </div>
               </form>
 
-              {/* Portal Switch Link */}
-              <div className="mt-10 pt-6 border-t border-[#7b7b7b]/10 text-center lg:text-left">
-                <p className="text-body-sm text-[#7b7b7b]">
-                  Bukan Mentor? {' '}
-                  <button 
-                    onClick={() => navigate('/admin/login')} 
-                    className="text-[#a50022] hover:text-[#012060] font-bold underline decoration-2 underline-offset-4 transition-colors cursor-pointer"
-                  >
-                    Masuk sebagai Administrator
-                  </button>
-                </p>
-              </div>
+
             </div>
 
             {/* Footer */}

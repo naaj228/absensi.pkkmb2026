@@ -224,12 +224,19 @@ export const gugusDb = {
   },
 
   async delete(id) {
-    // Clear gugus_id on any mentor currently assigned to this gugus
+    // 1. Clear gugus_id on any peserta currently assigned to this gugus
+    await supabase
+      .from('peserta')
+      .update({ gugus_id: null })
+      .eq('gugus_id', id);
+
+    // 2. Clear gugus_id on any mentor currently assigned to this gugus
     await supabase
       .from('profiles')
       .update({ gugus_id: null })
       .eq('gugus_id', id);
 
+    // 3. Delete the gugus row
     const { error } = await supabase
       .from('gugus')
       .delete()

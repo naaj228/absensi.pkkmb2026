@@ -41,8 +41,8 @@ function buildEmailHtml({ toName, nim, gugus, mentor, qrUrl, appName, hasIdCards
       <div style="text-align: center; margin-bottom: 28px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px 20px;">
         <p style="color: #64748b; font-size: 11px; font-weight: 700; margin-top: 0; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.08em; font-family: 'Segoe UI', Arial, sans-serif;">ID CARD PKKMB KAMU</p>
         <div style="text-align: center;">
-          <img src="cid:idcardfront" alt="ID Card Depan" style="width: 100%; max-width: 320px; border-radius: 12px; border: 1px solid #e2e8f0; margin: 0 auto 16px auto; display: block; box-shadow: 0 4px 12px rgba(0,0,0,0.05);" />
-          <img src="cid:idcardback" alt="ID Card Belakang" style="width: 100%; max-width: 320px; border-radius: 12px; border: 1px solid #e2e8f0; margin: 0 auto; display: block; box-shadow: 0 4px 12px rgba(0,0,0,0.05);" />
+          <img src="cid:idcardfront" alt="ID Card Depan" style="width: 100%; max-width: 480px; border-radius: 12px; border: 1px solid #e2e8f0; margin: 0 auto 16px auto; display: block; box-shadow: 0 4px 12px rgba(0,0,0,0.05);" />
+          <img src="cid:idcardback" alt="ID Card Belakang" style="width: 100%; max-width: 480px; border-radius: 12px; border: 1px solid #e2e8f0; margin: 0 auto; display: block; box-shadow: 0 4px 12px rgba(0,0,0,0.05);" />
         </div>
       </div>
   ` : '';
@@ -128,7 +128,7 @@ function buildEmailHtml({ toName, nim, gugus, mentor, qrUrl, appName, hasIdCards
 
 // ─── POST /api/send-qr-email  (kirim ke 1 peserta) ───────────────────────────
 app.post('/api/send-qr-email', async (req, res) => {
-  const { toEmail, toName, nim, gugus, mentor, qrUrl } = req.body;
+  const { toEmail, toName, nim, gugus, mentor, qrUrl, prodi } = req.body;
 
   if (!toEmail || !toName || !nim) {
     return res.status(400).json({ ok: false, message: 'toEmail, toName, dan nim wajib diisi.' });
@@ -142,7 +142,7 @@ app.post('/api/send-qr-email', async (req, res) => {
     let attachments = [];
     let hasIdCards = false;
     try {
-      const { front, back } = await generateIdCard(toName, nim, gugus);
+      const { front, back } = await generateIdCard(toName, nim, gugus, prodi);
       attachments = [
         { filename: `ID-Card-Depan-${nim}.png`, content: front, contentType: 'image/png', cid: 'idcardfront' },
         { filename: `ID-Card-Belakang-${nim}.png`, content: back, contentType: 'image/png', cid: 'idcardback' },
@@ -203,14 +203,14 @@ app.post('/api/send-bulk-qr-email', async (req, res) => {
   const errors = [];
 
   for (let i = 0; i < students.length; i++) {
-    const { toEmail, toName, nim, gugus, mentor, qrUrl } = students[i];
+    const { toEmail, toName, nim, gugus, mentor, qrUrl, prodi } = students[i];
 
     try {
       // Generate ID card
       let attachments = [];
       let hasIdCards = false;
       try {
-        const { front, back } = await generateIdCard(toName, nim, gugus);
+        const { front, back } = await generateIdCard(toName, nim, gugus, prodi);
         attachments = [
           { filename: `ID-Card-Depan-${nim}.png`, content: front, contentType: 'image/png', cid: 'idcardfront' },
           { filename: `ID-Card-Belakang-${nim}.png`, content: back, contentType: 'image/png', cid: 'idcardback' },
@@ -265,13 +265,13 @@ app.post('/api/generate-gugus-zip', async (req, res) => {
     const zip = new JSZip();
 
     for (const student of students) {
-      const { id, name, gugusName } = student;
+      const { id, name, gugusName, prodi } = student;
       const folderName = `${name.replace(/[^a-zA-Z0-9]/g, '_')}_${id}`;
       const folder = zip.folder(folderName);
 
       // 1. Generate front card image
       try {
-        const frontBuffer = await generateFrontCard(name, id, gugusName);
+        const frontBuffer = await generateFrontCard(name, id, gugusName, prodi);
         folder.file('ID_Card_Depan.png', frontBuffer);
       } catch (err) {
         console.warn(`Gagal generate front card untuk ${id}: ${err.message}`);

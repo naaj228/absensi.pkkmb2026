@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate, Navigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 import logo from '../assets/logo.png';
@@ -15,6 +15,9 @@ export default function MentorLayout() {
   const { currentUser, logout } = useContext(AppContext);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isSubPage = location.pathname.endsWith('/notifikasi');
 
   console.log('--- MentorLayout render, currentUser:', currentUser);
 
@@ -35,14 +38,22 @@ export default function MentorLayout() {
       <aside className={`fixed left-0 top-0 h-full w-[280px] bg-[#0d1b4d] z-50 flex flex-col shadow-2xl transition-transform duration-300 ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}>
-        <div className="p-gutter mb-6 flex items-center gap-3">
-          <div className="h-10 w-10 flex items-center justify-center overflow-hidden">
-            <img src={logo} alt="Logo" className="w-full h-full object-contain" />
+        <div className="p-gutter mb-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 flex items-center justify-center overflow-hidden">
+              <img src={logo} alt="Logo" className="w-full h-full object-contain" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-white font-headline-sm leading-tight">PKKMB</span>
+              <span className="text-on-primary-container text-label-sm">ACCESS</span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-white font-headline-sm leading-tight">PKKMB</span>
-            <span className="text-on-primary-container text-label-sm">ACCESS</span>
-          </div>
+          <button 
+            onClick={() => setIsSidebarOpen(false)}
+            className="lg:hidden w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[20px]">close</span>
+          </button>
         </div>
         <div className="flex-1 px-4 overflow-y-auto space-y-6 pb-8">
           <div className="space-y-1">
@@ -54,6 +65,7 @@ export default function MentorLayout() {
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  onClick={() => setIsSidebarOpen(false)}
                   className={({ isActive }) =>
                     `flex items-center px-4 py-3 rounded-xl transition-all group ${
                       isActive
@@ -85,13 +97,17 @@ export default function MentorLayout() {
         </div>
       </aside>
 
-      {/* Floating Hamburger Toggle (visible on mobile only) */}
-      <button 
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="fixed left-4 top-3 z-[60] lg:hidden cursor-pointer flex items-center justify-center w-10 h-10 rounded-xl bg-white text-[#0d1b4d] shadow-md border border-gray-200 hover:bg-gray-100 transition-colors"
-      >
-        <span className="material-symbols-outlined">{isSidebarOpen ? 'close' : 'menu'}</span>
-      </button>
+      {/* Floating Hamburger Toggle or Back Button (visible on mobile only) */}
+      {!isSidebarOpen && (
+        <button 
+          onClick={() => isSubPage ? navigate(-1) : setIsSidebarOpen(true)}
+          className="fixed left-4 top-3 z-[60] lg:hidden cursor-pointer flex items-center justify-center w-10 h-10 rounded-xl bg-white text-[#0d1b4d] shadow-md border border-gray-200 hover:bg-gray-100 transition-colors animate-[fadeIn_0.2s_ease-out]"
+        >
+          <span className="material-symbols-outlined">
+            {isSubPage ? 'arrow_back' : 'menu'}
+          </span>
+        </button>
+      )}
 
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (

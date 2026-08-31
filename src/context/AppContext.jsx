@@ -761,7 +761,12 @@ export function AppContextProvider({ children }) {
       }
     } catch (err) {
       console.error("Error adding gugus:", err);
-      alert(err.message || "Gagal menambahkan gugus.");
+      const isRlsError = err.code === '42501' || (err.message && err.message.toLowerCase().includes('row-level security'));
+      const msg = isRlsError 
+        ? "Gagal menambahkan gugus (Akses Ditolak 403 oleh RLS Supabase). Harap hilangkan RLS di Supabase SQL Editor." 
+        : (err.message || "Gagal menambahkan gugus.");
+      alert(msg);
+      throw err;
     }
   };
 
@@ -799,15 +804,17 @@ export function AppContextProvider({ children }) {
     // Optimistic local state update
     setGugus(prev => prev.filter(g => g.id !== id));
     setMentors(prev => prev.map(m => m.gugusId === id ? { ...m, gugusId: 'Unassigned' } : m));
+    setPeserta(prev => prev.map(p => p.gugusId === id ? { ...p, gugusId: '' } : p));
     try {
       await gugusDb.delete(id);
     } catch (err) {
       console.error("Error deleting gugus:", err);
-      alert(err.message || "Gagal menghapus gugus.");
+      alert("Gagal menghapus gugus dari database: " + (err.message || "Izin ditolak"));
       // Rollback
-      const [mData, gData] = await Promise.all([mentorsDb.fetchAll(), gugusDb.fetchAll()]);
+      const [mData, gData, pData] = await Promise.all([mentorsDb.fetchAll(), gugusDb.fetchAll(), pesertaDb.fetchAll()]);
       setMentors(mData);
       setGugus(gData);
+      setPeserta(pData);
     }
   };
 

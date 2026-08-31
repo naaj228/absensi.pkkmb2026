@@ -11,10 +11,11 @@ window.alert = (message) => {
   const toast = document.createElement('div');
   toast.className = 'custom-toast';
   toast.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 10px;">
-      <span class="material-symbols-outlined" style="color: #b9c3ff; font-size: 22px; font-variation-settings: 'FILL' 1;">info</span>
-      <span style="font-family: 'Poppins', sans-serif; font-size: 14px; font-weight: 500; color: #ffffff; white-space: nowrap;">${message}</span>
+    <div class="custom-toast-inner">
+      <span class="material-symbols-outlined toast-icon">info</span>
+      <span class="toast-message">${message}</span>
     </div>
+    <div class="custom-toast-progress"></div>
   `;
   document.body.appendChild(toast);
   

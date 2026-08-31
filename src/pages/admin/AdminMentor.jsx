@@ -38,7 +38,8 @@ export default function AdminMentor() {
   const filteredMentors = mentors.filter((m) => {
     const term = searchTerm.toLowerCase();
     const matchesSearch = m.name.toLowerCase().includes(term) || 
-                          m.email.toLowerCase().includes(term);
+                          m.email.toLowerCase().includes(term) ||
+                          (m.nip && m.nip.toLowerCase().includes(term));
     if (!matchesSearch) return false;
 
     if (activeFilter === 'aktif') return m.gugusId !== 'Unassigned';
@@ -113,308 +114,324 @@ export default function AdminMentor() {
   };
 
   return (
-    <div className="w-full">
-      <header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
-        <div className="flex items-center gap-4">
-          <h1 className="text-headline-sm font-headline-md text-on-surface">Mentor</h1>
+    <div className="w-full bg-[#f8fafc] min-h-screen pb-16">
+      {/* Header - Fixed to top */}
+      <header className="fixed top-0 left-0 lg:left-[280px] right-0 h-16 bg-white/90 backdrop-blur-md z-40 flex items-center justify-between pl-16 pr-4 sm:px-6 lg:px-8 shadow-[0_1px_8px_rgba(0,0,0,0.03)] border-b border-slate-100">
+        <div className="flex items-center gap-2.5 overflow-hidden">
+          <span className="material-symbols-outlined text-[#012060] text-[22px] sm:text-[24px] shrink-0">badge</span>
+          <h1 className="text-body-md sm:text-title-md font-bold text-[#012060] font-sans truncate">
+            Mentor & Pendamping Gugus
+          </h1>
         </div>
-        <div className="flex items-center gap-6">
-          <div className="relative group">
-            <span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>
-            {hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}
+        <div className="flex items-center gap-3 shrink-0">
+          <div 
+            className="relative group cursor-pointer p-2 rounded-xl hover:bg-slate-100 transition-colors"
+            onClick={() => navigate('/admin/notifikasi')}
+            title="Notifikasi Admin"
+          >
+            <span className="material-symbols-outlined text-slate-600 group-hover:text-primary transition-colors text-[22px] sm:text-[24px]">notifications</span>
+            {hasAdminNotifications && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}
           </div>
-          
         </div>
       </header>
       
-      <main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto">
-        <div className="flex flex-col w-full h-full relative space-y-8">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col space-y-2">
-              <div className="flex items-center gap-4">
-                <h2 className="text-headline-lg font-headline-lg text-on-background">Mentor</h2>
-                <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-label-sm font-label-sm">Total: {mentors.length}</span>
-              </div>
+      {/* Main Content */}
+      <main className="relative pt-20 px-3 sm:px-6 lg:px-8 max-w-container-max mx-auto space-y-4 sm:space-y-6">
+        
+        {/* Top Banner */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[9.5px] sm:text-[10px] font-extrabold uppercase tracking-wider bg-[#012060]/5 text-[#012060] px-2.5 py-0.5 rounded-full border border-[#012060]/10">
+                Manajemen Mentor
+              </span>
+              <span className="text-[10px] font-bold text-slate-400">
+                {mentors.length} Total Mentor
+              </span>
             </div>
-            <div className="flex items-center gap-3">
-              <button onClick={handleOpenAddModal} className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary hover:bg-primary/90 rounded-xl transition-all shadow-md shadow-primary/20 font-label-md text-label-md cursor-pointer">
-                <span className="material-symbols-outlined text-[18px]">add</span>
-                Tambah
-              </button>
-            </div>
+            <h2 className="text-body-md sm:text-headline-md font-bold text-[#012060]">Data Mentor PKKMB</h2>
+            <p className="text-[10.5px] sm:text-body-sm text-slate-500 mt-0.5">
+              Kelola data mentor, penugasan ke gugus, dan akun login.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div 
-              onClick={() => handleFilterToggle('aktif')}
-              className={`bg-surface-container rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all cursor-pointer ${
-                activeFilter === 'aktif' ? 'ring-2 ring-primary bg-primary/5' : ''
-              }`}
-            >
-              <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-colors"></div>
-              <div className="flex items-center justify-between mb-4 relative z-10">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <span className="material-symbols-outlined">school</span>
-                </div>
-                <span className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Aktif</span>
-              </div>
-              <div className="relative z-10">
-                <p className="text-display-lg font-display-lg text-on-background">{mentors.filter(m => m.gugusId !== 'Unassigned').length}</p>
-              </div>
-            </div>
+          <button 
+            onClick={handleOpenAddModal} 
+            className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-[#012060] hover:bg-[#022b80] text-white px-3.5 py-2 rounded-xl text-body-sm font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[18px]">person_add</span>
+            <span>Tambah Mentor</span>
+          </button>
+        </div>
 
-            <div 
-              onClick={() => handleFilterToggle('unassigned')}
-              className={`bg-surface-container rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all cursor-pointer ${
-                activeFilter === 'unassigned' ? 'ring-2 ring-secondary bg-secondary/5' : ''
-              }`}
-            >
-              <div className="absolute -right-6 -top-6 w-24 h-24 bg-secondary/5 rounded-full blur-xl group-hover:bg-secondary/10 transition-colors"></div>
-              <div className="flex items-center justify-between mb-4 relative z-10">
-                <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
-                  <span className="material-symbols-outlined">hourglass_empty</span>
-                </div>
-                <span className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Belum Ditugaskan</span>
-              </div>
-              <div className="relative z-10">
-                <p className="text-display-lg font-display-lg text-on-background">{mentors.filter(m => m.gugusId === 'Unassigned').length}</p>
+        {/* Quick Filter Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-4">
+          <div 
+            onClick={() => handleFilterToggle('aktif')}
+            className={`bg-white rounded-2xl p-3.5 sm:p-5 shadow-xs border transition-all cursor-pointer ${
+              activeFilter === 'aktif' ? 'border-[#012060] ring-2 ring-[#012060]/10 bg-[#012060]/5' : 'border-slate-100 hover:border-slate-200'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] sm:text-label-sm font-bold text-slate-400 uppercase tracking-wider">Aktif Bertugas</span>
+              <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold">
+                <span className="material-symbols-outlined text-[16px]">school</span>
               </div>
             </div>
-
-            <div 
-              onClick={() => handleFilterToggle('alerts')}
-              className={`bg-surface-container rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all cursor-pointer ${
-                activeFilter === 'alerts' ? 'ring-2 ring-error bg-error/5' : ''
-              }`}
-            >
-              <div className="absolute -right-6 -top-6 w-24 h-24 bg-error/5 rounded-full blur-xl group-hover:bg-error/10 transition-colors"></div>
-              <div className="flex items-center justify-between mb-4 relative z-10">
-                <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center text-error">
-                  <span className="material-symbols-outlined">warning</span>
-                </div>
-                <span className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Alerts</span>
-              </div>
-              <div className="relative z-10">
-                <p className="text-display-lg font-display-lg text-on-background">{mentors.filter(m => !m.email || !m.phone).length}</p>
-              </div>
-            </div>
+            <p className="text-body-md sm:text-headline-md font-extrabold text-[#012060]">{mentors.filter(m => m.gugusId !== 'Unassigned').length}</p>
           </div>
 
-          <div className="bg-surface-container rounded-2xl shadow-sm overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-outline-variant/30 flex items-center justify-between bg-surface-container-low flex-wrap gap-4">
-              <div className="relative w-64">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-[20px]">search</span>
-                <input className="w-full pl-10 pr-4 py-2 bg-surface rounded-xl text-body-sm font-body-sm text-on-background placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" placeholder="Cari mentor..." type="text" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
-              </div>
-              
-              {(activeFilter !== 'all' || searchTerm) && (
-                <div className="flex items-center gap-2">
-                  {activeFilter !== 'all' && (
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-label-sm font-label-sm font-medium ${
-                      activeFilter === 'aktif' ? 'bg-primary/10 text-primary' :
-                      activeFilter === 'unassigned' ? 'bg-secondary/10 text-secondary' :
-                      'bg-error/10 text-error'
-                    }`}>
-                      Filter: {
-                        activeFilter === 'aktif' ? 'Aktif' :
-                        activeFilter === 'unassigned' ? 'Belum Ditugaskan' :
-                        'Alerts'
-                      }
-                    </span>
-                  )}
-                  <button onClick={() => { setActiveFilter('all'); setSearchTerm(''); setCurrentPage(1); }} className="flex items-center gap-1 px-3 py-1 bg-surface hover:bg-surface-variant text-on-surface-variant border border-outline-variant/40 rounded-full text-label-sm font-label-sm transition-all cursor-pointer">
-                    <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
-                    Reset
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Desktop View: Table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-surface-container-low text-label-md font-label-md text-on-surface-variant">
-                    <th className="px-6 py-4 whitespace-nowrap">Mentor</th>
-                    <th className="px-6 py-4 whitespace-nowrap">Gugus</th>
-                    <th className="px-6 py-4 whitespace-nowrap">Kontak</th>
-                    <th className="px-6 py-4 whitespace-nowrap text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="text-body-sm font-body-sm text-on-background">
-                  {currentItems.length > 0 ? (
-                    currentItems.map((m) => (
-                      <tr key={m.id} className="border-b border-outline-variant/20 hover:bg-surface-container-highest/30 transition-colors group">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                              {m.name.substring(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="font-label-md text-on-background">{m.name}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-label-sm font-label-sm ${
-                            m.gugusId === 'Unassigned' ? 'bg-surface-variant text-on-surface-variant' : 'bg-secondary/10 text-secondary'
-                          }`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                            {getGugusName(m.gugusId)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col space-y-1">
-                            {m.email ? (
-                              <span className="text-on-surface-variant flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">mail</span> {m.email}</span>
-                            ) : (
-                              <span className="text-error flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">warning</span> Tidak Ada Email</span>
-                            )}
-                            {m.phone && (
-                              <span className="text-on-surface-variant flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">call</span> {m.phone}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleOpenEditModal(m)} className="p-1.5 text-on-surface-variant hover:text-primary hover:bg-primary/5 rounded-md transition-colors cursor-pointer" title="Edit">
-                              <span className="material-symbols-outlined text-[18px]">edit</span>
-                            </button>
-                            <button onClick={() => handleDelete(m.id, m.name)} className="p-1.5 text-on-surface-variant hover:text-error hover:bg-error/5 rounded-md transition-colors cursor-pointer" title="Hapus">
-                              <span className="material-symbols-outlined text-[18px]">delete</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="4" className="text-center py-10 text-on-surface-variant text-body-md">Tidak ada data mentor.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile View: Card List */}
-            <div className="block md:hidden space-y-4 p-4">
-              {currentItems.length > 0 ? (
-                currentItems.map((m) => (
-                  <div key={m.id} className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/40 flex flex-col gap-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                          {m.name.substring(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-on-surface">{m.name}</p>
-                          <span className="text-label-sm text-on-surface-variant">NIP: {m.nip || '-'}</span>
-                        </div>
-                      </div>
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-label-sm font-label-sm ${
-                        m.gugusId === 'Unassigned' ? 'bg-surface-variant text-on-surface-variant' : 'bg-secondary/10 text-secondary'
-                      }`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                        {getGugusName(m.gugusId)}
-                      </span>
-                    </div>
-                    <div className="border-t border-b border-outline-variant/20 py-2.5 my-1 text-body-sm text-on-surface-variant flex flex-col gap-1">
-                      {m.email ? (
-                        <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px] text-on-surface-variant/60">mail</span> {m.email}</span>
-                      ) : (
-                        <span className="text-error flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">warning</span> Tidak Ada Email</span>
-                      )}
-                      {m.phone && (
-                        <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px] text-on-surface-variant/60">call</span> {m.phone}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <button onClick={() => handleOpenEditModal(m)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-on-surface-variant hover:text-primary hover:bg-primary/5 rounded-lg border border-outline-variant/30 transition-colors cursor-pointer">
-                        <span className="material-symbols-outlined text-[16px]">edit</span>
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(m.id, m.name)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-error hover:bg-error/5 rounded-lg border border-error/10 transition-colors cursor-pointer">
-                        <span className="material-symbols-outlined text-[16px]">delete</span>
-                        Hapus
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-10 text-on-surface-variant text-body-md bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/60">Tidak ada data mentor.</div>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-outline-variant/20 bg-surface-container-low flex items-center justify-between">
-              <span className="text-label-sm font-label-sm text-on-surface-variant">Menampilkan {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, totalItems)} dari {totalItems} mentor</span>
-              <div className="flex gap-1">
-                <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} className="w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-highest disabled:opacity-50" disabled={currentPage === 1}>
-                  <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-                </button>
-                {Array.from({ length: totalPages }).map((_, i) => (
-                  <button key={i} onClick={() => setCurrentPage(i + 1)} className={`w-8 h-8 flex items-center justify-center rounded-lg text-label-sm font-label-sm ${
-                    currentPage === i + 1 ? 'bg-primary text-on-primary font-bold' : 'text-on-surface-variant hover:bg-surface-container-highest'
-                  }`}>{i + 1}</button>
-                ))}
-                <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} className="w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-highest disabled:opacity-50" disabled={currentPage === totalPages}>
-                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-                </button>
+          <div 
+            onClick={() => handleFilterToggle('unassigned')}
+            className={`bg-white rounded-2xl p-3.5 sm:p-5 shadow-xs border transition-all cursor-pointer ${
+              activeFilter === 'unassigned' ? 'border-amber-500 ring-2 ring-amber-500/10 bg-amber-50/30' : 'border-slate-100 hover:border-slate-200'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] sm:text-label-sm font-bold text-slate-400 uppercase tracking-wider">Unassigned</span>
+              <div className="w-7 h-7 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold">
+                <span className="material-symbols-outlined text-[16px]">hourglass_empty</span>
               </div>
             </div>
+            <p className="text-body-md sm:text-headline-md font-extrabold text-amber-700">{mentors.filter(m => m.gugusId === 'Unassigned').length}</p>
+          </div>
+
+          <div 
+            onClick={() => handleFilterToggle('alerts')}
+            className={`bg-white rounded-2xl p-3.5 sm:p-5 shadow-xs border transition-all cursor-pointer col-span-2 md:col-span-1 ${
+              activeFilter === 'alerts' ? 'border-rose-500 ring-2 ring-rose-500/10 bg-rose-50/30' : 'border-slate-100 hover:border-slate-200'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] sm:text-label-sm font-bold text-slate-400 uppercase tracking-wider">Perlu Kontak</span>
+              <div className="w-7 h-7 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center font-bold">
+                <span className="material-symbols-outlined text-[16px]">warning</span>
+              </div>
+            </div>
+            <p className="text-body-md sm:text-headline-md font-extrabold text-rose-700">{mentors.filter(m => !m.email || !m.phone).length}</p>
           </div>
         </div>
 
-        {/* ADD/EDIT MENTOR MODAL */}
-        {(showAddModal || showEditModal) && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-primary/20 backdrop-blur-md" onClick={() => { setShowAddModal(false); setShowEditModal(false); }}></div>
-            <div className="relative w-full max-w-lg bg-surface-container-lowest shadow-2xl rounded-[24px] overflow-hidden flex flex-col z-10">
-              <div className="bg-primary p-6 text-on-primary">
-                <h3 className="text-headline-md font-headline-md">{showAddModal ? 'Tambah Mentor' : 'Edit Mentor'}</h3>
-              </div>
-              <form onSubmit={handleFormSubmit}>
-                <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-                  <div>
-                    <label className="block text-label-md font-label-md text-on-surface mb-1">Nama Lengkap</label>
-                    <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="Nama..." value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="block text-label-md font-label-md text-on-surface mb-1">NIM (Nomor Induk Mahasiswa)</label>
-                    <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="Masukkan NIM..." value={formData.nip} onChange={(e) => setFormData({...formData, nip: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="block text-label-md font-label-md text-on-surface mb-1">Email</label>
-                    <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="email" placeholder="mentor@univ.ac.id" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-                  </div>
-                  {showAddModal && (
-                    <div>
-                      <label className="block text-label-md font-label-md text-on-surface mb-1">Password Mentor</label>
-                      <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" type="password" placeholder="Password (default: pkkmb2026)..." value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
-                    </div>
-                  )}
-                  <div>
-                    <label className="block text-label-md font-label-md text-on-surface mb-1">Nomor Telepon</label>
-                    <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="+62 812..." value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="block text-label-md font-label-md text-on-surface mb-1">Gugus yang Ditugaskan</label>
-                    <select className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary cursor-pointer font-body-md" value={formData.gugusId} onChange={(e) => setFormData({...formData, gugusId: e.target.value})}>
-                      <option value="Unassigned">Belum Ditugaskan</option>
-                      {gugus.map(g => (
-                        <option key={g.id} value={g.id}>{g.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="p-6 bg-surface-container-low flex justify-end gap-3 border-t border-outline-variant/30">
-                  <button type="button" className="px-5 py-2.5 text-label-md font-label-md text-on-surface-variant hover:bg-surface-container-high rounded-xl transition-colors cursor-pointer" onClick={() => { setShowAddModal(false); setShowEditModal(false); }}>Batal</button>
-                  <button type="submit" className="px-5 py-2.5 text-label-md font-label-md bg-primary text-on-primary shadow-md hover:bg-primary-fixed rounded-xl transition-all cursor-pointer">Simpan</button>
-                </div>
-              </form>
+        {/* Main Table Container */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col w-full relative z-10">
+          
+          <div className="p-3.5 sm:p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5 bg-[#f8fafc]/50">
+            <div className="relative flex-1 sm:max-w-xs">
+              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px]">search</span>
+              <input 
+                className="w-full bg-white border border-slate-200 text-slate-800 text-body-sm font-semibold py-2 pl-8 pr-8 rounded-xl shadow-2xs focus:outline-none focus:border-primary transition-all placeholder:text-slate-400" 
+                placeholder="Cari Mentor..." 
+                type="text" 
+                value={searchTerm} 
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} 
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer">
+                  <span className="material-symbols-outlined text-[14px]">close</span>
+                </button>
+              )}
             </div>
+
+            {(activeFilter !== 'all' || searchTerm) && (
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => {
+                    setActiveFilter('all'); 
+                    setSearchTerm(''); 
+                    setCurrentPage(1); 
+                  }} 
+                  className="flex items-center gap-1 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[14px]">filter_alt_off</span>
+                  <span>Reset Filter</span>
+                </button>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead>
+                <tr className="bg-[#f8fafc] border-b border-slate-100">
+                  <th className="py-3.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mentor</th>
+                  <th className="py-3.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gugus</th>
+                  <th className="py-3.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kontak</th>
+                  <th className="py-3.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-100">
+                {currentItems.length > 0 ? (
+                  currentItems.map((m) => (
+                    <tr key={m.id} className="hover:bg-slate-50 transition-colors group">
+                      <td className="py-3.5 px-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-[#012060]/10 text-[#012060] font-bold flex items-center justify-center text-body-sm shrink-0 border border-[#012060]/20">
+                            {m.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-body-sm font-bold text-slate-800">{m.name}</p>
+                            <p className="text-[10px] font-mono text-slate-400">NIP/NIM: {m.nip || '-'}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-5">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          m.gugusId === 'Unassigned' ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-[#012060]/5 text-[#012060] border border-[#012060]/10'
+                        }`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                          <span>{getGugusName(m.gugusId)}</span>
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-5 text-body-sm text-slate-600">
+                        <div className="flex flex-col space-y-0.5">
+                          <span className="flex items-center gap-1 text-[11px] font-medium"><span className="material-symbols-outlined text-[13px] text-slate-400">mail</span> {m.email}</span>
+                          {m.phone && <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500"><span className="material-symbols-outlined text-[13px] text-slate-400">call</span> {m.phone}</span>}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-5 text-right">
+                        <div className="flex justify-end gap-1.5">
+                          <button onClick={() => handleOpenEditModal(m)} className="p-1.5 text-slate-500 hover:text-[#012060] hover:bg-slate-100 rounded-lg transition-colors cursor-pointer" title="Edit Mentor">
+                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                          </button>
+                          <button onClick={() => handleDelete(m.id, m.name)} className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer" title="Hapus Mentor">
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="text-center py-8 text-slate-400 text-body-sm">Tidak ada data mentor.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile View */}
+          <div className="block md:hidden space-y-2.5 p-3">
+            {currentItems.length > 0 ? (
+              currentItems.map((m) => (
+                <div key={m.id} className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-[#012060]/10 text-[#012060] font-bold flex items-center justify-center text-xs">
+                        {m.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-body-sm font-bold text-slate-800">{m.name}</p>
+                        <span className="text-[9.5px] text-slate-400 font-mono">NIP: {m.nip || '-'}</span>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                      m.gugusId === 'Unassigned' ? 'bg-slate-100 text-slate-500' : 'bg-secondary/10 text-secondary'
+                    }`}>
+                      {getGugusName(m.gugusId)}
+                    </span>
+                  </div>
+
+                  <div className="text-[10.5px] text-slate-500 border-t border-slate-100 pt-1.5 flex flex-col gap-0.5">
+                    <span>📧 {m.email}</span>
+                    {m.phone && <span>📞 {m.phone}</span>}
+                  </div>
+
+                  <div className="flex justify-end gap-1.5 pt-1 border-t border-slate-100">
+                    <button onClick={() => handleOpenEditModal(m)} className="px-2.5 py-1 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg cursor-pointer">Edit</button>
+                    <button onClick={() => handleDelete(m.id, m.name)} className="px-2.5 py-1 text-xs font-bold text-rose-600 bg-rose-50 rounded-lg cursor-pointer">Hapus</button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-6 text-slate-400 text-xs">Tidak ada data mentor.</div>
+            )}
+          </div>
+
+          {/* Pagination */}
+          <div className="p-3.5 sm:p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#f8fafc]/50">
+            <span className="text-[11px] sm:text-body-sm font-medium text-slate-500">
+              Menampilkan {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, totalItems)} dari {totalItems} mentor
+            </span>
+            
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <button 
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                </button>
+
+                <span className="text-[11px] font-bold text-[#012060] bg-[#012060]/5 border border-[#012060]/10 px-3 py-1 rounded-lg">
+                  {currentPage} / {totalPages}
+                </span>
+
+                <button 
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+        </div>
       </main>
+
+      {/* ADD/EDIT MENTOR MODAL */}
+      {(showAddModal || showEditModal) && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setShowAddModal(false); setShowEditModal(false); }}></div>
+          <div className="relative w-full max-w-sm sm:max-w-md bg-white shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col z-10 border border-slate-100">
+            <div className="bg-[#012060] p-3.5 sm:p-4 text-white">
+              <h3 className="text-body-sm sm:text-body-md font-bold">{showAddModal ? 'Tambah Mentor' : 'Edit Mentor'}</h3>
+            </div>
+            <form onSubmit={handleFormSubmit}>
+              <div className="p-3.5 sm:p-5 space-y-3 max-h-[60vh] overflow-y-auto">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nama Lengkap</label>
+                  <input className="w-full bg-[#f8fafc] text-slate-800 py-2 px-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary text-body-sm font-semibold" required type="text" placeholder="Nama..." value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">NIM / NIP</label>
+                  <input className="w-full bg-[#f8fafc] text-slate-800 py-2 px-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary text-body-sm font-semibold font-mono" required type="text" placeholder="Masukkan NIP..." value={formData.nip} onChange={(e) => setFormData({...formData, nip: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email</label>
+                  <input className="w-full bg-[#f8fafc] text-slate-800 py-2 px-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary text-body-sm font-semibold" required type="email" placeholder="mentor@univ.ac.id" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                </div>
+                {showAddModal && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Password Mentor</label>
+                    <input className="w-full bg-[#f8fafc] text-slate-800 py-2 px-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary text-body-sm font-semibold" type="password" placeholder="Password (default: pkkmb2026)..." value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nomor Telepon</label>
+                  <input className="w-full bg-[#f8fafc] text-slate-800 py-2 px-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary text-body-sm font-semibold" required type="text" placeholder="+62 812..." value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Gugus yang Ditugaskan</label>
+                  <select className="w-full bg-[#f8fafc] text-slate-800 py-2 px-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary cursor-pointer text-body-sm font-semibold" value={formData.gugusId} onChange={(e) => setFormData({...formData, gugusId: e.target.value})}>
+                    <option value="Unassigned">Belum Ditugaskan</option>
+                    {gugus.map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="p-3.5 sm:p-4 bg-slate-50 flex justify-end gap-2 border-t border-slate-100">
+                <button type="button" className="py-2 px-4 rounded-xl text-body-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer" onClick={() => { setShowAddModal(false); setShowEditModal(false); }}>Batal</button>
+                <button type="submit" className="py-2 px-4 rounded-xl text-body-sm font-bold bg-[#012060] text-white hover:bg-[#022b80] transition-all cursor-pointer">Simpan</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

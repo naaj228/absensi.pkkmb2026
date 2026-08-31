@@ -10,9 +10,12 @@ export default function MentorPeserta() {
   // Get gugus ID from the currently logged-in mentor
   const mentorGugusId = currentUser?.gugusId || '';
   const mentorGugus = gugus.find(g => g.id === mentorGugusId);
-  const mentorGugusName = mentorGugus?.name || 'Gugus Saya';
+  const rawGugusName = mentorGugus?.name || 'Gugus Saya';
+  const mentorGugusName = rawGugusName.toLowerCase().includes('panitia')
+    ? 'Gugus'
+    : (rawGugusName.startsWith('Gugus') ? rawGugusName : `Gugus ${rawGugusName}`);
 
-  // Search & Tab states
+  // Search & Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -33,17 +36,20 @@ export default function MentorPeserta() {
     status: 'Alpha'
   });
 
-  // Filter students
+  // Filter students belonging to mentor's group
   const mentorStudents = peserta.filter(p => p.gugusId === mentorGugusId);
+  const hadirCount = mentorStudents.filter(p => isHadir(p.status)).length;
+  const alphaCount = mentorStudents.length - hadirCount;
 
   const filteredStudents = mentorStudents.filter(student => {
-    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) || student.id.includes(searchTerm);
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = student.name.toLowerCase().includes(term) || student.id.includes(term);
     
     let matchesStatus = true;
     if (statusFilter === 'hadir') {
       matchesStatus = isHadir(student.status);
     } else if (statusFilter === 'belum') {
-      matchesStatus = student.status === 'Alpha' || !student.status;
+      matchesStatus = !isHadir(student.status);
     }
 
     return matchesSearch && matchesStatus;
@@ -163,277 +169,486 @@ export default function MentorPeserta() {
   };
 
   return (
-<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Anggota Gugus</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/mentor/notifikasi')}>notifications</span>{hasMentorNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div></div></header><main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full h-full relative">
-{/* Floating Header Actions / Title */}
-<div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 relative z-10">
-<div className="flex flex-col gap-2">
-<div className="flex items-center gap-3">
-<h2 className="text-headline-lg font-headline-lg text-on-background">Daftar Peserta - {mentorGugusName}</h2>
-<span className="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-label-sm font-label-md">{mentorStudents.length} Total</span>
-</div>
-</div>
-<div className="flex items-center gap-3 shrink-0">
-<button 
-  onClick={handleDownloadZip} 
-  disabled={downloadingZip}
-  className="flex items-center gap-2 bg-surface text-primary border border-outline-variant hover:bg-primary/5 px-5 py-3 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
->
-  <span className="material-symbols-outlined text-[20px]">{downloadingZip ? 'sync' : 'download'}</span>
-  <span className="text-label-md font-label-md">{downloadingZip ? 'Mengunduh...' : 'Unduh ZIP ID Card & QR'}</span>
-</button>
-<button onClick={handleOpenAddModal} className="group relative flex items-center justify-center gap-2 bg-primary text-on-primary hover:bg-primary/90 transition-all px-5 py-3 rounded-xl shadow-[0_8px_16px_-6px_rgba(0,4,35,0.4)] hover:shadow-[0_12px_20px_-8px_rgba(0,4,35,0.5)] overflow-hidden cursor-pointer">
-<div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
-<span className="material-symbols-outlined text-[20px] relative z-10">person_add</span>
-<span className="text-label-md font-label-md relative z-10">Tambah</span>
-</button>
-</div>
-</div>
-{/* Main Content Card */}
-<div className="bg-surface-container-lowest rounded-[24px] shadow-[0_12px_40px_-12px_rgba(0,0,0,0.06)] overflow-hidden relative z-0 flex flex-col min-h-[500px]">
-{/* Toolbar (Search, Filter, Bulk Actions) */}
-<div className="p-6 bg-surface-container-lowest border-b border-outline-variant/30 flex flex-col lg:flex-row justify-between gap-6 items-start lg:items-center">
-{/* Search & Filters */}
-<div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto gap-6">
-<div className="relative w-full sm:w-[320px]">
-<span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline-variant text-[20px]">search</span>
-<input className="w-full bg-surface-container-low text-on-surface placeholder:text-outline-variant text-body-md font-body-md pl-12 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-shadow" placeholder="Cari..." type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-</div>
-<div className="flex items-center gap-3">
-<button onClick={() => setStatusFilter(prev => prev === 'hadir' ? 'all' : 'hadir')} className={`flex items-center gap-2 px-4 py-3 rounded-xl font-label-md text-label-md border transition-all ${
-  statusFilter === 'hadir' ? 'bg-[#ecfdf5] text-[#059669] border-[#a7f3d0]' : 'bg-surface-container-low text-on-surface border-outline-variant/30 hover:bg-surface-container'
-}`}>
-  <span className="material-symbols-outlined text-[18px]">verified_user</span>
-  <span>Hadir</span>
-</button>
-<button onClick={() => setStatusFilter(prev => prev === 'belum' ? 'all' : 'belum')} className={`flex items-center gap-2 px-4 py-3 rounded-xl font-label-md text-label-md border transition-all ${
-  statusFilter === 'belum' ? 'bg-[#fef2f2] text-[#dc2626] border-[#fecaca]' : 'bg-surface-container-low text-on-surface border-outline-variant/30 hover:bg-surface-container'
-}`}>
-  <span className="material-symbols-outlined text-[18px]">cancel</span>
-  <span>Alpha</span>
-</button>
-</div>
-</div>
-</div>
-{/* Data Table */}
-{/* Desktop View: Data Table */}
-<div className="hidden md:block overflow-x-auto flex-1">
-<table className="w-full text-left border-collapse min-w-[900px]">
-<thead>
-<tr className="bg-surface/50 border-b border-outline-variant/30">
-<th className="py-4 px-6 text-label-sm font-label-sm text-outline uppercase tracking-wider">Mahasiswa</th>
-<th className="py-4 px-6 text-label-sm font-label-sm text-outline uppercase tracking-wider">NIM</th>
-<th className="py-4 px-6 text-label-sm font-label-sm text-outline uppercase tracking-wider">Jurusan</th>
-<th className="py-4 px-6 text-label-sm font-label-sm text-outline uppercase tracking-wider">Status</th>
-<th className="py-4 px-6 text-right text-label-sm font-label-sm text-outline uppercase tracking-wider">Aksi</th>
-</tr>
-</thead>
-<tbody className="divide-y divide-outline-variant/20 bg-surface-container-lowest">
-  {filteredStudents.length > 0 ? (
-    filteredStudents.map((student) => (
-      <tr key={student.id} className="hover:bg-surface-container-low/50 transition-colors group">
-      <td className="py-4 px-6">
-      <div className="flex items-center gap-4">
-      <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold shadow-inner">
-        {student.name.substring(0, 2).toUpperCase()}
-      </div>
-      <div className="flex flex-col">
-      <span className="text-body-md font-semibold text-on-surface">{student.name}</span>
-      <span className="text-body-sm font-body-sm text-outline">{student.email}</span>
-      </div>
-      </div>
-      </td>
-      <td className="py-4 px-6">
-      <span className="text-body-md font-body-md text-on-surface-variant bg-surface-container px-2 py-1 rounded-md font-mono text-sm">{student.id}</span>
-      </td>
-      <td className="py-4 px-6">
-        <span className="text-body-md text-on-surface">{student.fakultas}</span>
-      </td>
-      <td className="py-4 px-6">
-        {(() => { const b = getStatusBadge(student.status); return (
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${b.bg} ${b.text} text-label-sm font-label-sm h-8`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span> {b.label}
-          </span>
-        ); })()}
-      </td>
-      <td className="py-4 px-6 text-right">
-      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-      <button onClick={() => handleOpenQrModal(student)} className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer" title="Lihat QR">
-      <span className="material-symbols-outlined text-[20px]">qr_code</span>
-      </button>
-      <button onClick={() => handleOpenEditModal(student)} className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer" title="Edit Data">
-      <span className="material-symbols-outlined text-[20px]">edit</span>
-      </button>
-      </div>
-      </td>
-      </tr>
-    ))
-  ) : (
-    <tr>
-      <td colSpan="5" className="text-center py-8 text-on-surface-variant">Tidak ada data anggota gugus.</td>
-    </tr>
-  )}
-</tbody>
-</table>
-</div>
+    <div className="w-full bg-[#f8fafc] min-h-screen pb-16">
+      {/* Header - Fixed to top, padded for mobile hamburger menu */}
+      <header className="fixed top-0 left-0 lg:left-[280px] right-0 h-16 bg-white/90 backdrop-blur-md z-40 flex items-center justify-between pl-16 pr-4 sm:px-6 lg:px-8 shadow-[0_1px_8px_rgba(0,0,0,0.03)] border-b border-slate-100">
+        <div className="flex items-center gap-2.5 overflow-hidden">
+          <span className="material-symbols-outlined text-[#012060] text-[22px] sm:text-[24px] shrink-0">groups</span>
+          <h1 className="text-body-md sm:text-title-md font-bold text-[#012060] font-sans truncate">
+            Anggota {mentorGugusName}
+          </h1>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <div 
+            className="relative group cursor-pointer p-2 rounded-xl hover:bg-slate-100 transition-colors"
+            onClick={() => navigate('/mentor/notifikasi')}
+            title="Notifikasi Mentor"
+          >
+            <span className="material-symbols-outlined text-slate-600 group-hover:text-primary transition-colors text-[22px] sm:text-[24px]">notifications</span>
+            {hasMentorNotifications && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}
+          </div>
+        </div>
+      </header>
 
-{/* Mobile View: Card List */}
-<div className="block md:hidden space-y-4 p-4">
-  {filteredStudents.length > 0 ? (
-    filteredStudents.map((student) => (
-      <div key={student.id} className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/40 flex flex-col gap-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold shadow-inner shrink-0">
-              {student.name.substring(0, 2).toUpperCase()}
+      {/* Main Content */}
+      <main className="relative pt-20 px-3 sm:px-6 lg:px-8 max-w-container-max mx-auto space-y-4 sm:space-y-6">
+        
+        {/* Banner & Action Buttons */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider bg-[#012060]/5 text-[#012060] px-2.5 py-0.5 rounded-full border border-[#012060]/10">
+                {mentorGugusName}
+              </span>
+              <span className="text-[10px] font-bold text-slate-400">
+                {mentorStudents.length} Mahasiswa
+              </span>
             </div>
-            <div className="min-w-0">
-              <p className="text-body-md font-semibold text-on-surface truncate">{student.name}</p>
-              <p className="text-label-sm text-outline truncate">{student.email}</p>
+            <h2 className="text-body-lg sm:text-headline-md font-bold text-[#012060]">Daftar Anggota Gugus</h2>
+            <p className="text-[11px] sm:text-body-sm text-slate-500 mt-0.5">
+              Kelola data presensi mahasiswa bimbingan Anda, unduh QR Code, atau ajukan penambahan peserta.
+            </p>
+          </div>
+
+          <div className="flex flex-row w-full sm:w-auto gap-2.5 shrink-0">
+            <button 
+              onClick={handleDownloadZip} 
+              disabled={downloadingZip}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-[#012060] px-4 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50 active:scale-98"
+            >
+              <span className="material-symbols-outlined text-[18px]">{downloadingZip ? 'sync' : 'download'}</span>
+              <span>{downloadingZip ? 'Mengunduh...' : 'Unduh ZIP'}</span>
+            </button>
+            
+            <button 
+              onClick={handleOpenAddModal} 
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-[#012060] hover:bg-[#022b80] text-white px-4 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-md cursor-pointer active:scale-98"
+            >
+              <span className="material-symbols-outlined text-[18px]">person_add</span>
+              <span>Tambah</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Main Section */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col w-full relative z-10">
+          
+          {/* Toolbar (Search & Filter Tabs) */}
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-[#f8fafc]/40">
+            <div className="relative w-full sm:w-80">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+              <input 
+                className="w-full bg-white border border-slate-200 text-slate-800 text-body-sm font-semibold py-2.5 pl-9 pr-8 rounded-xl shadow-2xs focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all placeholder:text-slate-400" 
+                placeholder="Cari Nama atau NIM..." 
+                type="text" 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer">
+                  <span className="material-symbols-outlined text-[15px]">close</span>
+                </button>
+              )}
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+              <button 
+                onClick={() => setStatusFilter('all')}
+                className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-[11px] sm:text-body-sm font-bold transition-all cursor-pointer ${
+                  statusFilter === 'all' 
+                    ? 'bg-white shadow-xs text-[#012060]' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Semua ({mentorStudents.length})
+              </button>
+
+              <button 
+                onClick={() => setStatusFilter('hadir')}
+                className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-[11px] sm:text-body-sm font-bold transition-all cursor-pointer ${
+                  statusFilter === 'hadir' 
+                    ? 'bg-white shadow-xs text-emerald-700' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Hadir ({hadirCount})
+              </button>
+
+              <button 
+                onClick={() => setStatusFilter('belum')}
+                className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-[11px] sm:text-body-sm font-bold transition-all cursor-pointer ${
+                  statusFilter === 'belum' 
+                    ? 'bg-white shadow-xs text-rose-700' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Belum ({alphaCount})
+              </button>
             </div>
           </div>
-          {(() => { const b = getStatusBadge(student.status); return (
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${b.bg} ${b.text} text-label-sm font-label-sm shrink-0`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span> {b.label}
+
+          {/* MOBILE VIEW GRID (2 Kolom pada Layar Mobile < md) */}
+          <div className="block md:hidden p-3 bg-slate-50/50 border-b border-slate-100">
+            {filteredStudents.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                {filteredStudents.map((student) => {
+                  const b = getStatusBadge(student.status);
+                  const isStudentHadir = isHadir(student.status);
+
+                  return (
+                    <div 
+                      key={student.id} 
+                      className={`bg-white rounded-2xl p-3 shadow-xs border flex flex-col justify-between gap-2.5 hover:shadow-md transition-all relative overflow-hidden group ${
+                        isStudentHadir ? 'border-l-4 border-l-emerald-500 border-slate-200/80' : 'border-l-4 border-l-rose-500 border-slate-200/80'
+                      }`}
+                    >
+                      {/* Top Bar: Status Badge */}
+                      <div className="flex items-center justify-end">
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold shrink-0 border flex items-center gap-1 ${
+                          isStudentHadir 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isStudentHadir ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                          <span>{b.label}</span>
+                        </span>
+                      </div>
+
+                      {/* Name & NIM */}
+                      <div className="overflow-hidden">
+                        <h4 className="text-body-sm font-bold text-slate-800 line-clamp-1 leading-snug" title={student.name}>
+                          {student.name}
+                        </h4>
+                        <div className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-[#012060]/5 border border-[#012060]/10">
+                          <span className="text-[8px] font-extrabold uppercase text-slate-400">NIM</span>
+                          <span className="text-[10px] font-bold text-[#012060] font-mono tracking-tight">{student.id}</span>
+                        </div>
+                      </div>
+
+                      {/* Jurusan & Email Info */}
+                      <div className="text-[10px] space-y-0.5 text-slate-500 border-t border-slate-100 pt-2 font-medium">
+                        <div className="truncate text-slate-700 font-semibold">
+                          {student.fakultas || 'Belum Ditentukan'}
+                        </div>
+                        <div className="truncate text-slate-400 text-[9.5px]">
+                          {student.email || '-'}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100">
+                        <button 
+                          onClick={() => handleOpenQrModal(student)}
+                          className="py-1.5 bg-[#012060] hover:bg-[#022b80] active:scale-95 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all shadow-xs"
+                          title="Lihat QR"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">qr_code_2</span>
+                          <span>QR</span>
+                        </button>
+
+                        <button 
+                          onClick={() => handleOpenEditModal(student)}
+                          className="py-1.5 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all border border-slate-200/60"
+                          title="Ubah Data"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">edit</span>
+                          <span>Ubah</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-10 text-slate-400 text-body-sm">
+                Tidak ada data anggota gugus ditemukan.
+              </div>
+            )}
+          </div>
+
+          {/* DESKTOP TABLE VIEW (Visible on screen >= md) */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[850px]">
+              <thead>
+                <tr className="bg-[#f8fafc] border-b border-slate-100">
+                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mahasiswa</th>
+                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">NIM</th>
+                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jurusan</th>
+                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status Kehadiran</th>
+                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-100">
+                {filteredStudents.length > 0 ? (
+                  filteredStudents.map((student) => {
+                    const b = getStatusBadge(student.status);
+                    return (
+                      <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
+                        <td className="py-4 px-6">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-body-sm font-bold text-slate-800 truncate">{student.name}</span>
+                            <span className="text-[11px] text-slate-400 truncate">{student.email}</span>
+                          </div>
+                        </td>
+
+                        <td className="py-4 px-6">
+                          <span className="text-body-sm font-bold text-[#012060] font-mono bg-[#012060]/5 px-2.5 py-1 rounded-lg border border-[#012060]/10">{student.id}</span>
+                        </td>
+
+                        <td className="py-4 px-6 text-body-sm text-slate-700 font-medium">
+                          {student.fakultas || '-'}
+                        </td>
+
+                        <td className="py-4 px-6">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-label-sm font-bold ${b.bg} ${b.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span>
+                            {b.label}
+                          </span>
+                        </td>
+
+                        <td className="py-4 px-6 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button 
+                              onClick={() => handleOpenQrModal(student)} 
+                              className="p-1.5 text-[#012060] hover:bg-[#012060]/10 rounded-lg transition-colors cursor-pointer" 
+                              title="Lihat QR Code"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">qr_code_2</span>
+                            </button>
+
+                            <button 
+                              onClick={() => handleOpenEditModal(student)} 
+                              className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer" 
+                              title="Edit Data Peserta"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">edit</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan="5" className="text-center py-10 text-slate-400 text-body-md">Tidak ada data anggota gugus.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer Bar */}
+          <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-[#f8fafc]/50">
+            <span className="text-[11px] sm:text-body-sm font-medium text-slate-500">
+              Menampilkan {filteredStudents.length} dari {mentorStudents.length} mahasiswa gugus
             </span>
-          ); })()}
-        </div>
+          </div>
 
-        <div className="grid grid-cols-2 gap-2 border-t border-b border-outline-variant/20 py-2.5 my-1 text-body-sm text-on-surface-variant">
-          <div>
-            <span className="text-label-sm text-outline block mb-0.5">NIM</span>
-            <span className="font-mono text-on-surface font-medium bg-surface px-1.5 py-0.5 rounded border border-outline-variant/20">{student.id}</span>
-          </div>
-          <div>
-            <span className="text-label-sm text-outline block mb-0.5">Jurusan</span>
-            <span className="text-on-surface font-medium block truncate">{student.fakultas}</span>
-          </div>
         </div>
+      </main>
 
-        <div className="flex items-center justify-end gap-2 pt-1">
-          <button onClick={() => handleOpenQrModal(student)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-primary hover:bg-primary/10 rounded-lg border border-primary/10 transition-colors cursor-pointer">
-            <span className="material-symbols-outlined text-[16px]">qr_code</span>
-            QR Code
-          </button>
-          <button onClick={() => handleOpenEditModal(student)} className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm text-on-surface-variant hover:text-primary hover:bg-primary/5 rounded-lg border border-outline-variant/30 transition-colors cursor-pointer">
-            <span className="material-symbols-outlined text-[16px]">edit</span>
-            Ubah Data
-          </button>
-        </div>
-      </div>
-    ))
-  ) : (
-    <div className="text-center py-10 text-on-surface-variant text-body-md bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/60">Tidak ada data anggota gugus.</div>
-  )}
-</div>
-</div>
-</div>
+      {/* ADD STUDENT MODAL */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddModal(false)}></div>
+          <div className="relative w-full max-w-sm sm:max-w-md lg:max-w-lg bg-white shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col z-10 border border-slate-100 animate-fade-in">
+            <div className="bg-[#012060] p-3.5 sm:p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white/10 flex items-center justify-center border border-white/15 shrink-0">
+                  <span className="material-symbols-outlined text-[16px] sm:text-[20px] text-white">person_add</span>
+                </div>
+                <div>
+                  <h3 className="text-body-md sm:text-body-lg font-bold">Tambah Anggota Gugus</h3>
+                  <p className="text-[10px] sm:text-[11px] text-white/80 mt-0.5">Pengajuan penambahan peserta baru ke Admin</p>
+                </div>
+              </div>
+              <button onClick={() => setShowAddModal(false)} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer shrink-0">
+                <span className="material-symbols-outlined text-[16px] sm:text-[18px]">close</span>
+              </button>
+            </div>
+            <form onSubmit={handleFormSubmit}>
+              <div className="p-3.5 sm:p-6 space-y-2.5 sm:space-y-4">
+                <div>
+                  <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">NIM (Nomor Induk Mahasiswa)</label>
+                  <div className="relative">
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="text" placeholder="Masukkan NIM..." value={formData.id} onChange={(e) => setFormData({...formData, id: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">badge</span>
+                  </div>
+                </div>
 
-{/* ADD STUDENT MODAL */}
-{showAddModal && (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-    <div className="absolute inset-0 bg-primary/20 backdrop-blur-md" onClick={() => setShowAddModal(false)}></div>
-    <div className="relative w-full max-w-lg bg-surface-container-lowest shadow-2xl rounded-[24px] overflow-hidden flex flex-col z-10">
-      <div className="bg-primary p-6 text-on-primary">
-        <h3 className="text-headline-md font-headline-md">Tambah Anggota</h3>
-      </div>
-      <form onSubmit={handleFormSubmit}>
-        <div className="p-6 space-y-4">
-          <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">NIM</label>
-            <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="Masukkan NIM..." value={formData.id} onChange={(e) => setFormData({...formData, id: e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">Nama Lengkap</label>
-            <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="Nama..." value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">Email</label>
-            <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="email" placeholder="mahasiswa@student.univ.ac.id" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">Jurusan</label>
-            <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="Cth: Teknik Informatika" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
+                <div>
+                  <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nama Lengkap</label>
+                  <div className="relative">
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="text" placeholder="Nama..." value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">person</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email Mahasiswa</label>
+                  <div className="relative">
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="email" placeholder="mahasiswa@student.univ.ac.id" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">mail</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jurusan / Program Studi</label>
+                  <div className="relative">
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="text" placeholder="Cth: Teknik Informatika" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">school</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 sm:p-4 bg-slate-50 flex justify-end gap-2 border-t border-slate-100">
+                <button type="button" className="px-4 py-2 text-body-sm font-bold text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer" onClick={() => setShowAddModal(false)}>Batal</button>
+                <button type="submit" className="px-4 py-2 text-body-sm font-bold bg-[#012060] text-white hover:bg-[#022b80] rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px]">send</span>
+                  <span>Kirim Pengajuan</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-        <div className="p-6 bg-surface-container-low flex justify-end gap-3 border-t border-outline-variant/30">
-          <button type="button" className="px-5 py-2.5 text-label-md font-label-md text-on-surface-variant hover:bg-surface-container-high rounded-xl transition-colors cursor-pointer" onClick={() => setShowAddModal(false)}>Batal</button>
-          <button type="submit" className="px-5 py-2.5 text-label-md font-label-md bg-primary text-on-primary shadow-md hover:bg-primary-fixed rounded-xl transition-all cursor-pointer">Simpan</button>
+      )}
+
+      {/* EDIT STUDENT MODAL */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowEditModal(false)}></div>
+          <div className="relative w-full max-w-sm sm:max-w-md lg:max-w-lg bg-white shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col z-10 border border-slate-100 animate-fade-in">
+            {/* Header */}
+            <div className="bg-[#012060] p-3.5 sm:p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white/10 flex items-center justify-center border border-white/15 shrink-0">
+                  <span className="material-symbols-outlined text-[16px] sm:text-[20px] text-white">edit_note</span>
+                </div>
+                <div>
+                  <h3 className="text-body-md sm:text-body-lg font-bold">Edit Data Anggota</h3>
+                  <p className="text-[10px] sm:text-[11px] text-white/80 mt-0.5">Pengajuan perubahan profil ke Admin</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowEditModal(false)} 
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              >
+                <span className="material-symbols-outlined text-[16px] sm:text-[18px]">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleFormSubmit}>
+              <div className="p-3.5 sm:p-6 space-y-2.5 sm:space-y-4">
+                {/* NIM Readonly */}
+                <div>
+                  <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">NIM (Nomor Induk Mahasiswa)</label>
+                  <div className="relative">
+                    <input className="w-full bg-slate-100 text-slate-500 font-mono font-bold p-2.5 sm:p-3 rounded-xl border border-slate-200 text-body-sm pl-9" disabled type="text" value={formData.id} />
+                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">lock</span>
+                  </div>
+                </div>
+
+                {/* Nama Lengkap */}
+                <div>
+                  <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nama Lengkap</label>
+                  <div className="relative">
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">person</span>
+                  </div>
+                </div>
+
+                {/* Email Mahasiswa */}
+                <div>
+                  <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email Mahasiswa</label>
+                  <div className="relative">
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">mail</span>
+                  </div>
+                </div>
+
+                {/* Jurusan / Prodi */}
+                <div>
+                  <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jurusan / Program Studi</label>
+                  <div className="relative">
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="text" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">school</span>
+                  </div>
+                </div>
+
+                {/* Status Kehadiran */}
+                <div>
+                  <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Status Kehadiran</label>
+                  <div className="relative">
+                    <select className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 cursor-pointer text-body-sm appearance-none pl-9 pr-8 transition-all" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
+                      {STATUS_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">fact_check</span>
+                    <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[16px] sm:text-[18px]">expand_more</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-3 sm:p-4 bg-slate-50 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button 
+                  type="button" 
+                  className="px-4 py-2 text-body-sm font-bold text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer" 
+                  onClick={() => setShowEditModal(false)}
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 text-body-sm font-bold bg-[#012060] text-white hover:bg-[#022b80] rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">save</span>
+                  <span>Simpan Perubahan</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </form>
+      )}
+
+      {/* QR CODE MODAL */}
+      {showQrModal && qrStudent && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowQrModal(false)}></div>
+          <div className="relative w-full max-w-sm bg-white shadow-2xl rounded-3xl overflow-hidden flex flex-col z-10 border border-slate-100 animate-fade-in p-6 items-center text-center">
+            <div className="w-full flex items-center justify-between mb-3">
+              <h3 className="text-body-lg font-bold text-[#012060]">QR Code Mahasiswa</h3>
+              <button onClick={() => setShowQrModal(false)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+            
+            <div className="w-48 h-48 bg-white rounded-2xl p-3 border border-slate-200 flex items-center justify-center shadow-xs mb-4">
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrStudent.id)}`} 
+                alt={`QR Code NIM: ${qrStudent.id}`}
+                className="w-full h-full object-contain"
+              />
+            </div>
+            
+            <p className="text-body-md font-bold text-slate-800">{qrStudent.name}</p>
+            <p className="text-body-sm text-slate-500 font-mono mb-5">NIM: {qrStudent.id}</p>
+
+            <div className="flex gap-2.5 w-full">
+              <button onClick={() => handleDownloadQr(qrStudent)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl text-label-md font-bold transition-colors border border-slate-200 flex items-center justify-center gap-1 cursor-pointer">
+                <span className="material-symbols-outlined text-[18px]">download</span>
+                <span>Unduh</span>
+              </button>
+              <button onClick={() => setShowQrModal(false)} className="flex-1 bg-[#012060] text-white py-2.5 rounded-xl text-label-md font-bold transition-colors shadow-md hover:bg-[#022b80] cursor-pointer">
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
-  </div>
-)}
-
-{/* EDIT STUDENT MODAL */}
-{showEditModal && (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-    <div className="absolute inset-0 bg-primary/20 backdrop-blur-md" onClick={() => setShowEditModal(false)}></div>
-    <div className="relative w-full max-w-lg bg-surface-container-lowest shadow-2xl rounded-[24px] overflow-hidden flex flex-col z-10">
-      <div className="bg-primary p-6 text-on-primary">
-        <h3 className="text-headline-md font-headline-md">Edit Anggota</h3>
-      </div>
-      <form onSubmit={handleFormSubmit}>
-        <div className="p-6 space-y-4">
-          <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">NIM</label>
-            <input className="w-full bg-surface-container-low text-on-surface-variant p-3 rounded-xl border border-outline-variant opacity-60 font-body-md" disabled type="text" value={formData.id} />
-          </div>
-          <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">Nama Lengkap</label>
-            <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">Email</label>
-            <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">Jurusan</label>
-            <input className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary font-body-md" required type="text" placeholder="Cth: Teknik Informatika" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-label-md font-label-md text-on-surface mb-1">Status Kehadiran</label>
-            <select className="w-full bg-surface-container text-on-surface p-3 rounded-xl border border-outline-variant focus:outline-none focus:border-primary cursor-pointer font-body-md" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
-              {STATUS_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="p-6 bg-surface-container-low flex justify-end gap-3 border-t border-outline-variant/30">
-          <button type="button" className="px-5 py-2.5 text-label-md font-label-md text-on-surface-variant hover:bg-surface-container-high rounded-xl transition-colors cursor-pointer" onClick={() => setShowEditModal(false)}>Batal</button>
-          <button type="submit" className="px-5 py-2.5 text-label-md font-label-md bg-primary text-on-primary shadow-md hover:bg-primary-fixed rounded-xl transition-all cursor-pointer">Simpan Perubahan</button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
-
-{/* SIMULATED QR CODE MODAL */}
-{showQrModal && qrStudent && (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-    <div className="absolute inset-0 bg-primary/20 backdrop-blur-md" onClick={() => setShowQrModal(false)}></div>
-    <div className="relative w-full max-w-sm bg-surface-container-lowest shadow-2xl rounded-[24px] overflow-hidden flex flex-col z-10 p-6 items-center text-center">
-      <h3 className="text-headline-sm font-headline-md text-on-surface mb-4 self-start">QR Code</h3>
-      <div className="w-48 h-48 bg-white rounded-xl p-3 border border-outline-variant/30 flex items-center justify-center shadow-inner mb-6">
-        <img 
-          src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrStudent.id)}`} 
-          alt={`QR Code NIM: ${qrStudent.id}`}
-          className="w-full h-full object-contain"
-        />
-      </div>
-      <p className="text-body-sm text-on-surface-variant font-mono mb-6">{qrStudent.name} • NIM: {qrStudent.id}</p>
-      <div className="flex gap-3 w-full">
-        <button onClick={() => handleDownloadQr(qrStudent)} className="flex-1 bg-surface-container hover:bg-surface-container-high text-on-surface py-2.5 rounded-xl text-label-md font-label-md transition-colors border border-outline-variant cursor-pointer">
-          Unduh
-        </button>
-        <button onClick={() => setShowQrModal(false)} className="flex-1 bg-primary text-on-primary py-2.5 rounded-xl text-label-md font-label-md transition-colors shadow-md hover:bg-primary-fixed cursor-pointer">
-          Tutup
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-</main></div>
   );
 }

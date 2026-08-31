@@ -112,69 +112,69 @@ export default function AdminDashboard() {
   ];
 
   return (
-<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Ikhtisar Sistem</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div></div></header><main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full gap-8 pb-12">
+<div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Dashboard</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div></div></header><main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full gap-8 pb-12">
 {/* Top Stats Row */}
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+<div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
 {/* Card 1: Total Peserta */}
-<div className="bg-surface-container-lowest rounded-[16px] p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" onClick={() => navigate('/admin/peserta')}>
-<div className="flex items-center justify-between mb-4">
-<p className="text-label-md text-on-surface-variant uppercase tracking-wider">Total Peserta</p>
-<div className="w-8 h-8 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center">
-<span className="material-symbols-outlined text-primary text-[18px]">group</span>
+<div className="bg-surface-container-lowest rounded-[16px] p-4 sm:p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" onClick={() => navigate('/admin/peserta')}>
+<div className="flex items-center justify-between mb-2 sm:mb-4">
+<p className="text-[10px] sm:text-xs md:text-label-md text-on-surface-variant uppercase tracking-wider truncate">Total Peserta</p>
+<div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center shrink-0">
+<span className="material-symbols-outlined text-primary text-[16px] sm:text-[18px]">group</span>
 </div>
 </div>
-<h3 className="text-headline-lg font-headline-md text-on-surface">{totalPeserta}</h3>
+<h3 className="text-xl sm:text-2xl md:text-headline-lg font-bold text-on-surface leading-none">{totalPeserta}</h3>
 </div>
 {/* Card 2: Total Mentor */}
-<div className="bg-surface-container-lowest rounded-[16px] p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" onClick={() => navigate('/admin/mentor')}>
-<div className="flex items-center justify-between mb-4">
-<p className="text-label-md text-on-surface-variant uppercase tracking-wider">Total Mentor</p>
-<div className="w-8 h-8 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center">
-<span className="material-symbols-outlined text-primary text-[18px]">school</span>
+<div className="bg-surface-container-lowest rounded-[16px] p-4 sm:p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" onClick={() => navigate('/admin/mentor')}>
+<div className="flex items-center justify-between mb-2 sm:mb-4">
+<p className="text-[10px] sm:text-xs md:text-label-md text-on-surface-variant uppercase tracking-wider truncate">Total Mentor</p>
+<div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center shrink-0">
+<span className="material-symbols-outlined text-primary text-[16px] sm:text-[18px]">school</span>
 </div>
 </div>
-<h3 className="text-headline-lg font-headline-md text-on-surface">{totalMentor}</h3>
+<h3 className="text-xl sm:text-2xl md:text-headline-lg font-bold text-on-surface leading-none">{totalMentor}</h3>
 </div>
 {/* Card 3: Total Gugus */}
-<div className="bg-surface-container-lowest rounded-[16px] p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" onClick={() => navigate('/admin/gugus')}>
-<div className="flex items-center justify-between mb-4">
-<p className="text-label-md text-on-surface-variant uppercase tracking-wider">Total Gugus</p>
-<div className="w-8 h-8 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center">
-<span className="material-symbols-outlined text-primary text-[18px]">grid_view</span>
+<div className="bg-surface-container-lowest rounded-[16px] p-4 sm:p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" onClick={() => navigate('/admin/gugus')}>
+<div className="flex items-center justify-between mb-2 sm:mb-4">
+<p className="text-[10px] sm:text-xs md:text-label-md text-on-surface-variant uppercase tracking-wider truncate">Total Gugus</p>
+<div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center shrink-0">
+<span className="material-symbols-outlined text-primary text-[16px] sm:text-[18px]">grid_view</span>
 </div>
 </div>
-<h3 className="text-headline-lg font-headline-md text-on-surface">{totalGugus}</h3>
+<h3 className="text-xl sm:text-2xl md:text-headline-lg font-bold text-on-surface leading-none">{totalGugus}</h3>
 </div>
 {/* Card 4: Hadir Hari Ini */}
-<div className="bg-surface-container-lowest rounded-[16px] p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" onClick={() => navigate('/admin/riwayat')}>
-<div className="flex items-center justify-between mb-4">
-<p className="text-label-md text-on-surface-variant uppercase tracking-wider">Hadir Hari Ini</p>
-<div className="w-8 h-8 rounded-full bg-[#ecfdf5] flex items-center justify-center">
-<span className="material-symbols-outlined text-[#059669] text-[18px]">check_circle</span>
+<div className="bg-surface-container-lowest rounded-[16px] p-4 sm:p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" onClick={() => navigate('/admin/riwayat')}>
+<div className="flex items-center justify-between mb-2 sm:mb-4">
+<p className="text-[10px] sm:text-xs md:text-label-md text-on-surface-variant uppercase tracking-wider truncate">Hadir Hari Ini</p>
+<div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#ecfdf5] flex items-center justify-center shrink-0">
+<span className="material-symbols-outlined text-[#059669] text-[16px] sm:text-[18px]">check_circle</span>
 </div>
 </div>
-<h3 className="text-headline-lg font-headline-md text-on-surface">{hadirHariIni}</h3>
+<h3 className="text-xl sm:text-2xl md:text-headline-lg font-bold text-on-surface leading-none">{hadirHariIni}</h3>
 </div>
 {/* Card 5: Belum Hadir */}
-<div className="bg-surface-container-lowest rounded-[16px] p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" onClick={() => navigate('/admin/peserta')}>
-<div className="flex items-center justify-between mb-4">
-<p className="text-label-md text-on-surface-variant uppercase tracking-wider">Belum Hadir</p>
-<div className="w-8 h-8 rounded-full bg-[#fef2f2] flex items-center justify-center">
-<span className="material-symbols-outlined text-[#ef4444] text-[18px]">cancel</span>
+<div className="bg-surface-container-lowest rounded-[16px] p-4 sm:p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" onClick={() => navigate('/admin/peserta')}>
+<div className="flex items-center justify-between mb-2 sm:mb-4">
+<p className="text-[10px] sm:text-xs md:text-label-md text-on-surface-variant uppercase tracking-wider truncate">Belum Hadir</p>
+<div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#fef2f2] flex items-center justify-center shrink-0">
+<span className="material-symbols-outlined text-[#ef4444] text-[16px] sm:text-[18px]">cancel</span>
 </div>
 </div>
-<h3 className="text-headline-lg font-headline-md text-on-surface">{alphaCount}</h3>
+<h3 className="text-xl sm:text-2xl md:text-headline-lg font-bold text-on-surface leading-none">{alphaCount}</h3>
 </div>
 {/* Card 6: Persentase Kehadiran */}
-<div className="bg-primary rounded-[16px] p-6 shadow-[0_10px_30px_rgba(20,44,142,0.15)] text-on-primary">
-<div className="flex items-center justify-between mb-4">
-<p className="text-label-md text-primary-container uppercase tracking-wider">Kehadiran</p>
-<div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-<span className="material-symbols-outlined text-on-primary text-[18px]">percent</span>
+<div className="bg-primary rounded-[16px] p-4 sm:p-6 shadow-[0_10px_30px_rgba(20,44,142,0.15)] text-on-primary">
+<div className="flex items-center justify-between mb-2 sm:mb-4">
+<p className="text-[10px] sm:text-xs md:text-label-md text-white uppercase tracking-wider truncate">Kehadiran</p>
+<div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+<span className="material-symbols-outlined text-on-primary text-[16px] sm:text-[18px]">percent</span>
 </div>
 </div>
-<h3 className="text-headline-lg font-headline-md text-on-primary">{persentaseKehadiran}%</h3>
-<div className="mt-4 w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+<h3 className="text-xl sm:text-2xl md:text-headline-lg font-bold text-on-primary leading-none">{persentaseKehadiran}%</h3>
+<div className="mt-2 sm:mt-4 w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
 <div className="h-full bg-[#10b981] rounded-full transition-all duration-500" style={{ width: `${persentaseKehadiran}%` }}></div>
 </div>
 </div>
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
 {/* Main Content Area: Chart and Recent Activity Grid */}
 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 {/* Chart Section (Spans 2 columns) */}
-<div className="lg:col-span-2 bg-surface-container-lowest rounded-[16px] p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] flex flex-col">
+<div className="lg:col-span-2 bg-surface-container-lowest rounded-[16px] p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] flex flex-col order-2 lg:order-1">
 <div className="flex items-center justify-between mb-6">
 <div>
 <h2 className="text-headline-sm font-headline-md text-on-surface">Tren Kehadiran</h2>
@@ -193,13 +193,13 @@ export default function AdminDashboard() {
 <button onClick={() => setChartFilter('day')} className={`px-3 py-1.5 text-label-sm rounded-lg transition-colors ${chartFilter === 'day' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface hover:bg-surface-variant'}`}>Jam</button>
 </div>
 </div>
-<div className="flex-1 relative min-h-[300px] w-full flex items-end">
+<div className="flex-1 relative min-h-[300px] w-full flex flex-col items-stretch justify-between">
   {/* Simple SVG Area Chart Representation */}
-  <svg className="w-full h-full preserve-aspect-ratio-none" preserveAspectRatio="none" viewBox="0 0 800 300">
+  <svg className="w-full flex-1 preserve-aspect-ratio-none" preserveAspectRatio="none" viewBox="0 0 800 275">
     <defs>
       <linearGradient id="chart-gradient" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0%" stop-color="#142c8e" stop-opacity="0.2"></stop>
-        <stop offset="100%" stop-color="#142c8e" stop-opacity="0"></stop>
+        <stop offset="0%" stopColor="#142c8e" stopOpacity="0.2"></stop>
+        <stop offset="100%" stopColor="#142c8e" stopOpacity="0"></stop>
       </linearGradient>
     </defs>
     {/* Grid Lines */}
@@ -214,22 +214,11 @@ export default function AdminDashboard() {
       <>
         <path d={`M0,275 L0,${y1} C100,${y1} 150,${y2} 200,${y2} C250,${y2} 300,${y3} 400,${y3} C500,${y3} 550,${y4} 600,${y4} C650,${y4} 700,${y5} 800,${y5} L800,275 Z`} fill="url(#chart-gradient)"></path>
         <path d={`M0,${y1} C100,${y1} 150,${y2} 200,${y2} C250,${y2} 300,${y3} 400,${y3} C500,${y3} 550,${y4} 600,${y4} C650,${y4} 700,${y5} 800,${y5}`} fill="none" stroke="#142c8e" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3"></path>
-        <g className="text-label-sm fill-on-surface-variant">
-          <text x="0" y="295" textAnchor="start">{l1}</text>
-          <text x="200" y="295" textAnchor="middle">{l2}</text>
-          <text x="400" y="295" textAnchor="middle">{l3}</text>
-          <text x="600" y="295" textAnchor="middle">{l4}</text>
-          <text x="800" y="295" textAnchor="end">{l5}</text>
-        </g>
       </>
     ) : (
       <>
         <path d={`M0,275 L0,${wy1} C200,${wy1} 600,${wy2} 800,${wy2} L800,275 Z`} fill="url(#chart-gradient)"></path>
         <path d={`M0,${wy1} C200,${wy1} 600,${wy2} 800,${wy2}`} fill="none" stroke="#142c8e" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3"></path>
-        <g className="text-label-sm fill-on-surface-variant" text-anchor="middle">
-          <text x="50" y="295">Hari 1 (Kemarin)</text>
-          <text x="750" y="295">Hari 2 (Hari Ini)</text>
-        </g>
       </>
     )}
 
@@ -263,6 +252,24 @@ export default function AdminDashboard() {
     </g>
   </svg>
 
+  {/* X-axis HTML labels to prevent SVG horizontal distortion */}
+  <div className="relative w-full h-5 mt-2 text-[11px] sm:text-xs text-on-surface-variant font-medium select-none">
+    {chartFilter === 'day' ? (
+      <>
+        <span className="absolute left-0 top-0">{l1}</span>
+        <span className="absolute left-[25%] top-0 -translate-x-1/2">{l2}</span>
+        <span className="absolute left-[50%] top-0 -translate-x-1/2">{l3}</span>
+        <span className="absolute left-[75%] top-0 -translate-x-1/2">{l4}</span>
+        <span className="absolute right-0 top-0">{l5}</span>
+      </>
+    ) : (
+      <>
+        <span className="absolute left-[50px] top-0 -translate-x-1/2">Hari 1 (Kemarin)</span>
+        <span className="absolute right-[50px] top-0 translate-x-1/2">Hari 2 (Hari Ini)</span>
+      </>
+    )}
+  </div>
+
   {/* Absolute Tooltip Overlay */}
   {hoveredPoint && (
     <div 
@@ -279,7 +286,7 @@ export default function AdminDashboard() {
 </div>
 </div>
 {/* Recent Activity Section (Spans 1 column) */}
-<div className="bg-surface-container-lowest rounded-[16px] p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] flex flex-col">
+<div className="bg-surface-container-lowest rounded-[16px] p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] flex flex-col order-1 lg:order-2">
 <div className="flex items-center justify-between mb-6 pb-4 relative">
 <h2 className="text-headline-sm font-headline-md text-on-surface">Scan Terbaru</h2>
 <button className="text-label-sm text-secondary hover:text-primary transition-colors" onClick={() => navigate('/admin/riwayat')}>Lihat Semua</button>

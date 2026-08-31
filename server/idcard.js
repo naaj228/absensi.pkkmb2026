@@ -24,26 +24,27 @@ const BACK_TEMPLATE  = path.join(TEMPLATES_DIR, 'back.png');
 
 const COORDS = {
   // Ukuran target canvas (sharp akan resize template ke ini)
-  width:  620,
-  height: 980,
+  width:  1024,
+  height: 651,
 
   front: {
-    nama:  { x: 220, y: 542, w: 320, h: 54, fontSize: 20 },
-    nim:   { x: 220, y: 622, w: 320, h: 54, fontSize: 20 },
-    gugus: { x: 220, y: 702, w: 320, h: 54, fontSize: 20 },
-    textColor: '#3b0764',   // ungu gelap sesuai tema
+    nama:  { x: 585, y: 317, fontSize: 14 },
+    nim:   { x: 585, y: 336, fontSize: 14 },
+    prodi: { x: 585, y: 354, fontSize: 14 },
+    gugus: { x: 585, y: 374, fontSize: 14 },
+    textColor: '#ffffff',   // putih kontras dengan dark blue background
     fontFamily: 'Arial, sans-serif',
   },
 
   back: {
-    qr: { x: 103, y: 320, size: 320 }, // geser sedikit ke bawah agar tidak overlap teks PKKMB
+    qr: { x: 387, y: 228, size: 250 },
   },
 };
 
 /**
  * Build SVG teks untuk overlay ke ID card depan.
  */
-function buildFrontSvg(name, nim, gugus) {
+function buildFrontSvg(name, nim, gugus, prodi) {
   const { front, width, height } = COORDS;
   const truncate = (str, max) => str.length > max ? str.substring(0, max - 1) + '…' : str;
 
@@ -60,27 +61,35 @@ function buildFrontSvg(name, nim, gugus) {
 
       <!-- NAMA -->
       <text
-        x="${front.nama.x + front.nama.w / 2}"
-        y="${front.nama.y + front.nama.h / 2}"
+        x="${front.nama.x}"
+        y="${front.nama.y}"
         font-size="${front.nama.fontSize}"
-        text-anchor="middle"
-      >${truncate(name, 28)}</text>
+        text-anchor="start"
+      >${truncate(name, 35)}</text>
 
       <!-- NIM -->
       <text
-        x="${front.nim.x + front.nim.w / 2}"
-        y="${front.nim.y + front.nim.h / 2}"
+        x="${front.nim.x}"
+        y="${front.nim.y}"
         font-size="${front.nim.fontSize}"
-        text-anchor="middle"
+        text-anchor="start"
       >${truncate(nim, 20)}</text>
+
+      <!-- PRODI -->
+      <text
+        x="${front.prodi.x}"
+        y="${front.prodi.y}"
+        font-size="${front.prodi.fontSize}"
+        text-anchor="start"
+      >${truncate(prodi || 'Belum Diisi', 30)}</text>
 
       <!-- GUGUS -->
       <text
-        x="${front.gugus.x + front.gugus.w / 2}"
-        y="${front.gugus.y + front.gugus.h / 2}"
+        x="${front.gugus.x}"
+        y="${front.gugus.y}"
         font-size="${front.gugus.fontSize}"
-        text-anchor="middle"
-      >${truncate(gugus || 'Belum Ditentukan', 24)}</text>
+        text-anchor="start"
+      >${truncate(gugus || 'Belum Ditentukan', 30)}</text>
     </svg>
   `);
 }
@@ -93,7 +102,7 @@ async function generateQrBuffer(nim, size) {
     type: 'png',
     width: size,
     margin: 1,
-    color: { dark: '#3b0764', light: '#ffffff' },
+    color: { dark: '#012060', light: '#ffffff' },
     errorCorrectionLevel: 'H',
   });
 }
@@ -102,12 +111,12 @@ async function generateQrBuffer(nim, size) {
  * Generate ID Card depan (dengan nama, NIM, gugus ditempel ke template).
  * @returns {Promise<Buffer>} PNG buffer
  */
-async function generateFrontCard(name, nim, gugus) {
+async function generateFrontCard(name, nim, gugus, prodi) {
   if (!fs.existsSync(FRONT_TEMPLATE)) {
     throw new Error(`Template depan tidak ditemukan: ${FRONT_TEMPLATE}\nLetakkan file front.png di folder server/templates/`);
   }
 
-  const svgOverlay = buildFrontSvg(name, nim, gugus);
+  const svgOverlay = buildFrontSvg(name, nim, gugus, prodi);
 
   return sharp(FRONT_TEMPLATE)
     .resize(COORDS.width, COORDS.height)
@@ -127,11 +136,22 @@ async function generateBackCard(nim) {
 
   const { back } = COORDS;
   const qrBuffer = await generateQrBuffer(nim, back.qr.size);
+  
+  // Buat SVG untuk membungkus QR Code dengan clip path (rounded corners)
+  const base64Qr = qrBuffer.toString('base64');
+  const svgQr = Buffer.from(`
+    <svg width="${back.qr.size}" height="${back.qr.size}" xmlns="http://www.w3.org/2000/svg">
+      <clipPath id="clip">
+        <rect x="0" y="0" width="${back.qr.size}" height="${back.qr.size}" rx="14" ry="14" />
+      </clipPath>
+      <image href="data:image/png;base64,${base64Qr}" width="${back.qr.size}" height="${back.qr.size}" clip-path="url(#clip)" />
+    </svg>
+  `);
 
   return sharp(BACK_TEMPLATE)
     .resize(COORDS.width, COORDS.height)
     .composite([{
-      input: qrBuffer,
+      input: svgQr,
       top: back.qr.y,
       left: back.qr.x,
     }])
@@ -143,9 +163,9 @@ async function generateBackCard(nim) {
  * Generate kedua sisi ID card.
  * @returns {Promise<{ front: Buffer, back: Buffer }>}
  */
-async function generateIdCard(name, nim, gugus) {
+async function generateIdCard(name, nim, gugus, prodi) {
   const [front, back] = await Promise.all([
-    generateFrontCard(name, nim, gugus),
+    generateFrontCard(name, nim, gugus, prodi),
     generateBackCard(nim),
   ]);
   return { front, back };

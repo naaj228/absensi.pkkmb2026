@@ -95,24 +95,24 @@ export default function MentorNotifikasi() {
   );
 
   const renderNotifItem = (n) => (
-    <div key={n.id} className="p-5 flex items-start gap-4 hover:bg-surface-container-lowest transition-colors group">
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${n.color}`}>
-        <span className="material-symbols-outlined text-[20px]">{n.icon}</span>
+    <div key={n.id} className="p-4 sm:p-5 flex items-start gap-3 sm:gap-4 hover:bg-surface-container-lowest transition-colors group">
+      <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${n.color}`}>
+        <span className="material-symbols-outlined text-[16px] sm:text-[20px]">{n.icon}</span>
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-4">
-          <h3 className="font-headline-sm text-body-md font-semibold text-on-surface leading-tight">{n.title}</h3>
-          <span className="text-label-sm text-on-surface-variant/70 shrink-0 font-mono">{n.time}</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4">
+          <h3 className="text-xs sm:text-body-md font-bold text-on-surface leading-tight">{n.title}</h3>
+          <span className="text-[10px] sm:text-label-sm text-on-surface-variant/70 shrink-0 font-mono">{n.time}</span>
         </div>
-        <p className="text-body-sm text-on-surface-variant mt-1 leading-relaxed">{n.message}</p>
-        <div className="mt-3 flex items-center gap-3">
-          <button onClick={n.action} className="text-primary hover:underline text-label-sm font-label-md cursor-pointer">
+        <p className="text-xs sm:text-body-sm text-on-surface-variant mt-1 leading-relaxed">{n.message}</p>
+        <div className="mt-2 sm:mt-3 flex items-center gap-3">
+          <button onClick={n.action} className="text-primary hover:underline text-[10px] sm:text-label-sm font-semibold cursor-pointer">
             {n.actionLabel}
           </button>
         </div>
       </div>
-      <button onClick={() => handleRemove(n.id)} className="text-on-surface-variant/40 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-surface-variant shrink-0 cursor-pointer">
-        <span className="material-symbols-outlined text-[18px]">close</span>
+      <button onClick={() => handleRemove(n.id)} className="text-on-surface-variant/40 hover:text-error opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-surface-variant shrink-0 cursor-pointer">
+        <span className="material-symbols-outlined text-[16px] sm:text-[18px]">close</span>
       </button>
     </div>
   );
@@ -120,7 +120,13 @@ export default function MentorNotifikasi() {
   return (
     <div className="w-full">
       <header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="hidden lg:flex items-center justify-center w-9 h-9 rounded-xl hover:bg-black/5 active:scale-95 transition-all text-on-surface-variant cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[22px]">arrow_back</span>
+          </button>
           <h1 className="text-headline-sm font-headline-md text-on-surface">Notifikasi Mentor</h1>
         </div>
       </header>

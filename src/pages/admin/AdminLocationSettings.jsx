@@ -182,11 +182,29 @@ export default function AdminLocationSettings() {
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
 
+  // Mobile active tab state: 'map', 'form', 'guide'
+  const [mobileTab, setMobileTab] = useState('map');
+
   // Map refs
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const circleRef = useRef(null);
   const mapContainerRef = useRef(null);
+  const coordsRef = useRef({ lat: tempLat, lng: tempLng });
+
+  useEffect(() => {
+    coordsRef.current = { lat: tempLat, lng: tempLng };
+  }, [tempLat, tempLng]);
+
+  // Trigger Leaflet invalidateSize when switching mobile tabs
+  useEffect(() => {
+    if (mapRef.current) {
+      const timer = setTimeout(() => {
+        mapRef.current?.invalidateSize();
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [mobileTab]);
 
   // Init local states when global locationSettings is fetched
   useEffect(() => {
@@ -339,15 +357,15 @@ export default function AdminLocationSettings() {
       circleRef.current.setRadius(radius);
 
       const popupHtml = `
-        <div class="p-3 flex items-start gap-3 min-w-[200px] font-sans">
-          <div class="w-10 h-10 rounded-xl bg-[#012060]/10 flex items-center justify-center text-[#012060] shrink-0">
-            <span class="material-symbols-outlined text-[20px]">location_city</span>
+        <div class="p-3 flex items-start gap-3 min-w-[180px] sm:min-w-[200px] font-sans">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#012060]/10 flex items-center justify-center text-[#012060] shrink-0">
+            <span class="material-symbols-outlined text-[18px] sm:text-[20px]">location_city</span>
           </div>
           <div>
-            <h4 class="font-bold text-slate-800 text-[13px]">${locationName || 'Gedung Utama PKKMB'}</h4>
-            <p class="text-[10px] text-slate-400 mt-1 uppercase font-semibold tracking-wider">Radius</p>
-            <p class="font-bold text-[#012060] text-[16px]">${radius} Meter</p>
-            <span class="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <h4 class="font-bold text-slate-800 text-[12px] sm:text-[13px] leading-tight">${locationName || 'Gedung Utama PKKMB'}</h4>
+            <p class="text-[9px] text-slate-400 mt-1 uppercase font-semibold tracking-wider">Radius</p>
+            <p class="font-bold text-[#012060] text-[14px] sm:text-[16px]">${radius} Meter</p>
+            <span class="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
               Area Aktif
             </span>
@@ -411,21 +429,23 @@ export default function AdminLocationSettings() {
   };
 
   // Delete/Reset Pin coordinates
-  const handleResetPin = async () => {
-    const defaultLat = locationSettings?.latitude || -6.966748;
-    const defaultLng = locationSettings?.longitude || 107.672466;
-    setTempLat(defaultLat);
-    setTempLng(defaultLng);
-    if (mapRef.current) {
-      mapRef.current.setView([defaultLat, defaultLng], 16);
-    }
-    const data = await performReverseGeocode(defaultLat, defaultLng);
-    if (data && data.display_name) {
-      const segments = data.display_name.split(',');
-      const shortName = segments.slice(0, 2).join(',').trim();
-      setLocationName(shortName);
-      setSearchQuery(shortName);
-    }
+  const handleResetPin = () => {
+    window.confirmAction("Apakah Anda yakin ingin menghapus/mereset pin koordinat ke lokasi default?", async () => {
+      const defaultLat = locationSettings?.latitude || -6.966748;
+      const defaultLng = locationSettings?.longitude || 107.672466;
+      setTempLat(defaultLat);
+      setTempLng(defaultLng);
+      if (mapRef.current) {
+        mapRef.current.setView([defaultLat, defaultLng], 16);
+      }
+      const data = await performReverseGeocode(defaultLat, defaultLng);
+      if (data && data.display_name) {
+        const segments = data.display_name.split(',');
+        const shortName = segments.slice(0, 2).join(',').trim();
+        setLocationName(shortName);
+        setSearchQuery(shortName);
+      }
+    });
   };
 
   // Geolocation search using OpenStreetMap Nominatim
@@ -454,7 +474,7 @@ export default function AdminLocationSettings() {
 
   // Save changes to Supabase
   const handleSave = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!locationName.trim()) {
       alert("Nama lokasi wajib diisi.");
       return;
@@ -489,81 +509,162 @@ export default function AdminLocationSettings() {
   };
 
   return (
-    <div className="w-full bg-[#f8fafc] min-h-screen">
-      {/* Header */}
-      <header className="fixed top-0 left-[280px] right-0 h-16 bg-white/80 backdrop-blur-md z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.03)] border-b border-slate-100">
-        <div className="flex items-center gap-2.5">
-          <span className="material-symbols-outlined text-[#012060] text-[24px]">pin_drop</span>
-          <h1 className="text-title-md font-bold text-[#012060] font-sans">Pengaturan Lokasi & Geofencing</h1>
+    <div className="w-full bg-[#f8fafc] min-h-screen pb-24 lg:pb-12">
+      {/* Header - Fixed to top, properly padded for mobile hamburger menu */}
+      <header className="fixed top-0 left-0 lg:left-[280px] right-0 h-16 bg-white/90 backdrop-blur-md z-40 flex items-center justify-between pl-16 pr-4 sm:px-6 lg:px-8 shadow-[0_1px_8px_rgba(0,0,0,0.03)] border-b border-slate-100">
+        <div className="flex items-center gap-2.5 overflow-hidden">
+          <span className="material-symbols-outlined text-[#012060] text-[22px] sm:text-[24px] shrink-0">pin_drop</span>
+          <h1 className="text-body-md sm:text-title-md font-bold text-[#012060] font-sans truncate">
+            Pengaturan Lokasi & Geofencing
+          </h1>
         </div>
-        <div className="flex items-center gap-6">
-          <div className="relative group cursor-pointer" onClick={() => navigate('/admin/notifikasi')}>
-            <span className="material-symbols-outlined text-slate-500 hover:text-primary transition-colors text-[24px]">notifications</span>
-            {hasAdminNotifications && <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}
+        <div className="flex items-center gap-3 shrink-0">
+          <div 
+            className="relative group cursor-pointer p-2 rounded-xl hover:bg-slate-100 transition-colors" 
+            onClick={() => navigate('/admin/notifikasi')}
+            title="Notifikasi Admin"
+          >
+            <span className="material-symbols-outlined text-slate-600 group-hover:text-primary transition-colors text-[22px] sm:text-[24px]">notifications</span>
+            {hasAdminNotifications && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="relative pt-20 min-h-screen px-margin-desktop py-6 max-w-container-max mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <main className="relative pt-20 px-3 sm:px-6 lg:px-8 max-w-container-max mx-auto space-y-4 sm:space-y-6">
+        
+        {/* Mobile Quick Summary Card (visible on mobile only) */}
+        <div className="lg:hidden bg-gradient-to-r from-[#012060] to-[#02318c] text-white rounded-2xl p-4 shadow-md flex items-center justify-between gap-3">
+          <div className="overflow-hidden">
+            <div className="flex items-center gap-2">
+              <span className="bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Aktif
+              </span>
+              <span className="text-[11px] font-semibold text-white/80 font-mono">Radius: {radius}m</span>
+            </div>
+            <h2 className="text-body-md font-bold truncate mt-1 text-white">{locationName || 'Gedung Utama PKKMB'}</h2>
+            <p className="text-[10px] text-white/70 font-mono truncate">{tempLat}, {tempLng}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3.5 py-2.5 bg-white text-[#012060] rounded-xl text-label-sm font-bold shadow hover:bg-slate-50 active:scale-95 transition-all shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+          >
+            <span className="material-symbols-outlined text-[16px]">{saving ? 'sync' : 'save'}</span>
+            <span>{saving ? 'Menyimpan...' : 'Simpan'}</span>
+          </button>
+        </div>
+
+        {/* Mobile Segmented Tab Control (visible on mobile screens < lg) */}
+        <div className="lg:hidden flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm gap-1">
+          <button
+            type="button"
+            onClick={() => setMobileTab('map')}
+            className={`flex-1 py-2 px-2 rounded-xl text-[12px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              mobileTab === 'map'
+                ? 'bg-[#012060] text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">map</span>
+            <span>Peta</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('form')}
+            className={`flex-1 py-2 px-2 rounded-xl text-[12px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              mobileTab === 'form'
+                ? 'bg-[#012060] text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">tune</span>
+            <span>Form</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('guide')}
+            className={`flex-1 py-2 px-2 rounded-xl text-[12px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              mobileTab === 'guide'
+                ? 'bg-[#012060] text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">help</span>
+            <span>Panduan</span>
+          </button>
+        </div>
+
+        {/* Layout Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* Left Panel: Form Settings */}
-          <div className="lg:col-span-4 flex flex-col gap-6">
+          {/* Left Panel: Form Settings & Guides */}
+          <div className={`lg:col-span-5 flex flex-col gap-6 ${
+            mobileTab === 'form' || mobileTab === 'guide' ? 'block' : 'hidden lg:flex'
+          }`}>
             
-            {/* Card 1: Titik Absensi Aktif */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col gap-6">
+            {/* Card 1: Form Titik Absensi Aktif */}
+            <div className={`bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col gap-5 ${
+              mobileTab === 'guide' ? 'hidden lg:flex' : 'flex'
+            }`}>
               
-              {/* Card Title Section */}
-              <div className="flex justify-between items-start gap-4">
+              {/* Card Header Section */}
+              <div className="flex justify-between items-start gap-3">
                 <div className="flex gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#012060]/5 flex items-center justify-center text-[#012060] shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-[#012060]/5 flex items-center justify-center text-[#012060] shrink-0">
                     <span className="material-symbols-outlined text-[22px]">pin_drop</span>
                   </div>
                   <div>
-                    <h3 className="text-body-lg font-bold text-[#012060]">Titik Absensi Aktif</h3>
-                    <p className="text-[12px] text-slate-400 mt-1 leading-relaxed">
+                    <h3 className="text-body-md sm:text-body-lg font-bold text-[#012060]">Titik Absensi Aktif</h3>
+                    <p className="text-[11px] sm:text-[12px] text-slate-400 mt-0.5 leading-relaxed">
                       Konfigurasi pusat lokasi acara PKKMB dan radius absensi untuk membatasi scan mentor.
                     </p>
                   </div>
                 </div>
-                <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-[11px] font-bold shrink-0 flex items-center gap-1 border border-emerald-100">
+                <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-bold shrink-0 flex items-center gap-1 border border-emerald-100">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                   Aktif
                 </span>
               </div>
 
-              {/* Form inputs */}
-              <form onSubmit={handleSave} className="flex flex-col gap-5">
+              {/* Form Inputs */}
+              <form onSubmit={handleSave} className="flex flex-col gap-4 sm:gap-5">
                 
-                 {/* Location Search Field */}
-                <div className="flex flex-col gap-2 relative">
+                {/* Location Search Field */}
+                <div className="flex flex-col gap-1.5 relative">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cari Lokasi Acara</label>
                   <div className="relative group">
-                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">
+                    <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">
                       {searchLoading ? 'sync' : 'search'}
                     </span>
                     <input
                       type="text"
-                      className={`w-full pl-12 pr-10 py-3 bg-[#f8fafc] rounded-xl border border-slate-100 text-body-md font-semibold text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all ${searchLoading ? 'animate-pulse' : ''}`}
+                      className={`w-full pl-11 pr-10 py-3 bg-[#f8fafc] rounded-2xl border border-slate-200 text-body-sm sm:text-body-md font-semibold text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all ${searchLoading ? 'animate-pulse' : ''}`}
                       placeholder="Ketik alamat atau nama gedung..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={handleKeyDown}
                     />
-                    <button
-                      type="button"
-                      onClick={() => handleSearch(searchQuery)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors cursor-pointer"
-                      title="Cari"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">search</span>
-                    </button>
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setSearchResults([]);
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                        title="Bersihkan"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">close</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Search Results Dropdown */}
                   {searchResults.length > 0 && (
-                    <div className="absolute left-0 right-0 top-[100%] mt-1 bg-white border border-slate-100 rounded-xl shadow-lg z-[1010] max-h-60 overflow-y-auto">
+                    <div className="absolute left-0 right-0 top-[100%] mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-[1010] max-h-60 overflow-y-auto divide-y divide-slate-100">
                       {searchResults.map((item, idx) => {
                         const segments = item.display_name.split(',');
                         const title = segments.slice(0, 2).join(',').trim();
@@ -586,12 +687,12 @@ export default function AdminLocationSettings() {
                                 mapRef.current.setView([latVal, lonVal], 17);
                               }
                             }}
-                            className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-start gap-3 border-b border-slate-55 last:border-b-0"
+                            className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-slate-400 text-[18px] mt-0.5">location_on</span>
-                            <div>
-                              <p className="text-body-sm font-bold text-slate-700">{title}</p>
-                              <p className="text-[10px] text-slate-400 truncate max-w-[280px]">{sub}</p>
+                            <span className="material-symbols-outlined text-[#012060] text-[18px] mt-0.5 shrink-0">location_on</span>
+                            <div className="overflow-hidden">
+                              <p className="text-body-sm font-bold text-slate-800 leading-snug">{title}</p>
+                              <p className="text-[10px] text-slate-400 truncate mt-0.5">{sub}</p>
                             </div>
                           </button>
                         );
@@ -601,12 +702,12 @@ export default function AdminLocationSettings() {
                 </div>
 
                 {/* Location Name Input */}
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nama Lokasi Aktif</label>
                   <input
                     type="text"
                     required
-                    className="w-full px-4 py-3 bg-[#f8fafc] rounded-xl border border-slate-100 text-body-md font-semibold text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all"
+                    className="w-full px-4 py-3 bg-[#f8fafc] rounded-2xl border border-slate-200 text-body-sm sm:text-body-md font-semibold text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all"
                     placeholder="Nama lokasi (misal: Gedung Rektorat)"
                     value={locationName}
                     onChange={(e) => {
@@ -616,62 +717,81 @@ export default function AdminLocationSettings() {
                   />
                 </div>
 
-                {/* Radius Slider Section */}
-                <div className="flex flex-col gap-2">
+                {/* Radius Section */}
+                <div className="flex flex-col gap-2.5 bg-[#f8fafc] border border-slate-100 rounded-2xl p-3.5">
                   <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Radius Batas Scan</label>
-                    <span className="text-body-md font-bold text-[#012060]">{radius} Meter</span>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px] text-[#012060]">radar</span>
+                      Radius Batas Scan
+                    </label>
+                    <span className="text-body-md font-extrabold text-[#012060] bg-white px-2.5 py-0.5 rounded-lg border border-slate-200 shadow-xs">
+                      {radius} Meter
+                    </span>
                   </div>
+
+                  {/* Slider */}
                   <input
                     type="range"
                     min="50"
                     max="1000"
                     step="25"
-                    className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-[#012060]"
+                    className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#012060]"
                     value={radius}
                     onChange={(e) => setRadius(parseInt(e.target.value, 10))}
                   />
-                  <div className="flex justify-between text-[11px] text-slate-400 font-medium px-0.5">
-                    <span>50m (Ketat)</span>
-                    <span>100m</span>
-                    <span>250m</span>
-                    <span>500m</span>
-                    <span>1000m (Longgar)</span>
+
+                  {/* Quick Preset Buttons for easy mobile tapping */}
+                  <div className="flex items-center justify-between gap-1.5 pt-1">
+                    {[50, 100, 150, 250, 500, 1000].map((rVal) => (
+                      <button
+                        key={rVal}
+                        type="button"
+                        onClick={() => setRadius(rVal)}
+                        className={`flex-1 py-1.5 text-[10px] sm:text-[11px] font-bold rounded-xl transition-all cursor-pointer border ${
+                          radius === rVal
+                            ? 'bg-[#012060] text-white border-[#012060] shadow-xs'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {rVal}m
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Alert Warning */}
-                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3 flex gap-2.5 text-emerald-800">
-                  <span className="material-symbols-outlined text-[20px] shrink-0 text-emerald-600">check_circle</span>
-                  <p className="text-[12px] font-medium leading-relaxed">
-                    Scan absensi hanya dapat dilakukan di dalam area radius yang ditentukan.
+                {/* Alert Info */}
+                <div className="bg-emerald-50/70 border border-emerald-200/60 rounded-2xl p-3 flex gap-2.5 text-emerald-800">
+                  <span className="material-symbols-outlined text-[20px] shrink-0 text-emerald-600 mt-0.5">check_circle</span>
+                  <p className="text-[11px] sm:text-[12px] font-medium leading-relaxed">
+                    Mentor hanya dapat melakukan scan kehadiran jika berada di dalam area radius <strong>{radius}m</strong>.
                   </p>
                 </div>
 
                 {/* Collapsible Coordinates Section */}
-                <div className="border border-slate-100 rounded-2xl overflow-hidden bg-[#f8fafc]/50">
+                <div className="border border-slate-200 rounded-2xl overflow-hidden bg-[#f8fafc]/50">
                   <button
                     type="button"
                     onClick={() => setShowCoords(!showCoords)}
-                    className="w-full px-4 py-3.5 flex justify-between items-center text-body-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                    className="w-full px-4 py-3 flex justify-between items-center text-body-sm font-bold text-slate-700 hover:bg-slate-100/50 transition-colors cursor-pointer"
                   >
                     <span className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[18px] text-slate-400">{showCoords ? 'expand_less' : 'expand_more'}</span>
-                      Koordinat Detail
+                      <span className="material-symbols-outlined text-[18px] text-[#012060]">pin_drop</span>
+                      Koordinat Latitude & Longitude
                     </span>
+                    <span className="material-symbols-outlined text-[20px] text-slate-400">{showCoords ? 'expand_less' : 'expand_more'}</span>
                   </button>
                   
                   {showCoords && (
-                    <div className="p-4 pt-0 grid grid-cols-2 gap-3 transition-all duration-300">
+                    <div className="p-3.5 pt-0 grid grid-cols-2 gap-3 transition-all duration-300">
                       {/* Latitude Card */}
-                      <div className="flex flex-col gap-1 relative bg-white border border-slate-100 rounded-xl p-3 shadow-sm">
+                      <div className="flex flex-col gap-1 relative bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs">
                         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Latitude</label>
-                        <div className="flex justify-between items-center mt-1">
+                        <div className="flex justify-between items-center">
                           <input
                             type="number"
                             step="any"
                             required
-                            className="w-full bg-transparent text-body-sm font-semibold text-slate-700 font-mono focus:outline-none"
+                            className="w-full bg-transparent text-[12px] sm:text-body-sm font-semibold text-slate-800 font-mono focus:outline-none"
                             value={tempLat}
                             onChange={(e) => {
                               const val = parseFloat(e.target.value);
@@ -681,23 +801,23 @@ export default function AdminLocationSettings() {
                           <button 
                             type="button" 
                             onClick={() => handleCopy(tempLat, 'Latitude')}
-                            className="text-slate-400 hover:text-primary transition-colors cursor-pointer shrink-0 ml-1"
+                            className="text-slate-400 hover:text-primary transition-colors cursor-pointer shrink-0 ml-1 p-1"
                             title="Salin Latitude"
                           >
-                            <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                            <span className="material-symbols-outlined text-[16px]">content_copy</span>
                           </button>
                         </div>
                       </div>
                       
                       {/* Longitude Card */}
-                      <div className="flex flex-col gap-1 relative bg-white border border-slate-100 rounded-xl p-3 shadow-sm">
+                      <div className="flex flex-col gap-1 relative bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs">
                         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Longitude</label>
-                        <div className="flex justify-between items-center mt-1">
+                        <div className="flex justify-between items-center">
                           <input
                             type="number"
                             step="any"
                             required
-                            className="w-full bg-transparent text-body-sm font-semibold text-slate-700 font-mono focus:outline-none"
+                            className="w-full bg-transparent text-[12px] sm:text-body-sm font-semibold text-slate-800 font-mono focus:outline-none"
                             value={tempLng}
                             onChange={(e) => {
                               const val = parseFloat(e.target.value);
@@ -707,10 +827,10 @@ export default function AdminLocationSettings() {
                           <button 
                             type="button" 
                             onClick={() => handleCopy(tempLng, 'Longitude')}
-                            className="text-slate-400 hover:text-primary transition-colors cursor-pointer shrink-0 ml-1"
+                            className="text-slate-400 hover:text-primary transition-colors cursor-pointer shrink-0 ml-1 p-1"
                             title="Salin Longitude"
                           >
-                            <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                            <span className="material-symbols-outlined text-[16px]">content_copy</span>
                           </button>
                         </div>
                       </div>
@@ -719,71 +839,82 @@ export default function AdminLocationSettings() {
                 </div>
 
                 {/* GPS and Center buttons */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <button
                     type="button"
                     onClick={handleGetCurrentLocation}
                     disabled={gpsLoading}
-                    className="flex items-center gap-3 p-3 bg-white hover:bg-slate-50 border border-slate-100 rounded-2xl transition-all cursor-pointer text-left shadow-sm disabled:opacity-60"
+                    className="flex items-center gap-2.5 p-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl transition-all cursor-pointer text-left shadow-xs disabled:opacity-60"
                   >
-                    <div className="w-9 h-9 rounded-xl bg-[#012060]/5 flex items-center justify-center text-[#012060] shrink-0">
-                      <span className="material-symbols-outlined text-[18px]">my_location</span>
+                    <div className="w-8 h-8 rounded-xl bg-[#012060]/5 flex items-center justify-center text-[#012060] shrink-0">
+                      <span className="material-symbols-outlined text-[18px]">{gpsLoading ? 'sync' : 'my_location'}</span>
                     </div>
-                    <div>
-                      <p className="text-body-sm font-bold text-slate-700">GPS Saya</p>
-                      <p className="text-[9px] text-slate-400">Gunakan lokasi saat ini</p>
+                    <div className="overflow-hidden">
+                      <p className="text-body-sm font-bold text-slate-800 leading-tight">GPS Saya</p>
+                      <p className="text-[9px] text-slate-400 truncate">Lokasi saat ini</p>
                     </div>
                   </button>
+
                   <button
                     type="button"
                     onClick={centerMap}
-                    className="flex items-center gap-3 p-3 bg-white hover:bg-slate-50 border border-slate-100 rounded-2xl transition-all cursor-pointer text-left shadow-sm"
+                    className="flex items-center gap-2.5 p-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl transition-all cursor-pointer text-left shadow-xs"
                   >
-                    <div className="w-9 h-9 rounded-xl bg-[#012060]/5 flex items-center justify-center text-[#012060] shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-[#012060]/5 flex items-center justify-center text-[#012060] shrink-0">
                       <span className="material-symbols-outlined text-[18px]">center_focus_weak</span>
                     </div>
-                    <div>
-                      <p className="text-body-sm font-bold text-slate-700">Fokus Pin</p>
-                      <p className="text-[9px] text-slate-400">Tengahkan ke pin</p>
+                    <div className="overflow-hidden">
+                      <p className="text-body-sm font-bold text-slate-800 leading-tight">Fokus Pin</p>
+                      <p className="text-[9px] text-slate-400 truncate">Tengahkan peta</p>
                     </div>
                   </button>
                 </div>
 
-                {/* Submit Settings button */}
+                {/* Desktop Save Button */}
                 <button
                   type="submit"
                   disabled={saving}
-                  className="w-full mt-2 bg-[#012060] hover:bg-[#022b80] text-white py-4 rounded-2xl transition-all flex flex-col items-center justify-center shadow-md active:scale-[0.98] cursor-pointer disabled:opacity-60"
+                  className="hidden lg:flex w-full mt-2 bg-[#012060] hover:bg-[#022b80] text-white py-4 rounded-2xl transition-all flex-col items-center justify-center shadow-md active:scale-[0.98] cursor-pointer disabled:opacity-60"
                 >
                   <span className="flex items-center gap-2 text-label-md font-bold">
-                    <span className="material-symbols-outlined text-[18px]">save</span>
-                    Simpan Pengaturan
+                    <span className="material-symbols-outlined text-[18px]">{saving ? 'sync' : 'save'}</span>
+                    {saving ? 'Menyimpan Pengaturan...' : 'Simpan Pengaturan'}
                   </span>
-                  <span className="text-[11px] opacity-75 font-normal mt-0.5">Perubahan akan diterapkan ke seluruh mentor</span>
+                  <span className="text-[11px] opacity-75 font-normal mt-0.5">Terapkan ke seluruh akun mentor</span>
                 </button>
               </form>
             </div>
             
             {/* Card 2: Panduan Geofencing */}
-            <div className="bg-[#fffbf4] border border-[#ffedd5] rounded-3xl p-6 flex flex-col gap-4">
+            <div className={`bg-[#fffbf4] border border-[#ffedd5] rounded-3xl p-5 flex flex-col gap-3.5 ${
+              mobileTab === 'form' ? 'hidden lg:flex' : 'flex'
+            }`}>
               <span className="flex items-center gap-2 text-[#92400e] text-body-md font-bold">
                 <span className="material-symbols-outlined text-[20px]">info</span>
-                Panduan Geofencing
+                Panduan Ringkas Geofencing
               </span>
               
-              <div className="text-body-sm text-[#92400e]/80 space-y-3 font-medium">
-                <p>1. Tarik pin atau klik langsung di peta untuk menentukan pusat lokasi absensi.</p>
-                <p>2. Atur radius dengan slider (minimal 50m).</p>
-                <p>3. Pastikan area mencakup seluruh lokasi kegiatan.</p>
-                <p>4. Klik <strong className="text-[#92400e]">"Simpan Pengaturan"</strong> untuk menerapkan perubahan.</p>
+              <div className="text-body-sm text-[#92400e]/90 space-y-2 font-medium leading-relaxed">
+                <p className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-[#92400e]/10 flex items-center justify-center text-[11px] font-bold shrink-0 mt-0.5">1</span>
+                  Tarik pin atau klik langsung di peta untuk menentukan posisi absensi.
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-[#92400e]/10 flex items-center justify-center text-[11px] font-bold shrink-0 mt-0.5">2</span>
+                  Atur radius jangkauan dengan slider atau tombol pilihan meter.
+                </p>
+                <p className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-[#92400e]/10 flex items-center justify-center text-[11px] font-bold shrink-0 mt-0.5">3</span>
+                  Klik tombol <strong>"Simpan Pengaturan"</strong> untuk mengaktifkan lokasi.
+                </p>
               </div>
 
               <button 
                 type="button"
                 onClick={() => setShowGuideModal(true)}
-                className="text-[#012060] hover:text-[#022b80] font-bold text-label-sm flex items-center gap-1 mt-2 cursor-pointer hover:underline self-start"
+                className="text-[#012060] hover:text-[#022b80] font-bold text-label-sm flex items-center gap-1.5 mt-1 cursor-pointer hover:underline self-start bg-white/60 px-3 py-1.5 rounded-xl border border-amber-200/60"
               >
-                Lihat panduan lengkap
+                Lihat Panduan & Solusi Kendala
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </button>
             </div>
@@ -791,25 +922,26 @@ export default function AdminLocationSettings() {
           </div>
 
           {/* Right Panel: Interactive Map */}
-          <div className="lg:col-span-8 flex flex-col gap-4">
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col gap-5">
+          <div className={`lg:col-span-7 flex flex-col gap-4 ${
+            mobileTab === 'map' ? 'block' : 'hidden lg:block'
+          }`}>
+            <div className="bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col gap-4">
               
-              {/* Map Header Widgets */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              {/* Map Header & Widgets */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#012060]/5 flex items-center justify-center text-[#012060] shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-[#012060]/5 flex items-center justify-center text-[#012060] shrink-0">
                     <span className="material-symbols-outlined text-[22px]">map</span>
                   </div>
                   <div>
-                    <h3 className="text-body-lg font-bold text-[#012060]">Peta Interaktif Geofencing</h3>
-                    <p className="text-[12px] text-slate-400 mt-0.5">Geser pin untuk menentukan pusat lokasi absensi</p>
+                    <h3 className="text-body-md sm:text-body-lg font-bold text-[#012060]">Peta Interaktif Geofencing</h3>
+                    <p className="text-[11px] sm:text-[12px] text-slate-400 mt-0.5">Geser pin atau tap lokasi pada peta</p>
                   </div>
                 </div>
                 
                 {/* Status Badges */}
-                <div className="flex items-center gap-3 flex-wrap">
-                  {/* GPS Badge */}
-                  <div className="bg-[#f8fafc] border border-slate-100 rounded-xl p-2 flex items-center gap-2 min-w-[120px] shadow-sm">
+                <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                  <div className="bg-[#f8fafc] border border-slate-200 rounded-xl px-2.5 py-1.5 flex items-center gap-2 shadow-xs">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
                     <div>
                       <p className="text-[9px] font-bold text-slate-700 leading-none">GPS Valid</p>
@@ -817,9 +949,8 @@ export default function AdminLocationSettings() {
                     </div>
                   </div>
                   
-                  {/* Update Badge */}
-                  <div className="bg-[#f8fafc] border border-slate-100 rounded-xl p-2 flex items-center gap-2 min-w-[140px] shadow-sm">
-                    <span className="material-symbols-outlined text-slate-400 text-[18px] shrink-0">schedule</span>
+                  <div className="bg-[#f8fafc] border border-slate-200 rounded-xl px-2.5 py-1.5 flex items-center gap-2 shadow-xs">
+                    <span className="material-symbols-outlined text-slate-400 text-[16px] shrink-0">schedule</span>
                     <div>
                       <p className="text-[9px] font-bold text-slate-700 leading-none">Update Terakhir</p>
                       <p className="text-[8px] text-slate-400 mt-0.5 leading-none font-mono">{formattedDate}</p>
@@ -827,24 +958,55 @@ export default function AdminLocationSettings() {
                   </div>
                 </div>
               </div>
+
+              {/* Mobile Quick Action Pills above Map */}
+              <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-1">
+                <button
+                  type="button"
+                  onClick={handleGetCurrentLocation}
+                  disabled={gpsLoading}
+                  className="px-3 py-1.5 bg-[#012060]/5 hover:bg-[#012060]/10 text-[#012060] rounded-xl text-[11px] font-bold flex items-center gap-1.5 shrink-0 border border-[#012060]/10 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[15px]">{gpsLoading ? 'sync' : 'my_location'}</span>
+                  <span>GPS Saya</span>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={centerMap}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[11px] font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[15px]">center_focus_weak</span>
+                  <span>Fokus Pin</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetPin}
+                  className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-[11px] font-bold flex items-center gap-1.5 shrink-0 border border-rose-200/60 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[15px]">restart_alt</span>
+                  <span>Reset Pin</span>
+                </button>
+              </div>
               
-              {/* Leaflet container with absolute action bar inside */}
-              <div className="relative rounded-2xl overflow-hidden border border-slate-100 shadow-inner h-[530px] z-10">
+              {/* Leaflet map container with responsive height */}
+              <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-inner h-[380px] sm:h-[460px] lg:h-[530px] z-10">
                 <div ref={mapContainerRef} className="w-full h-full" />
                 
-                {/* Floating Action Bar Overlay */}
-                <div className="absolute bottom-4 left-4 right-4 z-[1000] bg-white/95 backdrop-blur-md border border-slate-100 rounded-xl p-3 shadow-md flex justify-between items-center">
-                  <div className="flex items-center gap-2 text-body-sm font-bold text-slate-700">
-                    <span className="material-symbols-outlined text-[20px] text-[#012060]">touch_app</span>
-                    Klik peta untuk memindahkan pin
+                {/* Floating Action Overlay on bottom of map */}
+                <div className="absolute bottom-3 left-3 right-3 z-[1000] bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-xl p-2.5 sm:p-3 shadow-md flex justify-between items-center gap-2">
+                  <div className="flex items-center gap-2 text-[11px] sm:text-body-sm font-bold text-slate-700 overflow-hidden">
+                    <span className="material-symbols-outlined text-[18px] sm:text-[20px] text-[#012060] shrink-0">touch_app</span>
+                    <span className="truncate">Klik/geser pin di peta</span>
                   </div>
                   <button 
                     type="button" 
                     onClick={handleResetPin}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-error/10 hover:bg-error/20 text-[#a50022] rounded-lg text-label-sm font-bold transition-colors cursor-pointer"
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-error/10 hover:bg-error/20 text-[#a50022] rounded-lg text-[11px] font-bold transition-colors cursor-pointer shrink-0"
                   >
-                    <span className="material-symbols-outlined text-[16px]">delete</span>
-                    Hapus pin
+                    <span className="material-symbols-outlined text-[15px]">delete</span>
+                    <span className="hidden sm:inline">Hapus pin</span>
                   </button>
                 </div>
               </div>
@@ -855,17 +1017,34 @@ export default function AdminLocationSettings() {
         </div>
       </main>
 
+      {/* Mobile Sticky Floating Save Bar (Visible on mobile screens < lg) */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 px-4 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] flex items-center justify-between gap-3">
+        <div className="overflow-hidden">
+          <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Pusat Absensi</p>
+          <p className="text-body-sm font-bold text-[#012060] truncate">{locationName || 'Gedung Utama'}</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-[#012060] hover:bg-[#022b80] text-white px-5 py-3 rounded-2xl text-label-md font-bold shadow-md active:scale-95 transition-all flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-60"
+        >
+          <span className="material-symbols-outlined text-[18px]">{saving ? 'sync' : 'save'}</span>
+          <span>{saving ? 'Menyimpan...' : 'Simpan Lokasi'}</span>
+        </button>
+      </div>
+
       {/* Guide Modal */}
       {showGuideModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-5 animate-fade-in relative z-50">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 animate-fade-in relative z-50">
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-3 text-[#012060]">
-                <div className="w-10 h-10 rounded-xl bg-[#012060]/5 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-2xl bg-[#012060]/5 flex items-center justify-center">
                   <span className="material-symbols-outlined text-[22px]">info</span>
                 </div>
                 <div>
-                  <h3 className="text-body-lg font-bold">Panduan Lengkap Geofencing</h3>
+                  <h3 className="text-body-md sm:text-body-lg font-bold">Panduan Lengkap Geofencing</h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">Tata cara pengaturan & pemecahan masalah lokasi</p>
                 </div>
               </div>
@@ -878,7 +1057,7 @@ export default function AdminLocationSettings() {
               </button>
             </div>
             
-            <div className="space-y-4 text-body-sm text-slate-600 leading-relaxed max-h-[400px] overflow-y-auto pr-2">
+            <div className="space-y-4 text-body-sm text-slate-600 leading-relaxed max-h-[380px] overflow-y-auto pr-2">
               <div className="space-y-1">
                 <h4 className="font-bold text-[#012060]">1. Apa itu Geofencing?</h4>
                 <p>Geofencing adalah pembatas geografis virtual menggunakan koordinat GPS (Latitude/Longitude). Fitur ini mewajibkan Mentor berada di lokasi yang ditentukan saat memindai QR Code kehadiran mahasiswa baru.</p>
@@ -898,7 +1077,7 @@ export default function AdminLocationSettings() {
                 <ul className="list-decimal pl-5 space-y-1">
                   <li>Gunakan tombol <strong>GPS Saya</strong> jika Anda saat ini berada di lokasi acara.</li>
                   <li>Atau, cari lokasi di peta, lalu <strong>klik lokasi pada peta</strong> atau <strong>tarik pin biru</strong> untuk memindahkannya.</li>
-                  <li>Sesuaikan radius menggunakan slider.</li>
+                  <li>Sesuaikan radius menggunakan slider atau preset radius.</li>
                   <li>Pastikan Anda menekan tombol <strong>Simpan Pengaturan</strong> di bagian bawah untuk menyimpan koordinat aktif ke server.</li>
                 </ul>
               </div>
@@ -917,7 +1096,7 @@ export default function AdminLocationSettings() {
             <button
               type="button"
               onClick={() => setShowGuideModal(false)}
-              className="w-full bg-[#012060] hover:bg-[#022b80] text-white py-3 rounded-xl text-label-md font-bold transition-all shadow-sm cursor-pointer text-center"
+              className="w-full bg-[#012060] hover:bg-[#022b80] text-white py-3 rounded-2xl text-label-md font-bold transition-all shadow-sm cursor-pointer text-center"
             >
               Saya Mengerti
             </button>
