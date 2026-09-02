@@ -17,18 +17,38 @@ function parseDbDate(dateStr) {
   return new Date(formatted);
 }
 
-// Helper to convert date to Indonesian time string
+// Helper to get today's date string in WIB (Asia/Jakarta) YYYY-MM-DD
+export function getTodayWibString() {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Helper to convert any date string/timestamp to WIB YYYY-MM-DD
+export function getWibDateString(dateStr) {
+  if (!dateStr) return getTodayWibString();
+  try {
+    const d = new Date(new Date(dateStr).toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  } catch {
+    return getTodayWibString();
+  }
+}
+
+// Helper to convert date to Indonesian time string (WIB)
 function getIndoTime(dateString) {
-  const date = dateString ? parseDbDate(dateString) : new Date();
-  return date.toTimeString().split(' ')[0]; // HH:MM:SS
+  if (!dateString) return new Date().toTimeString().split(' ')[0];
+  const d = new Date(new Date(dateString).toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+  return d.toTimeString().split(' ')[0]; // HH:MM:SS
 }
 
 function getIndoDate(dateString) {
-  const date = dateString ? parseDbDate(dateString) : new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return getWibDateString(dateString);
 }
 
 // ----------------------------------------------------
@@ -743,8 +763,25 @@ export const ormawaDb = {
 
     const nowIso = new Date().toISOString();
 
-    // 2. Update status if first time
-    const alreadyHadir = item.status === 'Hadir';
+    // 2. Check if Ormawa has already scanned TODAY (WIB)
+    const todayWib = getTodayWibString();
+    const { data: existingLogs } = await supabase
+      .from('absensi_ormawa')
+      .select('id, waktu_scan')
+      .eq('ormawa_id', item.id);
+
+    const alreadyScannedToday = (existingLogs || []).some(
+      log => getWibDateString(log.waktu_scan) === todayWib
+    );
+
+    if (alreadyScannedToday) {
+      return {
+        success: true,
+        alreadyHadir: true,
+        item: { ...item, status: 'Hadir' },
+        message: `Ormawa "${item.nama_ormawa}" sudah melakukan absensi hari ini (${todayWib}).`
+      };
+    }
 
     await supabase
       .from('ormawa')
@@ -774,7 +811,7 @@ export const ormawaDb = {
 
     return {
       success: true,
-      alreadyHadir,
+      alreadyHadir: false,
       item: { ...item, status: 'Hadir', waktu_hadir: nowIso },
       log: logData
     };

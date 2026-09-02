@@ -7,7 +7,9 @@ import {
   claimsDb,
   logsDb,
   qrSessionsDb,
-  locationSettingsDb
+  locationSettingsDb,
+  getTodayWibString,
+  getWibDateString
 } from '../lib/db';
 
 export const AppContext = createContext();
@@ -26,16 +28,6 @@ const parseDbDate = (dateStr) => {
     }
   }
   return new Date(formatted);
-};
-
-// Helper to format Date to YYYY-MM-DD in local timezone
-const getLocalDateFormat = (dateVal) => {
-  if (!dateVal) return '';
-  const date = parseDbDate(dateVal);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 };
 
 // ----------------------------------------------------
@@ -83,8 +75,8 @@ const transformClaim = (c) => ({
 const transformLog = (l) => ({
   id: l.id,
   waktu: l.waktu,
-  timestamp: l.waktu ? parseDbDate(l.waktu).toTimeString().split(' ')[0] : '',
-  date: l.waktu ? getLocalDateFormat(l.waktu) : '',
+  timestamp: l.waktu ? new Date(new Date(l.waktu).toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })).toTimeString().split(' ')[0] : '',
+  date: getWibDateString(l.waktu),
   name: l.peserta_nama || '',
   nim: l.peserta_nim || '',
   gugusName: l.gugus_nama || '-',
@@ -240,25 +232,24 @@ export function AppContextProvider({ children }) {
           setLocationSettings(locData);
         }
 
-        // Sync peserta status with logs to correct any database discrepancies
-        const discrepancies = pData.filter(p => {
-          if (p.status !== 'Hadir Penuh') return false;
-          const hasValidLog = lData.some(l => String(l.nim) === String(p.id) && l.status === 'Valid');
-          return !hasValidLog;
+        // Sync peserta status for TODAY based on logs
+        const todayWib = getTodayWibString();
+        const updatedPeserta = pData.map(p => {
+          if (p.status === 'Hadir Penuh' || p.status === 'Belum Hadir') {
+            const hasValidLogToday = lData.some(
+              l => String(l.nim) === String(p.id) && 
+                   l.status === 'Valid' && 
+                   getWibDateString(l.waktu) === todayWib
+            );
+            return {
+              ...p,
+              status: hasValidLogToday ? 'Hadir Penuh' : 'Belum Hadir'
+            };
+          }
+          return p;
         });
 
-        if (discrepancies.length > 0) {
-          console.log(`Menyelaraskan data: status ${discrepancies.length} peserta diset kembali ke 'Belum Hadir' karena tidak memiliki log absensi.`);
-          Promise.all(discrepancies.map(p => pesertaDb.update(p.id, { status: 'Belum Hadir' })))
-            .catch(err => console.error("Gagal menyelaraskan status peserta di DB:", err));
-
-          setPeserta(pData.map(p => {
-            const isDisc = discrepancies.some(d => d.id === p.id);
-            return isDisc ? { ...p, status: 'Belum Hadir' } : p;
-          }));
-        } else {
-          setPeserta(pData);
-        }
+        setPeserta(updatedPeserta);
       } catch (err) {
         console.error('Error fetching data from Supabase:', err);
       } finally {
@@ -1134,7 +1125,9 @@ export function AppContextProvider({ children }) {
       setAdminNotificationsCleared,
       setMentorNotificationsCleared,
       loading,
-      parseDbDate
+      parseDbDate,
+      getTodayWibString,
+      getWibDateString
     }}>
       {children}
     </AppContext.Provider>

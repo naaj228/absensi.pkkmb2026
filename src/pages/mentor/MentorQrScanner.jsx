@@ -21,7 +21,7 @@ function getHaversineDistance(lat1, lon1, lat2, lon2) {
 }
 
 export default function MentorQrScanner() {
-  const { peserta, logs, gugus, currentUser, recordScan, hasMentorNotifications, locationSettings } = useContext(AppContext);
+  const { peserta, logs, gugus, currentUser, recordScan, hasMentorNotifications, locationSettings, getTodayWibString } = useContext(AppContext);
   const navigate = useNavigate();
 
   const mentorGugusId = currentUser?.gugusId || '';
@@ -69,7 +69,8 @@ export default function MentorQrScanner() {
   useEffect(() => { recordScanRef.current = recordScan; },       [recordScan]);
   useEffect(() => { isReadyRef.current = isReady; },             [isReady]);
 
-  const gugusLogs = logs.filter(log => log.gugusName === mentorGugusName);
+  const todayWib = getTodayWibString ? getTodayWibString() : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+  const gugusLogs = logs.filter(log => log.gugusName === mentorGugusName && log.date === todayWib);
 
   // Audio beep
   const playBeep = (type) => {
@@ -125,9 +126,8 @@ export default function MentorQrScanner() {
       return;
     }
 
-    // 3. Check if student has already scanned today (1 scan per day)
-    const d = new Date();
-    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    // 3. Check if student has already scanned today (1 scan per day in WIB)
+    const todayStr = getTodayWibString ? getTodayWibString() : todayWib;
     const alreadyScannedToday = logsRef.current.some(log => 
       String(log.nim) === String(student.id) && 
       log.date === todayStr &&
@@ -135,7 +135,7 @@ export default function MentorQrScanner() {
     );
 
     if (alreadyScannedToday) {
-      showResult('already', student.name, '⚠️ Sudah melakukan absensi');
+      showResult('already', student.name, '⚠️ Sudah melakukan absensi hari ini');
       return;
     }
 
