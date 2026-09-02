@@ -17,6 +17,9 @@ import AdminPesertaDetail from './pages/admin/AdminPesertaDetail';
 import AdminGugusDetail from './pages/admin/AdminGugusDetail';
 import AdminNotifikasi from './pages/admin/AdminNotifikasi';
 import AdminLocationSettings from './pages/admin/AdminLocationSettings';
+import AdminOrmawa from './pages/admin/AdminOrmawa';
+import AdminOrmawaRiwayat from './pages/admin/AdminOrmawaRiwayat';
+import OrmawaQrScanner from './pages/admin/OrmawaQrScanner';
 
 import MentorQrScanner from './pages/mentor/MentorQrScanner';
 import MentorPeserta from './pages/mentor/MentorPeserta';
@@ -57,6 +60,7 @@ function AppContent() {
         <Route path="/" element={<RootRedirect />} />
         <Route path="/login-mentor" element={<LoginMentor />} />
         <Route path="/admin/login" element={<LoginAdmin />} />
+        <Route path="/scan-ormawa" element={<OrmawaQrScanner />} />
 
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
@@ -68,6 +72,9 @@ function AppContent() {
           <Route path="gugus/:id" element={<AdminGugusDetail />} />
           <Route path="approval" element={<AdminApproval />} />
           <Route path="qr-management" element={<AdminQrManagement />} />
+          <Route path="ormawa" element={<AdminOrmawa />} />
+          <Route path="ormawa/riwayat" element={<AdminOrmawaRiwayat />} />
+          <Route path="scan-ormawa" element={<OrmawaQrScanner />} />
           <Route path="riwayat" element={<AdminRiwayat />} />
           <Route path="notifikasi" element={<AdminNotifikasi />} />
           <Route path="location" element={<AdminLocationSettings />} />
@@ -78,7 +85,9 @@ function AppContent() {
           <Route path="dashboard" element={<MentorDashboard />} />
           <Route path="peserta" element={<MentorPeserta />} />
           <Route path="scanner-qr" element={<MentorQrScanner />} />
+          <Route path="scanner-ormawa" element={<OrmawaQrScanner />} />
           <Route path="absensi-manual" element={<MentorAbsensiManual />} />
+          <Route path="riwayat-ormawa" element={<AdminOrmawaRiwayat />} />
           <Route path="riwayat" element={<MentorRiwayat />} />
           <Route path="notifikasi" element={<MentorNotifikasi />} />
         </Route>

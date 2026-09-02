@@ -169,6 +169,78 @@ app.post('/api/send-qr-email', async (req, res) => {
   }
 });
 
+// ─── POST /api/send-ormawa-qr-email ──────────────────────────────────────────
+app.post('/api/send-ormawa-qr-email', async (req, res) => {
+  const { toEmail, namaOrmawa, namaPerwakilan, jabatan, qrCode } = req.body;
+
+  if (!toEmail || !namaOrmawa || !qrCode) {
+    return res.status(400).json({ ok: false, message: 'Email, Nama Ormawa, dan Kode QR wajib diisi.' });
+  }
+
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    return res.status(500).json({ ok: false, message: 'GMAIL_USER atau GMAIL_APP_PASSWORD belum dikonfigurasi di .env' });
+  }
+
+  try {
+    const qrPngBuffer = await QRCode.toBuffer(qrCode, {
+      type: 'png',
+      width: 350,
+      margin: 2,
+      color: { dark: '#0d1b4d', light: '#ffffff' }
+    });
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"/></head>
+    <body style="font-family: Arial, sans-serif; background:#f4f6f9; margin:0; padding:20px;">
+      <div style="max-width:550px; margin:0 auto; background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 4px 15px rgba(0,0,0,0.08);">
+        <div style="background:#0d1b4d; padding:24px; text-align:center; color:#ffffff;">
+          <h2 style="margin:0; font-size:20px;">🎓 Undangan & QR Code Ormawa PKKMB</h2>
+          <p style="margin:6px 0 0; opacity:0.8; font-size:13px;">Digitech University</p>
+        </div>
+        <div style="padding:28px; color:#1e293b;">
+          <p>Yth. <strong>${namaOrmawa}</strong> ${namaPerwakilan ? `(${namaPerwakilan} - ${jabatan || 'Utusan'})` : ''},</p>
+          <p style="font-size:14px; color:#475569; line-height:1.6;">
+            Berikut adalah Kode QR Absensi Resmi Anda untuk menghadiri rangkaian acara PKKMB 2026. Tunjukkan QR Code ini kepada petugas/mentor di lokasi saat proses presensi.
+          </p>
+          <div style="text-align:center; margin:24px 0; background:#f8fafc; padding:20px; border-radius:12px; border:1px border-gray-200;">
+            <img src="cid:ormawaqr" alt="QR Code Ormawa" style="width:220px; height:220px; border-radius:8px; display:inline-block;" />
+            <p style="font-family:monospace; font-weight:bold; color:#0d1b4d; font-size:16px; margin:12px 0 0;">${qrCode}</p>
+          </div>
+          <p style="font-size:12px; color:#94a3b8; text-align:center;">Simpan email ini atau unduh lampiran QR Code yang tertera.</p>
+        </div>
+        <div style="background:#f8fafc; padding:16px; text-align:center; font-size:12px; color:#94a3b8; border-top:1px solid #e2e8f0;">
+          Panitia PKKMB 2026 &copy; Digitech University
+        </div>
+      </div>
+    </body>
+    </html>
+    `;
+
+    await transporter.sendMail({
+      from: `"${process.env.EMAIL_FROM_NAME || 'Panitia PKKMB'}" <${process.env.GMAIL_USER}>`,
+      to: toEmail,
+      subject: `QR Code Absensi Resmi Ormawa - ${namaOrmawa}`,
+      html: htmlContent,
+      attachments: [
+        {
+          filename: `QR_Ormawa_${namaOrmawa.replace(/\s+/g, '_')}.png`,
+          content: qrPngBuffer,
+          contentType: 'image/png',
+          cid: 'ormawaqr'
+        }
+      ]
+    });
+
+    console.log(`✉️  Sent Ormawa QR Email to ${toEmail} (${namaOrmawa})`);
+    res.json({ ok: true, message: `Email QR Code berhasil dikirim ke ${toEmail}` });
+  } catch (err) {
+    console.error(`❌  Failed to send Ormawa QR to ${toEmail}:`, err.message);
+    res.status(500).json({ ok: false, message: `Gagal mengirim email: ${err.message}` });
+  }
+});
+
 // ─── POST /api/send-bulk-qr-email  (kirim ke banyak peserta sekaligus) ───────
 //
 // Body: { students: [ { toEmail, toName, nim, gugus, mentor, qrUrl }, ... ] }

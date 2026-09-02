@@ -58,14 +58,15 @@ export default function AdminNotifikasi() {
   });
 
   // 3. QR Session Created
-  qrCodes.forEach(q => {
+  (qrCodes || []).filter(Boolean).forEach(q => {
+    if (!q) return;
     const id = `qr-${q.id}`;
     if (dismissedNotifications.includes(id)) return;
     notifications.push({
       id,
       type: 'qr',
       title: 'Sesi QR Code Aktif',
-      message: `Sesi "${q.title}" ditargetkan ke ${q.targetAudience === 'all' ? 'Semua Peserta' : q.targetAudience} (${q.startTime} - ${q.endTime})`,
+      message: `Sesi "${q.title || ''}" ditargetkan ke ${q.targetAudience === 'all' ? 'Semua Peserta' : (q.targetAudience || 'Peserta')} (${q.startTime || '-'} - ${q.endTime || '-'})`,
       time: 'Hari Ini',
       icon: 'qr_code_2',
       color: 'text-primary bg-primary/5',

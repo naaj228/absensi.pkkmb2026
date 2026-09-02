@@ -97,16 +97,19 @@ const transformLog = (l) => ({
   distanceMeters: l.distance_meters
 });
 
-const transformQr = (q) => ({
-  id: q.kode,
-  title: q.nama_sesi,
-  sessionType: 'PKKMB',
-  targetAudience: 'All',
-  startTime: q.berlaku_mulai ? new Date(q.berlaku_mulai).toTimeString().split(' ')[0] : '',
-  endTime: q.berlaku_sampai ? new Date(q.berlaku_sampai).toTimeString().split(' ')[0] : '',
-  status: q.status === 'active' ? 'Active' : 'Expired',
-  scans: 0
-});
+const transformQr = (q) => {
+  if (!q) return null;
+  return {
+    id: q.kode || q.id || '',
+    title: q.nama_sesi || q.title || 'Sesi QR',
+    sessionType: 'PKKMB',
+    targetAudience: 'All',
+    startTime: q.berlaku_mulai ? new Date(q.berlaku_mulai).toTimeString().split(' ')[0] : (q.startTime || ''),
+    endTime: q.berlaku_sampai ? new Date(q.berlaku_sampai).toTimeString().split(' ')[0] : (q.endTime || ''),
+    status: q.status === 'active' ? 'Active' : 'Expired',
+    scans: 0
+  };
+};
 
 export function AppContextProvider({ children }) {
   const [peserta, setPeserta] = useState([]);
