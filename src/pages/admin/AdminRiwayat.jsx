@@ -79,6 +79,15 @@ export default function AdminRiwayat() {
     return matchesSearch && matchesGugus && matchesDate && matchesTab;
   });
 
+  const formatDDMMYYYY = (dateStr) => {
+    if (!dateStr) return '-';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+  };
+
   const handleExport = (type) => {
     if (filteredLogs.length === 0) {
       alert("Tidak ada data absensi untuk diekspor!");
@@ -89,8 +98,9 @@ export default function AdminRiwayat() {
       const data = filteredLogs.map(log => {
         const studentInfo = peserta.find(p => p.id === log.nim);
         const jurusan = studentInfo ? studentInfo.fakultas : '-';
+        const formattedDate = formatDDMMYYYY(log.date);
         return {
-          'Timestamp': `${log.date} ${log.timestamp}`,
+          'Timestamp': `${formattedDate} ${log.timestamp}`,
           'NIM': log.nim,
           'Nama Lengkap': log.name,
           'Gugus': log.gugusName,
@@ -117,12 +127,6 @@ export default function AdminRiwayat() {
       XLSX.writeFile(workbook, `Laporan_Absensi_PKKMB_2026_${selectedDate || 'Semua_Hari'}.xlsx`);
     } 
     else if (type === 'PDF') {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert("Pop-up diblokir! Izinkan pop-up di browser Anda untuk mencetak PDF.");
-        return;
-      }
-
       const html = `
         <html>
           <head>
@@ -145,7 +149,7 @@ export default function AdminRiwayat() {
             <h1>Laporan Riwayat Kehadiran PKKMB 2026</h1>
             <div class="meta">
               Gugus: ${selectedGugus === 'all' ? 'Semua Gugus' : selectedGugusName} | 
-              Tanggal: ${selectedDate || 'Semua Tanggal'} | 
+              Tanggal: ${selectedDate ? formatDDMMYYYY(selectedDate) : 'Semua Tanggal'} | 
               Kategori: ${activeTab} |
               Total Log: ${filteredLogs.length}
             </div>
@@ -164,7 +168,7 @@ export default function AdminRiwayat() {
               <tbody>
                 ${filteredLogs.map(log => `
                   <tr>
-                    <td>${log.date}</td>
+                    <td>${formatDDMMYYYY(log.date)}</td>
                     <td>${log.timestamp}</td>
                     <td><strong>${log.name}</strong></td>
                     <td>${log.nim}</td>
@@ -183,13 +187,30 @@ export default function AdminRiwayat() {
           </body>
         </html>
       `;
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.focus();
+
+      const printFrame = document.createElement('iframe');
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      document.body.appendChild(printFrame);
+
+      const frameDoc = printFrame.contentWindow.document;
+      frameDoc.open();
+      frameDoc.write(html);
+      frameDoc.close();
+
       setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 500);
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+        setTimeout(() => {
+          if (document.body.contains(printFrame)) {
+            document.body.removeChild(printFrame);
+          }
+        }, 1000);
+      }, 300);
     }
   };
 
@@ -241,7 +262,7 @@ export default function AdminRiwayat() {
       </header>
 
       {/* Main Content */}
-      <main className="relative pt-20 px-3 sm:px-6 lg:px-8 max-w-container-max mx-auto space-y-4 sm:space-y-6">
+      <main className="relative pt-20 px-3 sm:px-4 lg:px-6 max-w-container-max mx-auto space-y-4 sm:space-y-6">
         
         {/* Top Header Banner & Action Buttons */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
@@ -493,7 +514,6 @@ export default function AdminRiwayat() {
                           title="Lihat Detail Peserta"
                         >
                           <span className="material-symbols-outlined text-[13px]">visibility</span>
-                          <span>Detail</span>
                         </button>
 
                         <button 
@@ -515,18 +535,26 @@ export default function AdminRiwayat() {
                 })}
               </div>
             ) : (
-              <div className="text-center py-10 text-slate-400 text-body-sm">
-                Tidak ada log absensi ditemukan.
-              </div>
+              <div className="text-center py-10 text-slate-400 text-body-md">Tidak ada log absensi ditemukan.</div>
             )}
           </div>
 
-          {/* DESKTOP TABLE VIEW (Visible on screen >= md) */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[900px]">
+          {/* DESKTOP TABLE VIEW (Strict 100% width, table-fixed, zero horizontal scroll) */}
+          <div className="hidden md:block w-full overflow-hidden">
+            <table className="w-full text-left border-collapse table-fixed">
+              <colgroup>
+                <col className="w-[3.5%]" />
+                <col className="w-[11.5%]" />
+                <col className="w-[25.5%]" />
+                <col className="w-[15.5%]" />
+                <col className="w-[8.5%]" />
+                <col className="w-[8.5%]" />
+                <col className="w-[18%]" />
+                <col className="w-[9%]" />
+              </colgroup>
               <thead>
                 <tr className="bg-[#f8fafc] border-b border-slate-100">
-                  <th className="py-3.5 px-6 w-12 text-center">
+                  <th className="py-3 px-1.5 text-center">
                     <input 
                       type="checkbox" 
                       className="w-4 h-4 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer"
@@ -534,13 +562,13 @@ export default function AdminRiwayat() {
                       onChange={handleSelectAll} 
                     />
                   </th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Waktu</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Peserta</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gugus</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pemindai</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lokasi Scan</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Aksi</th>
+                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Waktu</th>
+                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Peserta</th>
+                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Gugus</th>
+                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Pemindai</th>
+                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Status</th>
+                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Lokasi Scan</th>
+                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-100">
@@ -551,7 +579,7 @@ export default function AdminRiwayat() {
                       onClick={() => navigate(`/admin/peserta/${log.nim}`)}
                       className="hover:bg-[#012060]/[0.03] transition-all group cursor-pointer"
                     >
-                      <td className="py-4 px-6 w-12 text-center" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-2.5 px-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                         <input 
                           type="checkbox" 
                           className="w-4 h-4 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer"
@@ -559,63 +587,63 @@ export default function AdminRiwayat() {
                           onChange={(e) => handleSelectOne(log.id, e.target.checked)} 
                         />
                       </td>
-                      <td className="py-4 px-6">
-                        <div className="flex flex-col">
-                          <span className="text-body-sm font-bold text-slate-800">{log.timestamp}</span>
-                          <span className="text-[11px] text-slate-400">{log.date}</span>
+                      <td className="py-2.5 px-1.5 truncate">
+                        <div className="flex flex-col min-w-0 truncate">
+                          <span className="text-[11.5px] font-bold text-slate-800 truncate">{log.timestamp}</span>
+                          <span className="text-[10px] text-slate-400 truncate">{log.date}</span>
                         </div>
                       </td>
-                      <td className="py-4 px-6">
-                        <div className="flex flex-col min-w-0">
-                          <span className={`text-body-sm font-bold text-slate-800 truncate group-hover:text-[#012060] transition-colors ${log.status === 'Valid' ? '' : 'text-slate-500 italic'}`}>{log.name}</span>
-                          <span className="text-[11px] text-slate-400 font-mono">NIM: {log.nim}</span>
+                      <td className="py-2.5 px-1.5 truncate">
+                        <div className="flex flex-col min-w-0 truncate">
+                          <span className={`text-[11.5px] font-bold text-slate-800 truncate group-hover:text-[#012060] transition-colors ${log.status === 'Valid' ? '' : 'text-slate-500 italic'}`} title={log.name}>{log.name}</span>
+                          <span className="text-[10px] text-slate-400 font-mono truncate">NIM: {log.nim}</span>
                         </div>
                       </td>
-                      <td className="py-4 px-6">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-semibold text-label-sm border border-slate-200/60">
-                          {log.gugusName}
+                      <td className="py-2.5 px-1.5 truncate">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-semibold text-[10px] border border-slate-200/60 max-w-full truncate" title={log.gugusName}>
+                          <span className="truncate">{log.gugusName}</span>
                         </span>
                       </td>
-                      <td className="py-4 px-6">
-                        <span className="text-body-sm text-slate-700 font-medium">{log.scanner}</span>
+                      <td className="py-2.5 px-1.5 truncate">
+                        <span className="text-[11px] text-slate-700 font-medium truncate block" title={log.scanner}>{log.scanner}</span>
                       </td>
-                      <td className="py-4 px-6">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-label-sm font-bold border ${
+                      <td className="py-2.5 px-1.5 truncate">
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold border max-w-full truncate ${
                           log.status === 'Valid' 
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                             : 'bg-rose-50 text-rose-700 border-rose-200'
                         }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${log.status === 'Valid' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                          {log.status}
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${log.status === 'Valid' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                          <span className="truncate">{log.status}</span>
                         </span>
                       </td>
-                      <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-2.5 px-1.5 truncate" onClick={(e) => e.stopPropagation()}>
                         {log.latitude && log.longitude ? (
                           <a
                             href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-label-sm font-bold transition-all bg-emerald-50 text-emerald-700 border border-emerald-200/60 hover:bg-emerald-100"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[10px] font-bold transition-all bg-emerald-50 text-emerald-700 border border-emerald-200/60 hover:bg-emerald-100 max-w-full truncate"
                             title={`Latitude: ${log.latitude}, Longitude: ${log.longitude}`}
                           >
-                            <span className="material-symbols-outlined text-[16px]">pin_drop</span>
-                            {log.locationStatus || 'Dalam Area'} {log.distanceMeters ? `(${log.distanceMeters}m)` : ''}
+                            <span className="material-symbols-outlined text-[13px] shrink-0">pin_drop</span>
+                            <span className="truncate">{log.locationStatus || 'Dalam Area'} {log.distanceMeters ? `(${log.distanceMeters}m)` : ''}</span>
                           </a>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-label-sm font-medium bg-slate-100 text-slate-500 border border-slate-200/60">
-                            <span className="material-symbols-outlined text-[16px]">location_off</span>
-                            {log.scanner.startsWith('Admin') ? 'Manual (Admin)' : 'Tanpa Lokasi'}
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200/60 max-w-full truncate">
+                            <span className="material-symbols-outlined text-[13px] shrink-0">location_off</span>
+                            <span className="truncate">{log.scanner?.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi'}</span>
                           </span>
                         )}
                       </td>
-                      <td className="py-4 px-6 text-right relative" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
+                      <td className="py-2.5 px-1.5 text-right truncate" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-0.5">
                           <button 
                             onClick={() => navigate(`/admin/peserta/${log.nim}`)}
-                            className="p-1.5 text-[#012060] hover:bg-[#012060]/10 rounded-lg transition-colors cursor-pointer"
+                            className="p-1 text-[#012060] hover:bg-[#012060]/10 rounded-lg transition-colors cursor-pointer"
                             title="Lihat Detail Peserta"
                           >
-                            <span className="material-symbols-outlined text-[18px]">visibility</span>
+                            <span className="material-symbols-outlined text-[16px]">visibility</span>
                           </button>
                           <button 
                             onClick={() => {
@@ -624,10 +652,10 @@ export default function AdminRiwayat() {
                                 alert("Log absensi berhasil dihapus.");
                               });
                             }}
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             title="Hapus Log Absensi"
                           >
-                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
                           </button>
                         </div>
                       </td>

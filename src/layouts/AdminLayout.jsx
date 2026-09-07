@@ -10,8 +10,6 @@ const navItems = [
   { to: '/admin/gugus', icon: 'grid_view', label: 'Gugus' },
   { to: '/admin/location', icon: 'pin_drop', label: 'Pengaturan Lokasi' },
   { to: '/admin/qr-management', icon: 'qr_code_2', label: 'Manajemen QR' },
-  { to: '/admin/ormawa', icon: 'diversity_3', label: 'Absensi Ormawa' },
-  { to: '/admin/ormawa/riwayat', icon: 'manage_history', label: 'Riwayat Ormawa' },
   { to: '/admin/riwayat', icon: 'history', label: 'Riwayat Absensi' },
   { to: '/admin/approval', icon: 'check_box', label: 'Persetujuan Manual' },
 ];

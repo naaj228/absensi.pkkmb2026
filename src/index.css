@@ -1,5 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url('/fonts/material-symbols-outlined.woff2') format('woff2'),
+       url('/fonts/material-symbols-outlined.ttf') format('truetype');
+}
+
 @import "tailwindcss";
 
 @theme {
@@ -140,11 +147,13 @@
   -webkit-font-feature-settings: 'liga';
   font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
-  
-  /* Fallback FOUT prevention */
+  text-rendering: optimizeLegibility;
+  user-select: none;
+
   width: 1em;
   height: 1em;
   overflow: hidden;
+  vertical-align: middle;
 }
 
 /* Custom Toast System Styles */

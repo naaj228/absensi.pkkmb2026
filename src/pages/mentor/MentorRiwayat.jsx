@@ -43,6 +43,15 @@ export default function MentorRiwayat() {
     return matchesSearch && matchesDate && matchesTab;
   });
 
+  const formatDDMMYYYY = (dateStr) => {
+    if (!dateStr) return '-';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+  };
+
   const handleExport = (type) => {
     if (filteredLogs.length === 0) {
       alert("Tidak ada data absensi untuk diekspor!");
@@ -51,7 +60,7 @@ export default function MentorRiwayat() {
 
     if (type === 'Excel') {
       const data = filteredLogs.map(log => ({
-        'Tanggal': log.date,
+        'Tanggal': formatDDMMYYYY(log.date),
         'Waktu': log.timestamp,
         'NIM': log.nim,
         'Nama Peserta': log.name,
@@ -76,16 +85,10 @@ export default function MentorRiwayat() {
       XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Absensi");
       XLSX.writeFile(workbook, `Laporan_Absensi_${mentorGugusName.replace(/\s+/g, '_')}_${selectedDate || 'Semua_Hari'}.xlsx`);
     } else if (type === 'PDF') {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert("Pop-up diblokir! Izinkan pop-up di browser Anda untuk mencetak PDF.");
-        return;
-      }
-
       const rowsHtml = filteredLogs.map((log, idx) => `
         <tr>
           <td>${idx + 1}</td>
-          <td>${log.date} ${log.timestamp}</td>
+          <td>${formatDDMMYYYY(log.date)} ${log.timestamp}</td>
           <td>${log.nim}</td>
           <td>${log.name}</td>
           <td>${log.gugusName}</td>
@@ -142,18 +145,33 @@ export default function MentorRiwayat() {
             <div class="footer">
               Dicetak otomatis oleh Sistem Absensi PKKMB 2026
             </div>
-            <script>
-              window.onload = function() {
-                window.print();
-                window.onafterprint = function() { window.close(); };
-              };
-            </script>
           </body>
         </html>
       `;
 
-      printWindow.document.write(html);
-      printWindow.document.close();
+      const printFrame = document.createElement('iframe');
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      document.body.appendChild(printFrame);
+
+      const frameDoc = printFrame.contentWindow.document;
+      frameDoc.open();
+      frameDoc.write(html);
+      frameDoc.close();
+
+      setTimeout(() => {
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+        setTimeout(() => {
+          if (document.body.contains(printFrame)) {
+            document.body.removeChild(printFrame);
+          }
+        }, 1000);
+      }, 300);
     }
   };
 

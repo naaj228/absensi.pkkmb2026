@@ -7,9 +7,7 @@ const navItems = [
   { to: '/mentor/dashboard', icon: 'dashboard', label: 'Dashboard' },
   { to: '/mentor/peserta', icon: 'groups', label: 'Anggota Gugus' },
   { to: '/mentor/scanner-qr', icon: 'qr_code_scanner', label: 'Scanner Peserta' },
-  { to: '/mentor/scanner-ormawa', icon: 'diversity_3', label: 'Scanner Ormawa' },
   { to: '/mentor/absensi-manual', icon: 'person_add', label: 'Absensi Manual' },
-  { to: '/mentor/riwayat-ormawa', icon: 'manage_history', label: 'Riwayat Ormawa' },
   { to: '/mentor/riwayat', icon: 'history', label: 'Riwayat Absensi' },
 ];
 

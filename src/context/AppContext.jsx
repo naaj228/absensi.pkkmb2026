@@ -232,15 +232,17 @@ export function AppContextProvider({ children }) {
           setLocationSettings(locData);
         }
 
-        // Sync peserta status for TODAY based on logs
+        // Fast O(N+M) Sync of peserta status for TODAY using a Set
         const todayWib = getTodayWibString();
+        const validLogNimsToday = new Set(
+          lData
+            .filter(l => l.status === 'Valid' && getWibDateString(l.waktu) === todayWib)
+            .map(l => String(l.nim))
+        );
+
         const updatedPeserta = pData.map(p => {
           if (p.status === 'Hadir Penuh' || p.status === 'Belum Hadir') {
-            const hasValidLogToday = lData.some(
-              l => String(l.nim) === String(p.id) && 
-                   l.status === 'Valid' && 
-                   getWibDateString(l.waktu) === todayWib
-            );
+            const hasValidLogToday = validLogNimsToday.has(String(p.id));
             return {
               ...p,
               status: hasValidLogToday ? 'Hadir Penuh' : 'Belum Hadir'
@@ -258,12 +260,7 @@ export function AppContextProvider({ children }) {
     }
 
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await loadData();
-      } else {
-        setLoading(false);
-      }
+      await loadData();
     }
     init();
 

@@ -263,7 +263,7 @@ export default function AdminPeserta() {
 
   return (
     <div className="w-full">
-      <header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+      <header className="fixed top-0 left-0 lg:left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between pl-16 pr-4 sm:px-6 lg:px-8 shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
         <div className="flex items-center gap-4">
           <h1 className="text-headline-sm font-headline-md text-on-surface">Peserta</h1>
         </div>
