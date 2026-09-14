@@ -2,26 +2,34 @@ import { useContext } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { isHadir } from '../../utils/statusHelper';
+import { toISOKey, getTodayISOKey } from '../../utils/dateHelper';
 
 export default function AdminDashboard() {
   const { peserta, mentors, gugus, logs, hasAdminNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
+  // Filter logs for TODAY ONLY
+  const todayKey = getTodayISOKey();
+  const todayLogs = logs.filter(log => toISOKey(log.date) === todayKey);
+
   const totalPeserta = peserta.length;
   const totalMentor = mentors.length;
   const totalGugus = gugus.length;
-  const hadirHariIni = peserta.filter(p => isHadir(p.status)).length;
-  const alphaCount = peserta.filter(p => p.status === 'Alpha' || !p.status).length;
+  
+  // Hadir hari ini strictly based on today's valid scan logs
+  const hadirHariIni = new Set(todayLogs.filter(l => l.status === 'Valid').map(l => l.nim)).size;
+
+  const alphaCount = Math.max(0, totalPeserta - hadirHariIni);
   const persentaseKehadiran = totalPeserta > 0 ? ((hadirHariIni / totalPeserta) * 100).toFixed(1) : '0';
 
-  // Get top 8 recent scans
-  const recentScans = logs.slice(0, 8);
+  // Get top 8 recent scans for TODAY ONLY
+  const recentScans = todayLogs.slice(0, 8);
 
   return (
     <div className="w-full">
       <header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
         <div className="flex items-center gap-4">
-          <h1 className="text-headline-sm font-headline-md text-on-surface">Dashboard</h1>
+          <h1 className="text-headline-sm font-headline-md text-on-surface">Dashboard Admin</h1>
         </div>
         <div className="flex items-center gap-6">
           <div className="relative group">
@@ -41,101 +49,105 @@ export default function AdminDashboard() {
       <main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto">
         <div className="flex flex-col w-full gap-8 pb-12">
           {/* Top Stats Row */}
-          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-3">
             {/* Card 1: Total Peserta */}
             <div 
-              className="bg-surface-container-lowest rounded-[16px] p-4 sm:p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" 
+              className="bg-surface-container-lowest rounded-[16px] p-3.5 sm:p-4 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer flex flex-col justify-between" 
               onClick={() => navigate('/admin/peserta')}
             >
-              <div className="flex items-center justify-between mb-2 sm:mb-4">
-                <p className="text-[10px] sm:text-xs md:text-label-md text-on-surface-variant uppercase tracking-wider truncate">Total Peserta</p>
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-primary text-[16px] sm:text-[18px]">group</span>
+              <div className="flex items-start justify-between gap-1 mb-3">
+                <p className="text-[10px] sm:text-[11px] font-bold text-on-surface-variant uppercase tracking-wider leading-tight">Total Peserta</p>
+                <div className="w-7 h-7 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-primary text-[16px]">group</span>
                 </div>
               </div>
-              <h3 className="text-xl sm:text-2xl md:text-headline-lg font-bold text-on-surface leading-none">{totalPeserta}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-on-surface leading-none">{totalPeserta}</h3>
             </div>
 
             {/* Card 2: Total Mentor */}
             <div 
-              className="bg-surface-container-lowest rounded-[16px] p-4 sm:p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" 
+              className="bg-surface-container-lowest rounded-[16px] p-3.5 sm:p-4 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer flex flex-col justify-between" 
               onClick={() => navigate('/admin/mentor')}
             >
-              <div className="flex items-center justify-between mb-2 sm:mb-4">
-                <p className="text-[10px] sm:text-xs md:text-label-md text-on-surface-variant uppercase tracking-wider truncate">Total Mentor</p>
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-primary text-[16px] sm:text-[18px]">school</span>
+              <div className="flex items-start justify-between gap-1 mb-3">
+                <p className="text-[10px] sm:text-[11px] font-bold text-on-surface-variant uppercase tracking-wider leading-tight">Total Mentor</p>
+                <div className="w-7 h-7 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-primary text-[16px]">school</span>
                 </div>
               </div>
-              <h3 className="text-xl sm:text-2xl md:text-headline-lg font-bold text-on-surface leading-none">{totalMentor}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-on-surface leading-none">{totalMentor}</h3>
             </div>
 
             {/* Card 3: Total Gugus */}
             <div 
-              className="bg-surface-container-lowest rounded-[16px] p-4 sm:p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" 
+              className="bg-surface-container-lowest rounded-[16px] p-3.5 sm:p-4 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer flex flex-col justify-between" 
               onClick={() => navigate('/admin/gugus')}
             >
-              <div className="flex items-center justify-between mb-2 sm:mb-4">
-                <p className="text-[10px] sm:text-xs md:text-label-md text-on-surface-variant uppercase tracking-wider truncate">Total Gugus</p>
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-primary text-[16px] sm:text-[18px]">grid_view</span>
+              <div className="flex items-start justify-between gap-1 mb-3">
+                <p className="text-[10px] sm:text-[11px] font-bold text-on-surface-variant uppercase tracking-wider leading-tight">Total Gugus</p>
+                <div className="w-7 h-7 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-primary text-[16px]">grid_view</span>
                 </div>
               </div>
-              <h3 className="text-xl sm:text-2xl md:text-headline-lg font-bold text-on-surface leading-none">{totalGugus}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-on-surface leading-none">{totalGugus}</h3>
             </div>
 
             {/* Card 4: Hadir Hari Ini */}
             <div 
-              className="bg-surface-container-lowest rounded-[16px] p-4 sm:p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" 
+              className="bg-surface-container-lowest rounded-[16px] p-3.5 sm:p-4 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer flex flex-col justify-between" 
               onClick={() => navigate('/admin/riwayat')}
             >
-              <div className="flex items-center justify-between mb-2 sm:mb-4">
-                <p className="text-[10px] sm:text-xs md:text-label-md text-on-surface-variant uppercase tracking-wider truncate">Hadir Hari Ini</p>
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#ecfdf5] flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[#059669] text-[16px] sm:text-[18px]">check_circle</span>
+              <div className="flex items-start justify-between gap-1 mb-3">
+                <p className="text-[10px] sm:text-[11px] font-bold text-on-surface-variant uppercase tracking-wider leading-tight">Hadir Hari Ini</p>
+                <div className="w-7 h-7 rounded-full bg-[#ecfdf5] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#059669] text-[16px]">check_circle</span>
                 </div>
               </div>
-              <h3 className="text-xl sm:text-2xl md:text-headline-lg font-bold text-on-surface leading-none">{hadirHariIni}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-on-surface leading-none">{hadirHariIni}</h3>
             </div>
 
             {/* Card 5: Belum Hadir */}
             <div 
-              className="bg-surface-container-lowest rounded-[16px] p-4 sm:p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer" 
+              className="bg-surface-container-lowest rounded-[16px] p-3.5 sm:p-4 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer flex flex-col justify-between" 
               onClick={() => navigate('/admin/peserta')}
             >
-              <div className="flex items-center justify-between mb-2 sm:mb-4">
-                <p className="text-[10px] sm:text-xs md:text-label-md text-on-surface-variant uppercase tracking-wider truncate">Belum Hadir</p>
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#fef2f2] flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[#ef4444] text-[16px] sm:text-[18px]">cancel</span>
+              <div className="flex items-start justify-between gap-1 mb-3">
+                <p className="text-[10px] sm:text-[11px] font-bold text-on-surface-variant uppercase tracking-wider leading-tight">Belum Hadir</p>
+                <div className="w-7 h-7 rounded-full bg-[#fef2f2] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#ef4444] text-[16px]">cancel</span>
                 </div>
               </div>
-              <h3 className="text-xl sm:text-2xl md:text-headline-lg font-bold text-on-surface leading-none">{alphaCount}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-on-surface leading-none">{alphaCount}</h3>
             </div>
 
             {/* Card 6: Persentase Kehadiran */}
-            <div className="bg-primary rounded-[16px] p-4 sm:p-6 shadow-[0_10px_30px_rgba(20,44,142,0.15)] text-on-primary">
-              <div className="flex items-center justify-between mb-2 sm:mb-4">
-                <p className="text-[10px] sm:text-xs md:text-label-md text-white uppercase tracking-wider truncate">Kehadiran</p>
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-on-primary text-[16px] sm:text-[18px]">percent</span>
+            <div className="bg-primary rounded-[16px] p-3.5 sm:p-4 shadow-[0_10px_30px_rgba(20,44,142,0.15)] text-on-primary flex flex-col justify-between">
+              <div className="flex items-start justify-between gap-1 mb-3">
+                <p className="text-[10px] sm:text-[11px] font-bold text-white uppercase tracking-wider leading-tight">Kehadiran</p>
+                <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-on-primary text-[16px]">percent</span>
                 </div>
               </div>
-              <h3 className="text-xl sm:text-2xl md:text-headline-lg font-bold text-on-primary leading-none">{persentaseKehadiran}%</h3>
-              <div className="mt-2 sm:mt-4 w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-                <div className="h-full bg-[#10b981] rounded-full transition-all duration-500" style={{ width: `${persentaseKehadiran}%` }}></div>
+              <div>
+                <h3 className="text-xl sm:text-2xl font-bold text-on-primary leading-none">{persentaseKehadiran}%</h3>
+                <div className="mt-2.5 w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+                  <div className="h-full bg-[#10b981] rounded-full transition-all duration-500" style={{ width: `${persentaseKehadiran}%` }}></div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Recent Activity Section */}
+          {/* Recent Activity Section (TODAY ONLY) */}
           <div className="bg-surface-container-lowest rounded-[16px] p-6 shadow-[0_10px_30px_rgba(13,27,77,0.05)] flex flex-col">
             <div className="flex items-center justify-between mb-6 pb-4 relative">
-              <h2 className="text-headline-sm font-headline-md text-on-surface">Scan Terbaru</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-headline-sm font-headline-md text-on-surface">Scan Terbaru Hari Ini</h2>
+              </div>
               <button 
                 className="text-label-sm text-secondary hover:text-primary transition-colors cursor-pointer" 
                 onClick={() => navigate('/admin/riwayat')}
               >
-                Lihat Semua
+                Lihat Semua Riwayat
               </button>
               <div className="absolute bottom-0 left-0 right-0 h-px bg-outline-variant/30"></div>
             </div>
@@ -164,7 +176,7 @@ export default function AdminDashboard() {
                 ))
               ) : (
                 <div className="col-span-full text-center py-8 text-on-surface-variant text-body-md">
-                  Tidak ada log aktivitas scan terbaru.
+                  Belum ada log scan untuk hari ini.
                 </div>
               )}
             </div>

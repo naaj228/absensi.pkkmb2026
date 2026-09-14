@@ -2,9 +2,10 @@ import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
 import { isHadir, STATUS } from '../../utils/statusHelper';
+import { toISOKey, getTodayISOKey } from '../../utils/dateHelper';
 
 export default function MentorDashboard() {
-  const { peserta, gugus, currentUser, hasMentorNotifications } = useContext(AppContext);
+  const { peserta, gugus, logs, currentUser, hasMentorNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
   // Get gugus ID from the currently logged-in mentor
@@ -18,13 +19,21 @@ export default function MentorDashboard() {
   // Filter participants belonging to mentor's group
   const gugusStudents = peserta.filter(p => p.gugusId === mentorGugusId);
 
-  // Stats
+  // Filter logs for TODAY ONLY for mentor's gugus
+  const todayKey = getTodayISOKey();
+  const todayMentorLogs = logs.filter(log => 
+    log.gugusName.toLowerCase() === rawGugusName.toLowerCase() && 
+    toISOKey(log.date) === todayKey
+  );
+
+  // Stats for today (strictly based on today's valid scan logs)
   const totalStudents = gugusStudents.length;
-  const hadirCount = gugusStudents.filter(p => isHadir(p.status)).length;
-  const alphaCount = gugusStudents.filter(p => p.status === STATUS.ALPHA || !p.status).length;
+  const hadirCount = new Set(todayMentorLogs.filter(l => l.status === 'Valid').map(l => l.nim)).size;
+  const alphaCount = Math.max(0, totalStudents - hadirCount);
   const pendingCount = gugusStudents.filter(p => p.status === STATUS.PENDING).length;
 
   const attendancePercent = totalStudents > 0 ? Math.round((hadirCount / totalStudents) * 100) : 0;
+  const recentScansToday = todayMentorLogs.slice(0, 6);
 
   return (
     <div className="w-full bg-[#f8fafc] min-h-screen pb-16">
@@ -76,7 +85,7 @@ export default function MentorDashboard() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-white/70 font-bold uppercase tracking-wider">Persentase Hadir</span>
+                    <span className="text-[10px] text-white/70 font-bold uppercase tracking-wider">Kehadiran Hari Ini</span>
                     <span className="text-[9.5px] font-extrabold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-400/30">
                       {hadirCount}/{totalStudents} Hadir
                     </span>
@@ -120,10 +129,10 @@ export default function MentorDashboard() {
             </div>
           </div>
 
-          {/* Stat 2: Hadir */}
+          {/* Stat 2: Hadir Hari Ini */}
           <div className="bg-white rounded-2xl sm:rounded-3xl p-4 shadow-sm border border-slate-100 flex flex-col justify-between hover:border-emerald-200 transition-all">
             <div className="flex justify-between items-start mb-2">
-              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Hadir</span>
+              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Hadir Hari Ini</span>
               <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100">
                 <span className="material-symbols-outlined text-[18px]">check_circle</span>
               </div>
@@ -134,10 +143,10 @@ export default function MentorDashboard() {
             </div>
           </div>
 
-          {/* Stat 3: Alpha */}
+          {/* Stat 3: Belum Hadir */}
           <div className="bg-white rounded-2xl sm:rounded-3xl p-4 shadow-sm border border-slate-100 flex flex-col justify-between hover:border-rose-200 transition-all">
             <div className="flex justify-between items-start mb-2">
-              <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Alpha</span>
+              <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Belum Hadir</span>
               <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100">
                 <span className="material-symbols-outlined text-[18px]">cancel</span>
               </div>
@@ -212,12 +221,61 @@ export default function MentorDashboard() {
           </button>
         </div>
 
-        {/* Quick Preview: Anggota Gugus & Ringkasan */}
+        {/* Scan Terbaru Hari Ini Section */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 overflow-hidden p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-body-md sm:text-headline-sm font-bold text-[#012060]">Scan Terbaru Hari Ini</h3>
+              <p className="text-[11px] text-slate-500">Log pemindaian QR khusus hari ini untuk {mentorGugusName}</p>
+            </div>
+
+            <button 
+              onClick={() => navigate('/mentor/riwayat')}
+              className="text-[11px] sm:text-body-sm font-bold text-[#012060] hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <span>Lihat Riwayat Lengkap</span>
+              <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
+            </button>
+          </div>
+
+          {recentScansToday.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {recentScansToday.map((log) => {
+                const isValid = log.status === 'Valid';
+                return (
+                  <div 
+                    key={log.id}
+                    className="p-3 bg-[#f8fafc] rounded-2xl border border-slate-100 flex items-center justify-between hover:bg-slate-100/80 transition-colors"
+                  >
+                    <div className="overflow-hidden min-w-0 pr-2">
+                      <p className="text-body-sm font-bold text-slate-800 truncate">{log.name}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">NIM: {log.nim} • {log.timestamp}</p>
+                    </div>
+
+                    <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold shrink-0 border ${
+                      isValid 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                        : 'bg-rose-50 text-rose-700 border-rose-200'
+                    }`}>
+                      {log.status}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-slate-400 text-body-sm bg-slate-50/50 rounded-2xl border border-slate-100">
+              Belum ada log pemindaian untuk hari ini.
+            </div>
+          )}
+        </div>
+
+        {/* Quick Preview: Anggota Gugus */}
         <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 overflow-hidden p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-body-md sm:text-headline-sm font-bold text-[#012060]">Anggota {mentorGugusName}</h3>
-              <p className="text-[11px] text-slate-500">Ringkasan status mahasiswa di bawah bimbingan Anda</p>
+              <p className="text-[11px] text-slate-500">Ringkasan daftar mahasiswa di bawah bimbingan Anda</p>
             </div>
 
             <button 

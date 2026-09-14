@@ -265,7 +265,7 @@ export default function AdminPeserta() {
     <div className="w-full">
       <header className="fixed top-0 left-0 lg:left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between pl-16 pr-4 sm:px-6 lg:px-8 shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
         <div className="flex items-center gap-4">
-          <h1 className="text-headline-sm font-headline-md text-on-surface">Peserta</h1>
+          <h1 className="text-headline-sm font-headline-md text-on-surface">Data Peserta</h1>
         </div>
         <div className="flex items-center gap-6">
           <div className="relative group">
@@ -326,46 +326,76 @@ export default function AdminPeserta() {
           </div>
 
           <div className="bg-surface-container rounded-xl shadow-sm overflow-hidden flex flex-col w-full relative z-10">
-            <div className="p-6 pb-4 border-b border-surface-variant flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <h2 className="text-headline-sm font-headline-sm text-on-surface">Direktori Peserta</h2>
-                {selectedIds.length > 0 && (
-                  <button onClick={handleDeleteSelected} className="bg-error/10 hover:bg-error/20 text-error text-label-sm font-label-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined text-[16px]">delete</span>
-                    Hapus Terpilih ({selectedIds.length})
+            {/* Header & Filter Toolbar */}
+            <div className="p-4 sm:p-6 border-b border-surface-variant flex flex-col gap-4 bg-white">
+              {/* Top Row: Title + Action Buttons */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-primary text-[24px]">groups</span>
+                  <h2 className="text-headline-sm font-bold text-on-surface">Data Peserta</h2>
+                  {selectedIds.length > 0 && (
+                    <button onClick={handleDeleteSelected} className="bg-error/10 hover:bg-error/20 text-error text-label-sm font-label-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer border border-error/20">
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                      Hapus Terpilih ({selectedIds.length})
+                    </button>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-2.5">
+                  <button onClick={handleImportSimulate} className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-body-sm font-bold transition-all shadow-xs cursor-pointer active:scale-98">
+                    <span className="material-symbols-outlined text-[18px]">upload_file</span>
+                    <span>Import Excel</span>
                   </button>
-                )}
+
+                  <button onClick={handleOpenAddModal} className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 bg-primary text-on-primary hover:bg-primary/90 rounded-xl text-body-sm font-bold transition-all shadow-md active:scale-98 cursor-pointer">
+                    <span className="material-symbols-outlined text-[18px]">add</span>
+                    <span>Tambah Peserta</span>
+                  </button>
+                </div>
               </div>
-              
-              <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-                <button onClick={handleImportSimulate} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-label-sm font-label-sm font-semibold transition-colors cursor-pointer shadow-xs">
-                  <span className="material-symbols-outlined text-[18px]">upload_file</span>
-                  Import Excel
-                </button>
 
-                <button onClick={handleOpenAddModal} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-primary text-on-primary hover:bg-primary/90 rounded-lg text-label-sm font-label-sm font-semibold transition-colors cursor-pointer shadow-xs">
-                  <span className="material-symbols-outlined text-[18px]">add</span>
-                  Tambah Peserta
-                </button>
-
-                <div className="relative">
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
-                  <input className="w-full sm:w-56 pl-10 pr-4 py-2 bg-surface rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-on-surface-variant border border-outline-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors" placeholder="Cari Nama atau NIM..." type="text" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
+              {/* Bottom Row: Search & Filters Bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 pt-1">
+                {/* Search Input */}
+                <div className="sm:col-span-5 relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+                  <input 
+                    className="w-full pl-9 pr-8 py-2 bg-[#f8fafc] rounded-xl text-body-sm font-medium text-on-surface placeholder:text-on-surface-variant/60 border border-outline-variant focus:border-primary focus:outline-none transition-colors" 
+                    placeholder="Cari Nama atau NIM..." 
+                    type="text" 
+                    value={searchTerm} 
+                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} 
+                  />
+                  {searchTerm && (
+                    <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface p-0.5 cursor-pointer">
+                      <span className="material-symbols-outlined text-[15px]">close</span>
+                    </button>
+                  )}
                 </div>
 
-                <div className="relative">
-                  <select className="w-full sm:w-40 appearance-none pl-4 pr-10 py-2 bg-surface rounded-lg text-body-sm font-body-sm text-on-surface border border-outline-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors cursor-pointer" value={selectedGugus} onChange={(e) => { setSelectedGugus(e.target.value); setCurrentPage(1); }}>
+                {/* Gugus Filter */}
+                <div className="sm:col-span-3 relative">
+                  <select 
+                    className="w-full appearance-none pl-3.5 pr-8 py-2 bg-[#f8fafc] rounded-xl text-body-sm font-medium text-on-surface border border-outline-variant focus:border-primary focus:outline-none transition-colors cursor-pointer" 
+                    value={selectedGugus} 
+                    onChange={(e) => { setSelectedGugus(e.target.value); setCurrentPage(1); }}
+                  >
                     <option value="">Semua Gugus</option>
                     <option value="unassigned">Belum Masuk Gugus</option>
                     {gugus.map(g => (
                       <option key={g.id} value={g.id}>{g.name}</option>
                     ))}
                   </select>
-                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[20px]">expand_more</span>
+                  <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
                 </div>
 
-                <div className="relative">
-                  <select className="w-full sm:w-44 appearance-none pl-4 pr-10 py-2 bg-surface rounded-lg text-body-sm font-body-sm text-on-surface border border-outline-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors cursor-pointer" value={selectedStatus} onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}>
+                {/* Status Filter */}
+                <div className="sm:col-span-3 relative">
+                  <select 
+                    className="w-full appearance-none pl-3.5 pr-8 py-2 bg-[#f8fafc] rounded-xl text-body-sm font-medium text-on-surface border border-outline-variant focus:border-primary focus:outline-none transition-colors cursor-pointer" 
+                    value={selectedStatus} 
+                    onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
+                  >
                     <option value="">Semua Status</option>
                     <option value="Belum Hadir">⚪ Belum Hadir</option>
                     <option value="Hadir Penuh">✅ Hadir Penuh</option>
@@ -375,77 +405,91 @@ export default function AdminPeserta() {
                     <option value="Manual (Ditolak)">❌ Ditolak</option>
                     <option value="Alpha">🚫 Alpha</option>
                   </select>
-                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[20px]">expand_more</span>
+                  <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
                 </div>
 
+                {/* Reset Filter Button */}
                 {(searchTerm || selectedGugus || selectedStatus) && (
-                  <button className="bg-error/10 border border-error/20 text-error px-3 py-2 rounded-lg hover:bg-error/20 transition-colors flex items-center gap-1.5 text-label-sm font-label-sm cursor-pointer" title="Reset Semua Filter" onClick={() => { setSearchTerm(''); setSelectedGugus(''); setSelectedStatus(''); setCurrentPage(1); }}>
-                    <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
-                    Reset
-                  </button>
+                  <div className="sm:col-span-1">
+                    <button 
+                      className="w-full h-full bg-error/10 border border-error/20 text-error p-2 rounded-xl hover:bg-error/20 transition-colors flex items-center justify-center text-label-sm font-bold cursor-pointer" 
+                      title="Reset Semua Filter" 
+                      onClick={() => { setSearchTerm(''); setSelectedGugus(''); setSelectedStatus(''); setCurrentPage(1); }}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Desktop View: Table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            {/* Desktop View: Table (Strict 100% width, table-fixed, zero horizontal scrollbar) */}
+            <div className="hidden md:block w-full overflow-hidden">
+              <table className="w-full text-left border-collapse table-fixed">
+                <colgroup>
+                  <col className="w-[4%]" />
+                  <col className="w-[30%]" />
+                  <col className="w-[17%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[15%]" />
+                </colgroup>
                 <thead>
                   <tr className="bg-surface/50 border-b border-surface-variant">
-                    <th className="py-4 px-6 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold w-12">
+                    <th className="py-3.5 px-3 text-center">
                       <input className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary accent-primary cursor-pointer" type="checkbox" checked={currentItems.length > 0 && currentItems.every(p => selectedIds.includes(p.id))} onChange={handleSelectAll} />
                     </th>
-                    <th className="py-4 px-6 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Nama</th>
-                    <th className="py-4 px-6 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold">NIM</th>
-                    <th className="py-4 px-6 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Gugus</th>
-                    <th className="py-4 px-6 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Status</th>
-                    <th className="py-4 px-6 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold text-right">Aksi</th>
+                    <th className="py-3.5 px-3 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold truncate">Nama</th>
+                    <th className="py-3.5 px-3 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold truncate">NIM</th>
+                    <th className="py-3.5 px-3 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold truncate">Gugus</th>
+                    <th className="py-3.5 px-3 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold truncate">Status</th>
+                    <th className="py-3.5 px-4 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold text-right truncate">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-surface-variant">
+                <tbody className="divide-y divide-surface-variant bg-white">
                   {currentItems.length > 0 ? (
                     currentItems.map((student) => (
-                      <tr key={student.id} className="hover:bg-surface-variant/30 transition-colors group">
-                        <td className="py-4 px-6">
+                      <tr key={student.id} className="hover:bg-surface-variant/30 transition-colors group cursor-pointer" onClick={() => navigate(`/admin/peserta/${student.id}`)}>
+                        <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                           <input className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary accent-primary cursor-pointer" type="checkbox" checked={selectedIds.includes(student.id)} onChange={(e) => handleSelectOne(student.id, e.target.checked)} />
                         </td>
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-secondary-container/50 text-secondary font-headline-sm flex items-center justify-center border border-secondary/10 shrink-0 font-bold">
+                        <td className="py-3 px-3 truncate">
+                          <div className="flex items-center gap-2.5 min-w-0 truncate">
+                            <div className="w-9 h-9 rounded-full bg-secondary-container/50 text-secondary font-headline-sm flex items-center justify-center border border-secondary/10 shrink-0 font-bold text-body-sm">
                               {student.name.substring(0, 2).toUpperCase()}
                             </div>
-                            <div className="min-w-0">
-                              <p className="text-body-md font-body-md text-on-surface font-medium truncate group-hover:text-primary transition-colors">{student.name}</p>
-                              <p className="text-label-sm font-label-sm text-on-surface-variant truncate">{student.fakultas}</p>
+                            <div className="min-w-0 truncate">
+                              <p className="text-body-sm font-semibold text-on-surface truncate group-hover:text-primary transition-colors" title={student.name}>{student.name}</p>
+                              <p className="text-[11px] text-on-surface-variant truncate">{student.fakultas}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-6">
-                          <span className="text-body-sm font-body-sm text-on-surface font-mono bg-surface px-2 py-1 rounded-md border border-outline-variant/30">{student.id}</span>
+                        <td className="py-3 px-3 truncate">
+                          <span className="text-body-sm font-bold text-on-surface font-mono bg-surface px-2 py-0.5 rounded-md border border-outline-variant/30">{student.id}</span>
                         </td>
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-secondary"></span>
-                            <span className="text-body-sm font-body-sm text-on-surface">{getGugusName(student.gugusId)}</span>
-                          </div>
+                        <td className="py-3 px-3 truncate">
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-surface text-on-surface font-medium text-body-sm border border-outline-variant/30 max-w-full truncate" title={getGugusName(student.gugusId)}>
+                            <span className="w-2 h-2 rounded-full bg-secondary shrink-0"></span>
+                            <span className="truncate">{getGugusName(student.gugusId)}</span>
+                          </span>
                         </td>
-                        <td className="py-4 px-6">
+                        <td className="py-3 px-3 truncate">
                           {(() => { const b = getStatusBadge(student.status); return (
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label-sm font-medium ${b.bg} ${b.text}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span>
-                              {b.label}
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-label-sm font-bold max-w-full truncate ${b.bg} ${b.text}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${b.dot}`}></span>
+                              <span className="truncate">{b.label}</span>
                             </span>
                           ); })()}
                         </td>
-                        <td className="py-4 px-6 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => navigate(`/admin/peserta/${student.id}`)} className="p-1.5 text-on-surface-variant hover:text-primary hover:bg-primary/5 rounded-md transition-colors cursor-pointer" title="Lihat Detail">
+                        <td className="py-3 px-4 text-right truncate" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => navigate(`/admin/peserta/${student.id}`)} className="p-1.5 text-on-surface-variant hover:text-primary hover:bg-primary/5 rounded-lg transition-colors cursor-pointer" title="Lihat Detail">
                               <span className="material-symbols-outlined text-[18px]">visibility</span>
                             </button>
-                            <button onClick={() => handleOpenEditModal(student)} className="p-1.5 text-on-surface-variant hover:text-secondary hover:bg-secondary/5 rounded-md transition-colors cursor-pointer" title="Edit">
+                            <button onClick={() => handleOpenEditModal(student)} className="p-1.5 text-on-surface-variant hover:text-secondary hover:bg-secondary/5 rounded-lg transition-colors cursor-pointer" title="Edit">
                               <span className="material-symbols-outlined text-[18px]">edit</span>
                             </button>
-                            <button onClick={() => handleDeleteOne(student.id)} className="p-1.5 text-on-surface-variant hover:text-error hover:bg-error/5 rounded-md transition-colors cursor-pointer" title="Hapus">
+                            <button onClick={() => handleDeleteOne(student.id)} className="p-1.5 text-on-surface-variant hover:text-error hover:bg-error/5 rounded-lg transition-colors cursor-pointer" title="Hapus">
                               <span className="material-symbols-outlined text-[18px]">delete</span>
                             </button>
                           </div>

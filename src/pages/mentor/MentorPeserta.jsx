@@ -1,10 +1,11 @@
 import { useContext, useState, useCallback } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { isHadir, getStatusBadge, STATUS_OPTIONS } from '../../utils/statusHelper';
+import { isHadir } from '../../utils/statusHelper';
+import { toISOKey, getTodayISOKey, formatDDMMYYYY, formatIndonesianDate } from '../../utils/dateHelper';
 
 export default function MentorPeserta() {
-  const { peserta, gugus, addPeserta, updatePeserta, currentUser, hasMentorNotifications } = useContext(AppContext);
+  const { peserta, gugus, logs, addPeserta, updatePeserta, currentUser, hasMentorNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
   // Get gugus ID from the currently logged-in mentor
@@ -15,9 +16,10 @@ export default function MentorPeserta() {
     ? 'Gugus'
     : (rawGugusName.startsWith('Gugus') ? rawGugusName : `Gugus ${rawGugusName}`);
 
-  // Search & Filter states
+  // Search, Filter & Date states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedDate, setSelectedDate] = useState(getTodayISOKey());
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -38,18 +40,52 @@ export default function MentorPeserta() {
 
   // Filter students belonging to mentor's group
   const mentorStudents = peserta.filter(p => p.gugusId === mentorGugusId);
-  const hadirCount = mentorStudents.filter(p => isHadir(p.status)).length;
-  const alphaCount = mentorStudents.length - hadirCount;
 
+  // Calculate attendance status for each student based on selectedDate
+  const targetDateKey = toISOKey(selectedDate);
+  
+  const getStudentDailyStatus = useCallback((student) => {
+    // Check if student has a valid scan log on selectedDate
+    const hasValidLogOnDate = logs.some(l => 
+      String(l.nim) === String(student.id) && 
+      l.status === 'Valid' && 
+      toISOKey(l.date) === targetDateKey
+    );
+
+    if (hasValidLogOnDate) {
+      return { label: 'Hadir', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', isPresent: true };
+    }
+
+    if (student.status === 'Izin') {
+      return { label: 'Izin', bg: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500', isPresent: false };
+    }
+
+    if (student.status === 'Manual (Pending)') {
+      return { label: 'Pending', bg: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500', isPresent: false };
+    }
+
+    return { label: 'Belum Hadir', bg: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500', isPresent: false };
+  }, [logs, targetDateKey]);
+
+  // Calculate counts for selectedDate
+  let hadirCount = 0;
+  mentorStudents.forEach(student => {
+    const statusObj = getStudentDailyStatus(student);
+    if (statusObj.isPresent) hadirCount++;
+  });
+  const belumCount = mentorStudents.length - hadirCount;
+
+  // Filtered students for current search, date & tab
   const filteredStudents = mentorStudents.filter(student => {
     const term = searchTerm.toLowerCase();
     const matchesSearch = student.name.toLowerCase().includes(term) || student.id.includes(term);
     
+    const dailyStatus = getStudentDailyStatus(student);
     let matchesStatus = true;
     if (statusFilter === 'hadir') {
-      matchesStatus = isHadir(student.status);
+      matchesStatus = dailyStatus.isPresent;
     } else if (statusFilter === 'belum') {
-      matchesStatus = !isHadir(student.status);
+      matchesStatus = !dailyStatus.isPresent;
     }
 
     return matchesSearch && matchesStatus;
@@ -170,7 +206,7 @@ export default function MentorPeserta() {
 
   return (
     <div className="w-full bg-[#f8fafc] min-h-screen pb-16">
-      {/* Header - Fixed to top, padded for mobile hamburger menu */}
+      {/* Header */}
       <header className="fixed top-0 left-0 lg:left-[280px] right-0 h-16 bg-white/90 backdrop-blur-md z-40 flex items-center justify-between pl-16 pr-4 sm:px-6 lg:px-8 shadow-[0_1px_8px_rgba(0,0,0,0.03)] border-b border-slate-100">
         <div className="flex items-center gap-2.5 overflow-hidden">
           <span className="material-symbols-outlined text-[#012060] text-[22px] sm:text-[24px] shrink-0">groups</span>
@@ -206,7 +242,7 @@ export default function MentorPeserta() {
             </div>
             <h2 className="text-body-lg sm:text-headline-md font-bold text-[#012060]">Daftar Anggota Gugus</h2>
             <p className="text-[11px] sm:text-body-sm text-slate-500 mt-0.5">
-              Kelola data presensi mahasiswa bimbingan Anda, unduh QR Code, atau ajukan penambahan peserta.
+              Kelola data presensi mahasiswa bimbingan Anda per harinya, unduh QR Code, atau ajukan penambahan peserta.
             </p>
           </div>
 
@@ -233,26 +269,39 @@ export default function MentorPeserta() {
         {/* Main Section */}
         <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col w-full relative z-10">
           
-          {/* Toolbar (Search & Filter Tabs) */}
-          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-[#f8fafc]/40">
-            <div className="relative w-full sm:w-80">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
-              <input 
-                className="w-full bg-white border border-slate-200 text-slate-800 text-body-sm font-semibold py-2.5 pl-9 pr-8 rounded-xl shadow-2xs focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all placeholder:text-slate-400" 
-                placeholder="Cari Nama atau NIM..." 
-                type="text" 
-                value={searchTerm} 
-                onChange={(e) => setSearchTerm(e.target.value)} 
-              />
-              {searchTerm && (
-                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer">
-                  <span className="material-symbols-outlined text-[15px]">close</span>
-                </button>
-              )}
+          {/* Toolbar (Search, Date Selector & Status Filter Tabs) */}
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 bg-[#f8fafc]/40">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1">
+              {/* Search */}
+              <div className="relative flex-1 sm:max-w-xs">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+                <input 
+                  className="w-full bg-white border border-slate-200 text-slate-800 text-body-sm font-semibold py-2 pl-9 pr-8 rounded-xl focus:outline-none focus:border-primary transition-all placeholder:text-slate-400" 
+                  placeholder="Cari Nama atau NIM..." 
+                  type="text" 
+                  value={searchTerm} 
+                  onChange={(e) => setSearchTerm(e.target.value)} 
+                />
+                {searchTerm && (
+                  <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer">
+                    <span className="material-symbols-outlined text-[15px]">close</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Date Filter */}
+              <div className="relative flex items-center">
+                <input 
+                  type="date" 
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full sm:w-auto bg-white text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 px-3 rounded-xl focus:outline-none focus:border-primary transition-all cursor-pointer"
+                />
+              </div>
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+            <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto shrink-0">
               <button 
                 onClick={() => setStatusFilter('all')}
                 className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-[11px] sm:text-body-sm font-bold transition-all cursor-pointer ${
@@ -283,35 +332,38 @@ export default function MentorPeserta() {
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                Belum ({alphaCount})
+                Belum Hadir ({belumCount})
               </button>
             </div>
           </div>
 
-          {/* MOBILE VIEW GRID (2 Kolom pada Layar Mobile < md) */}
+          {/* Active Date Sub-Header */}
+          <div className="px-5 py-2.5 bg-[#012060]/[0.02] border-b border-slate-100 flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[15px] text-primary">calendar_today</span>
+              <span>Status Presensi Tanggal: <strong className="text-[#012060]">{formatIndonesianDate(selectedDate)}</strong> ({formatDDMMYYYY(selectedDate)})</span>
+            </span>
+          </div>
+
+          {/* MOBILE VIEW GRID */}
           <div className="block md:hidden p-3 bg-slate-50/50 border-b border-slate-100">
             {filteredStudents.length > 0 ? (
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 {filteredStudents.map((student) => {
-                  const b = getStatusBadge(student.status);
-                  const isStudentHadir = isHadir(student.status);
+                  const dailyStatus = getStudentDailyStatus(student);
 
                   return (
                     <div 
                       key={student.id} 
                       className={`bg-white rounded-2xl p-3 shadow-xs border flex flex-col justify-between gap-2.5 hover:shadow-md transition-all relative overflow-hidden group ${
-                        isStudentHadir ? 'border-l-4 border-l-emerald-500 border-slate-200/80' : 'border-l-4 border-l-rose-500 border-slate-200/80'
+                        dailyStatus.isPresent ? 'border-l-4 border-l-emerald-500 border-slate-200/80' : 'border-l-4 border-l-rose-500 border-slate-200/80'
                       }`}
                     >
-                      {/* Top Bar: Status Badge */}
+                      {/* Status Badge */}
                       <div className="flex items-center justify-end">
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold shrink-0 border flex items-center gap-1 ${
-                          isStudentHadir 
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${isStudentHadir ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                          <span>{b.label}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold shrink-0 border flex items-center gap-1 ${dailyStatus.bg}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${dailyStatus.dot} ${dailyStatus.isPresent ? 'animate-pulse' : ''}`}></span>
+                          <span>{dailyStatus.label}</span>
                         </span>
                       </div>
 
@@ -367,7 +419,7 @@ export default function MentorPeserta() {
             )}
           </div>
 
-          {/* DESKTOP TABLE VIEW (Visible on screen >= md) */}
+          {/* DESKTOP TABLE VIEW */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[850px]">
               <thead>
@@ -382,7 +434,8 @@ export default function MentorPeserta() {
               <tbody className="bg-white divide-y divide-slate-100">
                 {filteredStudents.length > 0 ? (
                   filteredStudents.map((student) => {
-                    const b = getStatusBadge(student.status);
+                    const dailyStatus = getStudentDailyStatus(student);
+
                     return (
                       <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
                         <td className="py-4 px-6">
@@ -401,9 +454,9 @@ export default function MentorPeserta() {
                         </td>
 
                         <td className="py-4 px-6">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-label-sm font-bold ${b.bg} ${b.text}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span>
-                            {b.label}
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-label-sm font-bold ${dailyStatus.bg}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${dailyStatus.dot} ${dailyStatus.isPresent ? 'animate-pulse' : ''}`}></span>
+                            {dailyStatus.label}
                           </span>
                         </td>
 
@@ -441,7 +494,7 @@ export default function MentorPeserta() {
           {/* Footer Bar */}
           <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-[#f8fafc]/50">
             <span className="text-[11px] sm:text-body-sm font-medium text-slate-500">
-              Menampilkan {filteredStudents.length} dari {mentorStudents.length} mahasiswa gugus
+              Menampilkan {filteredStudents.length} dari {mentorStudents.length} mahasiswa gugus untuk tanggal {formatDDMMYYYY(selectedDate)}
             </span>
           </div>
 
@@ -573,20 +626,6 @@ export default function MentorPeserta() {
                   <div className="relative">
                     <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="text" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
                     <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">school</span>
-                  </div>
-                </div>
-
-                {/* Status Kehadiran */}
-                <div>
-                  <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Status Kehadiran</label>
-                  <div className="relative">
-                    <select className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 cursor-pointer text-body-sm appearance-none pl-9 pr-8 transition-all" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
-                      {STATUS_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">fact_check</span>
-                    <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[16px] sm:text-[18px]">expand_more</span>
                   </div>
                 </div>
               </div>

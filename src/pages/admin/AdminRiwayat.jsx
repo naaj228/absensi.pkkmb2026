@@ -3,6 +3,7 @@ import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { isHadir } from '../../utils/statusHelper';
+import { groupLogsByDate, formatDDMMYYYY } from '../../utils/dateHelper';
 
 export default function AdminRiwayat() {
   const { logs, gugus, peserta, deleteLog, hasAdminNotifications } = useContext(AppContext);
@@ -14,18 +15,32 @@ export default function AdminRiwayat() {
   const [selectedDate, setSelectedDate] = useState(''); // Default empty to show all history
   const [activeTab, setActiveTab] = useState('Semua');
 
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 25;
+  // Accordion collapse state for date groups
+  const [openDates, setOpenDates] = useState({});
+
+  const toggleDateOpen = (isoDate) => {
+    setOpenDates(prev => ({
+      ...prev,
+      [isoDate]: prev[isoDate] !== undefined ? !prev[isoDate] : false
+    }));
+  };
+
+  const isDateOpen = (isoDate, index) => {
+    if (openDates[isoDate] !== undefined) {
+      return openDates[isoDate];
+    }
+    return index === 0; // Default: only latest date is open
+  };
 
   // Selection states
   const [selectedIds, setSelectedIds] = useState([]);
 
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedIds(currentItems.map(log => log.id));
+  const handleSelectGroupLogs = (groupLogs, checked) => {
+    const groupIds = groupLogs.map(log => log.id);
+    if (checked) {
+      setSelectedIds(prev => Array.from(new Set([...prev, ...groupIds])));
     } else {
-      setSelectedIds([]);
+      setSelectedIds(prev => prev.filter(id => !groupIds.includes(id)));
     }
   };
 
@@ -60,7 +75,7 @@ export default function AdminRiwayat() {
     const term = searchTerm.toLowerCase();
     const matchesSearch = log.name.toLowerCase().includes(term) || 
                           log.nim.includes(term) || 
-                          log.scanner.toLowerCase().includes(term);
+                          (log.scanner && log.scanner.toLowerCase().includes(term));
     
     let matchesGugus = true;
     if (selectedGugus !== 'all') {
@@ -79,14 +94,8 @@ export default function AdminRiwayat() {
     return matchesSearch && matchesGugus && matchesDate && matchesTab;
   });
 
-  const formatDDMMYYYY = (dateStr) => {
-    if (!dateStr) return '-';
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
-    return dateStr;
-  };
+  // Grouped logs for web view (newest day first)
+  const dateGroupsWeb = groupLogsByDate(filteredLogs, true);
 
   const handleExport = (type) => {
     if (filteredLogs.length === 0) {
@@ -94,95 +103,126 @@ export default function AdminRiwayat() {
       return;
     }
 
+    // Export chronological: oldest day first (Hari 1 -> Hari 2 -> Hari 3)
+    const dateGroupsAsc = groupLogsByDate(filteredLogs, false);
+    const flatLogsChronological = dateGroupsAsc.flatMap(group => group.logs);
+
     if (type === 'Excel') {
-      const data = filteredLogs.map(log => {
-        const studentInfo = peserta.find(p => p.id === log.nim);
-        const jurusan = studentInfo ? studentInfo.fakultas : '-';
-        const formattedDate = formatDDMMYYYY(log.date);
-        return {
-          'Timestamp': `${formattedDate} ${log.timestamp}`,
-          'NIM': log.nim,
-          'Nama Lengkap': log.name,
-          'Gugus': log.gugusName,
-          'Fakultas / Jurusan': jurusan,
-          'Pemindai (Mentor)': log.scanner,
-          'Status': log.status
-        };
+      // Option B for Admin: Multi-sheet Excel export (1 sheet per date) with Tanggal & Waktu columns
+      const workbook = XLSX.utils.book_new();
+
+      dateGroupsAsc.forEach(group => {
+        const sheetData = group.logs.map(log => {
+          const studentInfo = peserta.find(p => p.id === log.nim);
+          const jurusan = studentInfo ? studentInfo.fakultas : '-';
+          return {
+            'Tanggal': formatDDMMYYYY(log.date),
+            'Waktu': log.timestamp,
+            'NIM': log.nim,
+            'Nama Lengkap': log.name,
+            'Gugus': log.gugusName,
+            'Fakultas / Jurusan': jurusan,
+            'Pemindai (Mentor)': log.scanner,
+            'Status': log.status,
+            'Lokasi Scan': log.locationStatus || (log.scanner?.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi')
+          };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(sheetData);
+
+        worksheet['!cols'] = [
+          { wch: 14 },
+          { wch: 12 },
+          { wch: 15 },
+          { wch: 30 },
+          { wch: 15 },
+          { wch: 25 },
+          { wch: 20 },
+          { wch: 12 },
+          { wch: 20 }
+        ];
+
+        let sheetName = group.displayDateFormatted.replace(/[:\\/?*\[\]]/g, '');
+        if (sheetName.length > 31) sheetName = sheetName.substring(0, 31);
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName || "Absensi");
       });
 
-      const worksheet = XLSX.utils.json_to_sheet(data);
-
-      worksheet['!cols'] = [
-        { wch: 22 },
-        { wch: 15 },
-        { wch: 30 },
-        { wch: 15 },
-        { wch: 25 },
-        { wch: 20 },
-        { wch: 12 }
-      ];
-
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Absensi");
       XLSX.writeFile(workbook, `Laporan_Absensi_PKKMB_2026_${selectedDate || 'Semua_Hari'}.xlsx`);
     } 
     else if (type === 'PDF') {
+      // Single continuous table format sorted chronologically with Tanggal & Waktu columns
+      const rowsHtml = flatLogsChronological.map((log, idx) => {
+        const location = log.latitude && log.longitude 
+          ? (log.locationStatus || 'Dalam Area')
+          : (log.scanner?.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi');
+
+        return `
+          <tr>
+            <td style="text-align: center; width: 35px;">${idx + 1}</td>
+            <td style="width: 80px; font-family: monospace;">${formatDDMMYYYY(log.date)}</td>
+            <td style="width: 70px; font-family: monospace;">${log.timestamp}</td>
+            <td style="width: 95px; font-family: monospace;">${log.nim}</td>
+            <td><strong>${log.name}</strong></td>
+            <td style="width: 90px;">${log.gugusName}</td>
+            <td style="width: 100px;">${log.scanner}</td>
+            <td style="text-align: center; width: 70px;">
+              <span class="badge ${log.status === 'Valid' ? 'valid' : 'invalid'}">
+                ${log.status}
+              </span>
+            </td>
+            <td style="width: 95px; font-size: 10px;">${location}</td>
+          </tr>
+        `;
+      }).join('');
+
       const html = `
         <html>
           <head>
             <title>Laporan Absensi PKKMB 2026</title>
             <style>
-              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 25px; color: #1f2937; }
-              h1 { font-size: 20px; color: #012060; margin: 0 0 5px 0; }
-              .meta { font-size: 13px; color: #4b5563; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 25px; color: #1f2937; line-height: 1.4; }
+              h1 { font-size: 20px; color: #012060; margin: 0 0 4px 0; }
+              .meta { font-size: 12px; color: #4b5563; margin-bottom: 20px; border-bottom: 2px solid #012060; padding-bottom: 10px; }
               table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-              th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; font-size: 12px; }
-              th { background-color: #f3f4f6; color: #374151; font-weight: 600; }
-              tr:nth-child(even) { background-color: #f9fafb; }
-              .badge { display: inline-block; padding: 2px 6px; border-radius: 9999px; font-size: 11px; font-weight: 500; }
+              th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; font-size: 11px; }
+              th { background-color: #f8fafc; color: #1e293b; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+              tr:nth-child(even) { background-color: #f8fafc; }
+              .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; text-align: center; }
               .valid { background: #d1fae5; color: #065f46; }
               .invalid { background: #fee2e2; color: #991b1b; }
-              .footer { margin-top: 30px; font-size: 11px; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+              .footer { margin-top: 30px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; }
             </style>
           </head>
           <body>
             <h1>Laporan Riwayat Kehadiran PKKMB 2026</h1>
             <div class="meta">
-              Gugus: ${selectedGugus === 'all' ? 'Semua Gugus' : selectedGugusName} | 
-              Tanggal: ${selectedDate ? formatDDMMYYYY(selectedDate) : 'Semua Tanggal'} | 
-              Kategori: ${activeTab} |
-              Total Log: ${filteredLogs.length}
+              Gugus: <strong>${selectedGugus === 'all' ? 'Semua Gugus' : selectedGugusName}</strong> &nbsp;|&nbsp; 
+              Filter Tanggal: <strong>${selectedDate ? formatDDMMYYYY(selectedDate) : 'Semua Hari'}</strong> &nbsp;|&nbsp;
+              Kategori: <strong>${activeTab}</strong> &nbsp;|&nbsp;
+              Dicetak: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} &nbsp;|&nbsp; 
+              Total Absensi: <strong>${flatLogsChronological.length} Data</strong>
             </div>
             <table>
               <thead>
                 <tr>
+                  <th style="text-align: center;">No</th>
                   <th>Tanggal</th>
                   <th>Waktu</th>
-                  <th>Nama Peserta</th>
                   <th>NIM</th>
+                  <th>Nama Mahasiswa</th>
                   <th>Gugus</th>
                   <th>Pemindai</th>
-                  <th>Status</th>
+                  <th style="text-align: center;">Status</th>
+                  <th>Lokasi Scan</th>
                 </tr>
               </thead>
               <tbody>
-                ${filteredLogs.map(log => `
-                  <tr>
-                    <td>${formatDDMMYYYY(log.date)}</td>
-                    <td>${log.timestamp}</td>
-                    <td><strong>${log.name}</strong></td>
-                    <td>${log.nim}</td>
-                    <td>${log.gugusName}</td>
-                    <td>${log.scanner}</td>
-                    <td>
-                      <span class="badge ${log.status === 'Valid' ? 'valid' : 'invalid'}">${log.status}</span>
-                    </td>
-                  </tr>
-                `).join('')}
+                ${rowsHtml}
               </tbody>
             </table>
             <div class="footer">
-              Dicetak pada: ${new Date().toLocaleString('id-ID')}
+              Dicetak otomatis oleh Sistem Absensi PKKMB 2026 (Admin Panel)
             </div>
           </body>
         </html>
@@ -214,13 +254,6 @@ export default function AdminRiwayat() {
     }
   };
 
-  // Pagination calculations
-  const totalItems = filteredLogs.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredLogs.slice(indexOfFirstItem, indexOfLastItem);
-
   // Sync quick stats with selected filters
   const filteredPesertaForStats = peserta.filter(p => {
     if (selectedGugus !== 'all') {
@@ -241,7 +274,7 @@ export default function AdminRiwayat() {
 
   return (
     <div className="w-full bg-[#f8fafc] min-h-screen pb-16">
-      {/* Header - Fixed to top, properly padded for mobile hamburger menu */}
+      {/* Header */}
       <header className="fixed top-0 left-0 lg:left-[280px] right-0 h-16 bg-white/90 backdrop-blur-md z-40 flex items-center justify-between pl-16 pr-4 sm:px-6 lg:px-8 shadow-[0_1px_8px_rgba(0,0,0,0.03)] border-b border-slate-100">
         <div className="flex items-center gap-2.5 overflow-hidden">
           <span className="material-symbols-outlined text-[#012060] text-[22px] sm:text-[24px] shrink-0">history</span>
@@ -264,7 +297,7 @@ export default function AdminRiwayat() {
       {/* Main Content */}
       <main className="relative pt-20 px-3 sm:px-4 lg:px-6 max-w-container-max mx-auto space-y-4 sm:space-y-6">
         
-        {/* Top Header Banner & Action Buttons */}
+        {/* Banner & Action Buttons */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
           <div>
             <h2 className="text-body-lg sm:text-headline-md font-bold text-[#012060]">Laporan Riwayat Kehadiran</h2>
@@ -295,7 +328,7 @@ export default function AdminRiwayat() {
         {/* Filters & Quick Metrics Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
           
-          {/* Filter Panel (8 cols on desktop) */}
+          {/* Filter Panel */}
           <div className="lg:col-span-8 bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col gap-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Search */}
@@ -308,7 +341,7 @@ export default function AdminRiwayat() {
                     placeholder="Nama atau NIM..." 
                     type="text" 
                     value={searchTerm} 
-                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
                   />
                   {searchTerm && (
                     <button 
@@ -328,7 +361,7 @@ export default function AdminRiwayat() {
                   <select 
                     className="w-full appearance-none bg-[#f8fafc] border border-slate-200 rounded-xl py-2.5 pl-3.5 pr-8 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer" 
                     value={selectedGugus} 
-                    onChange={(e) => { setSelectedGugus(e.target.value); setCurrentPage(1); }}
+                    onChange={(e) => setSelectedGugus(e.target.value)}
                   >
                     <option value="all">Semua Gugus</option>
                     {gugus.map(g => (
@@ -346,13 +379,13 @@ export default function AdminRiwayat() {
                   className="w-full appearance-none bg-[#f8fafc] border border-slate-200 rounded-xl py-2.5 px-3.5 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer" 
                   type="date" 
                   value={selectedDate} 
-                  onChange={(e) => { setSelectedDate(e.target.value); setCurrentPage(1); }} 
+                  onChange={(e) => setSelectedDate(e.target.value)} 
                 />
               </div>
             </div>
           </div>
 
-          {/* Quick Metrics Cards (4 cols on desktop) */}
+          {/* Quick Metrics Cards */}
           <div className="lg:col-span-4 grid grid-cols-2 gap-3">
             <div className="bg-white rounded-2xl sm:rounded-3xl p-4 shadow-sm border border-slate-100 flex flex-col justify-between">
               <div className="flex justify-between items-start mb-2">
@@ -383,325 +416,329 @@ export default function AdminRiwayat() {
 
         </div>
 
-        {/* Main Log Section */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col w-full relative z-10">
-          
-          {/* Log Table Toolbar & Status Tabs */}
-          <div className="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-[#f8fafc]/40">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#012060] text-[20px]">list_alt</span>
-                <h3 className="text-body-md sm:text-headline-sm font-bold text-[#012060]">Data Kehadiran ({filteredLogs.length})</h3>
-              </div>
-              
-              {selectedIds.length > 0 && (
-                <button 
-                  onClick={handleDeleteSelected} 
-                  className="bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer border border-rose-200/60"
-                >
-                  <span className="material-symbols-outlined text-[15px]">delete</span>
-                  <span>Hapus Terpilih ({selectedIds.length})</span>
-                </button>
-              )}
+        {/* Global Toolbar Bar: Bulk Selection & Status Tabs */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 shadow-sm border border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#012060] text-[20px]">list_alt</span>
+              <h3 className="text-body-md sm:text-headline-sm font-bold text-[#012060]">Total Absensi ({filteredLogs.length})</h3>
             </div>
-
-            {/* Status Filter Tabs (Visible on mobile & desktop) */}
-            <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
-              {['Semua', 'Valid', 'Invalid'].map((tab) => (
-                <button 
-                  key={tab}
-                  onClick={() => { setActiveTab(tab); setCurrentPage(1); }} 
-                  className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-[11px] sm:text-body-sm font-bold transition-all cursor-pointer ${
-                    activeTab === tab 
-                      ? 'bg-white shadow-xs text-[#012060]' 
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* MOBILE VIEW GRID (2 Kolom pada Layar Mobile < md) */}
-          <div className="block md:hidden p-3 bg-slate-50/50 border-b border-slate-100">
-            {currentItems.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                {currentItems.map((log) => {
-                  const isValid = log.status === 'Valid';
-
-                  return (
-                    <div 
-                      key={log.id} 
-                      onClick={() => navigate(`/admin/peserta/${log.nim}`)}
-                      className={`bg-white rounded-2xl p-3 shadow-xs border flex flex-col justify-between gap-2.5 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 relative overflow-hidden group cursor-pointer active:scale-[0.98] ${
-                        isValid 
-                          ? 'border-slate-200/80 border-l-4 border-l-emerald-500 hover:border-[#012060]/30' 
-                          : 'border-slate-200/80 border-l-4 border-l-rose-500 hover:border-rose-300'
-                      }`}
-                    >
-                      {/* Top Bar: Checkbox + Status Badge */}
-                      <div className="flex items-center justify-between gap-1">
-                        <div onClick={(e) => e.stopPropagation()} className="flex items-center">
-                          <input 
-                            type="checkbox" 
-                            className="w-4 h-4 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer shrink-0"
-                            checked={selectedIds.includes(log.id)}
-                            onChange={(e) => handleSelectOne(log.id, e.target.checked)} 
-                          />
-                        </div>
-
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold shrink-0 border flex items-center gap-1 ${
-                          isValid 
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80' 
-                            : 'bg-rose-50 text-rose-700 border-rose-200/80'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${isValid ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                          <span>{isValid ? 'Valid' : 'Kendala'}</span>
-                        </span>
-                      </div>
-
-                      {/* Highlighted Info: Name & NIM Badge */}
-                      <div className="overflow-hidden">
-                        <h4 className={`text-body-sm font-bold text-slate-800 line-clamp-1 leading-snug group-hover:text-[#012060] transition-colors ${isValid ? '' : 'italic text-slate-600'}`} title={log.name}>
-                          {log.name}
-                        </h4>
-                        <div className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-[#012060]/5 border border-[#012060]/10">
-                          <span className="text-[8px] font-extrabold uppercase text-slate-400">NIM</span>
-                          <span className="text-[10px] font-bold text-[#012060] font-mono tracking-tight">{log.nim}</span>
-                        </div>
-                      </div>
-
-                      {/* Log Timestamp & Scanner */}
-                      <div className="text-[10px] space-y-1 text-slate-500 border-t border-slate-100 pt-2 font-medium">
-                        <div className="flex items-center gap-1 text-slate-700 font-semibold truncate">
-                          <span className="material-symbols-outlined text-[13px] shrink-0 text-[#012060]">schedule</span>
-                          <span>{log.timestamp} ({log.date})</span>
-                        </div>
-                        <div className="truncate text-slate-400 text-[9.5px]">
-                          Gugus: <strong className="text-slate-600">{log.gugusName}</strong>
-                        </div>
-                        <div className="truncate text-slate-400 text-[9.5px]">
-                          Oleh: {log.scanner}
-                        </div>
-                      </div>
-
-                      {/* Geolocation Tag */}
-                      <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
-                        {log.latitude && log.longitude ? (
-                          <a
-                            href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9.5px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/70 truncate w-full transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-[13px] shrink-0">pin_drop</span>
-                            <span className="truncate">{log.locationStatus || 'Dalam Area'}</span>
-                          </a>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9.5px] font-bold bg-slate-100 text-slate-500 border border-slate-200/60 truncate w-full">
-                            <span className="material-symbols-outlined text-[13px] shrink-0">location_off</span>
-                            <span className="truncate">{log.scanner.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi'}</span>
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Interactive Action Buttons */}
-                      <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
-                        <button 
-                          onClick={() => navigate(`/admin/peserta/${log.nim}`)}
-                          className="py-1.5 bg-[#012060] hover:bg-[#022b80] active:scale-95 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all shadow-xs"
-                          title="Lihat Detail Peserta"
-                        >
-                          <span className="material-symbols-outlined text-[13px]">visibility</span>
-                        </button>
-
-                        <button 
-                          onClick={() => {
-                            window.confirmAction(`Hapus log absensi untuk ${log.name} (${log.nim})?`, () => {
-                              deleteLog(log.id);
-                              alert("Log absensi berhasil dihapus.");
-                            });
-                          }}
-                          className="py-1.5 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors border border-rose-200/60"
-                          title="Hapus Log"
-                        >
-                          <span className="material-symbols-outlined text-[13px]">delete</span>
-                          <span>Hapus</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-10 text-slate-400 text-body-md">Tidak ada log absensi ditemukan.</div>
+            
+            {selectedIds.length > 0 && (
+              <button 
+                onClick={handleDeleteSelected} 
+                className="bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer border border-rose-200/60 animate-fade-in"
+              >
+                <span className="material-symbols-outlined text-[15px]">delete</span>
+                <span>Hapus Terpilih ({selectedIds.length})</span>
+              </button>
             )}
           </div>
 
-          {/* DESKTOP TABLE VIEW (Strict 100% width, table-fixed, zero horizontal scroll) */}
-          <div className="hidden md:block w-full overflow-hidden">
-            <table className="w-full text-left border-collapse table-fixed">
-              <colgroup>
-                <col className="w-[3.5%]" />
-                <col className="w-[11.5%]" />
-                <col className="w-[25.5%]" />
-                <col className="w-[15.5%]" />
-                <col className="w-[8.5%]" />
-                <col className="w-[8.5%]" />
-                <col className="w-[18%]" />
-                <col className="w-[9%]" />
-              </colgroup>
-              <thead>
-                <tr className="bg-[#f8fafc] border-b border-slate-100">
-                  <th className="py-3 px-1.5 text-center">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer"
-                      checked={currentItems.length > 0 && currentItems.every(log => selectedIds.includes(log.id))}
-                      onChange={handleSelectAll} 
-                    />
-                  </th>
-                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Waktu</th>
-                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Peserta</th>
-                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Gugus</th>
-                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Pemindai</th>
-                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Status</th>
-                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Lokasi Scan</th>
-                  <th className="py-3 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-slate-100">
-                {currentItems.length > 0 ? (
-                  currentItems.map((log) => (
-                    <tr 
-                      key={log.id} 
-                      onClick={() => navigate(`/admin/peserta/${log.nim}`)}
-                      className="hover:bg-[#012060]/[0.03] transition-all group cursor-pointer"
-                    >
-                      <td className="py-2.5 px-1.5 text-center" onClick={(e) => e.stopPropagation()}>
-                        <input 
-                          type="checkbox" 
-                          className="w-4 h-4 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer"
-                          checked={selectedIds.includes(log.id)}
-                          onChange={(e) => handleSelectOne(log.id, e.target.checked)} 
-                        />
-                      </td>
-                      <td className="py-2.5 px-1.5 truncate">
-                        <div className="flex flex-col min-w-0 truncate">
-                          <span className="text-[11.5px] font-bold text-slate-800 truncate">{log.timestamp}</span>
-                          <span className="text-[10px] text-slate-400 truncate">{log.date}</span>
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-1.5 truncate">
-                        <div className="flex flex-col min-w-0 truncate">
-                          <span className={`text-[11.5px] font-bold text-slate-800 truncate group-hover:text-[#012060] transition-colors ${log.status === 'Valid' ? '' : 'text-slate-500 italic'}`} title={log.name}>{log.name}</span>
-                          <span className="text-[10px] text-slate-400 font-mono truncate">NIM: {log.nim}</span>
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-1.5 truncate">
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-semibold text-[10px] border border-slate-200/60 max-w-full truncate" title={log.gugusName}>
-                          <span className="truncate">{log.gugusName}</span>
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-1.5 truncate">
-                        <span className="text-[11px] text-slate-700 font-medium truncate block" title={log.scanner}>{log.scanner}</span>
-                      </td>
-                      <td className="py-2.5 px-1.5 truncate">
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold border max-w-full truncate ${
-                          log.status === 'Valid' 
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${log.status === 'Valid' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                          <span className="truncate">{log.status}</span>
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-1.5 truncate" onClick={(e) => e.stopPropagation()}>
-                        {log.latitude && log.longitude ? (
-                          <a
-                            href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[10px] font-bold transition-all bg-emerald-50 text-emerald-700 border border-emerald-200/60 hover:bg-emerald-100 max-w-full truncate"
-                            title={`Latitude: ${log.latitude}, Longitude: ${log.longitude}`}
-                          >
-                            <span className="material-symbols-outlined text-[13px] shrink-0">pin_drop</span>
-                            <span className="truncate">{log.locationStatus || 'Dalam Area'} {log.distanceMeters ? `(${log.distanceMeters}m)` : ''}</span>
-                          </a>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200/60 max-w-full truncate">
-                            <span className="material-symbols-outlined text-[13px] shrink-0">location_off</span>
-                            <span className="truncate">{log.scanner?.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi'}</span>
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-1.5 text-right truncate" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-0.5">
-                          <button 
-                            onClick={() => navigate(`/admin/peserta/${log.nim}`)}
-                            className="p-1 text-[#012060] hover:bg-[#012060]/10 rounded-lg transition-colors cursor-pointer"
-                            title="Lihat Detail Peserta"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">visibility</span>
-                          </button>
-                          <button 
-                            onClick={() => {
-                              window.confirmAction(`Hapus log absensi untuk ${log.name} (${log.nim})?`, () => {
-                                deleteLog(log.id);
-                                alert("Log absensi berhasil dihapus.");
-                              });
-                            }}
-                            className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                            title="Hapus Log Absensi"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">delete</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="8" className="text-center py-10 text-slate-400 text-body-md">Tidak ada log absensi ditemukan.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Footer */}
-          <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#f8fafc]/50">
-            <span className="text-[11px] sm:text-body-sm font-medium text-slate-500 text-center sm:text-left">
-              Menampilkan {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, totalItems)} dari {totalItems} log
-            </span>
-
-            <div className="flex items-center gap-1.5">
+          {/* Status Filter Tabs */}
+          <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+            {['Semua', 'Valid', 'Invalid'].map((tab) => (
               <button 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
-                className="px-3 py-1.5 text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors text-label-sm font-bold disabled:opacity-40 cursor-pointer flex items-center gap-1 border border-slate-200" 
-                disabled={currentPage === 1}
+                key={tab}
+                onClick={() => setActiveTab(tab)} 
+                className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-[11px] sm:text-body-sm font-bold transition-all cursor-pointer ${
+                  activeTab === tab 
+                    ? 'bg-white shadow-xs text-[#012060]' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
               >
-                <span className="material-symbols-outlined text-[16px]">chevron_left</span>
-                <span className="hidden sm:inline">Sebelumnya</span>
+                {tab}
               </button>
-
-              <span className="px-3 py-1 text-label-sm font-bold text-[#012060] bg-white border border-slate-200 rounded-xl">
-                {currentPage} / {totalPages}
-              </span>
-
-              <button 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
-                className="px-3 py-1.5 text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors text-label-sm font-bold disabled:opacity-40 cursor-pointer flex items-center gap-1 border border-slate-200" 
-                disabled={currentPage === totalPages}
-              >
-                <span className="hidden sm:inline">Selanjutnya</span>
-                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-              </button>
-            </div>
+            ))}
           </div>
-
         </div>
+
+        {/* Grouped Day Accordions */}
+        <div className="space-y-4">
+          {dateGroupsWeb.length > 0 ? (
+            dateGroupsWeb.map((group, groupIdx) => {
+              const isOpen = isDateOpen(group.isoDate, groupIdx);
+              const isGroupAllSelected = group.logs.length > 0 && group.logs.every(log => selectedIds.includes(log.id));
+
+              return (
+                <div key={group.isoDate} className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-200">
+                  {/* Accordion Header */}
+                  <div 
+                    onClick={() => toggleDateOpen(group.isoDate)}
+                    className="w-full px-4 sm:px-6 py-3.5 bg-slate-50/80 hover:bg-slate-100/80 flex items-center justify-between transition-colors border-b border-slate-100 cursor-pointer select-none"
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <span className={`material-symbols-outlined text-[#012060] text-[20px] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                        keyboard_arrow_down
+                      </span>
+                      
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="material-symbols-outlined text-primary text-[18px]">calendar_today</span>
+                        <h3 className="text-body-sm sm:text-body-md font-bold text-[#012060] truncate">
+                          {group.indonesianDate}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#012060]/5 text-[#012060] border border-[#012060]/10">
+                        {group.totalValid} Hadir
+                      </span>
+                      {group.totalInvalid > 0 && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
+                          {group.totalInvalid} Kendala
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Accordion Content */}
+                  {isOpen && (
+                    <div>
+                      {/* MOBILE VIEW GRID */}
+                      <div className="block md:hidden p-3 bg-slate-50/30 border-b border-slate-100">
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {group.logs.map((log) => {
+                            const isValid = log.status === 'Valid';
+
+                            return (
+                              <div 
+                                key={log.id} 
+                                onClick={() => navigate(`/admin/peserta/${log.nim}`)}
+                                className={`bg-white rounded-2xl p-2.5 shadow-xs border flex flex-col justify-between gap-2 hover:shadow-md transition-all relative overflow-hidden group cursor-pointer ${
+                                  isValid 
+                                    ? 'border-slate-200/80 border-l-4 border-l-emerald-500' 
+                                    : 'border-slate-200/80 border-l-4 border-l-rose-500'
+                                }`}
+                              >
+                                {/* Top Bar: Checkbox + Status Badge */}
+                                <div className="flex items-center justify-between gap-1">
+                                  <div onClick={(e) => e.stopPropagation()} className="flex items-center">
+                                    <input 
+                                      type="checkbox" 
+                                      className="w-3.5 h-3.5 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer"
+                                      checked={selectedIds.includes(log.id)}
+                                      onChange={(e) => handleSelectOne(log.id, e.target.checked)} 
+                                    />
+                                  </div>
+
+                                  <span className={`px-1.5 py-0.5 rounded-full text-[8.5px] font-extrabold shrink-0 border flex items-center gap-1 ${
+                                    isValid 
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                      : 'bg-rose-50 text-rose-700 border-rose-200'
+                                  }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isValid ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                                    <span>{isValid ? 'Valid' : 'Kendala'}</span>
+                                  </span>
+                                </div>
+
+                                {/* Name & NIM */}
+                                <div className="overflow-hidden">
+                                  <h4 className="text-body-xs font-bold text-slate-800 line-clamp-1 leading-snug group-hover:text-[#012060] transition-colors" title={log.name}>
+                                    {log.name}
+                                  </h4>
+                                  <div className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-[#012060]/5 border border-[#012060]/10">
+                                    <span className="text-[7.5px] font-extrabold uppercase text-slate-400">NIM</span>
+                                    <span className="text-[9.5px] font-bold text-[#012060] font-mono tracking-tight">{log.nim}</span>
+                                  </div>
+                                </div>
+
+                                {/* Details: Time & Gugus */}
+                                <div className="text-[9.5px] space-y-0.5 text-slate-500 border-t border-slate-100 pt-1.5 font-medium">
+                                  <div className="flex items-center gap-1 text-slate-700 font-semibold truncate">
+                                    <span className="material-symbols-outlined text-[13px] shrink-0 text-[#012060]">schedule</span>
+                                    <span>{log.timestamp}</span>
+                                  </div>
+                                  <div className="truncate text-slate-400 text-[9px]">
+                                    Gugus: <strong className="text-slate-600">{log.gugusName}</strong>
+                                  </div>
+                                  <div className="truncate text-slate-400 text-[9px]">
+                                    Oleh: {log.scanner}
+                                  </div>
+                                </div>
+
+                                {/* Geolocation Tag */}
+                                <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                                  {log.latitude && log.longitude ? (
+                                    <a
+                                      href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/70 truncate w-full transition-colors"
+                                    >
+                                      <span className="material-symbols-outlined text-[12px] shrink-0">pin_drop</span>
+                                      <span className="truncate">{log.locationStatus || 'Dalam Area'}</span>
+                                    </a>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-bold bg-slate-100 text-slate-500 border border-slate-200/60 truncate w-full">
+                                      <span className="material-symbols-outlined text-[12px] shrink-0">location_off</span>
+                                      <span className="truncate">{log.scanner?.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi'}</span>
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="grid grid-cols-2 gap-1 pt-1 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                                  <button 
+                                    onClick={() => navigate(`/admin/peserta/${log.nim}`)}
+                                    className="py-1 bg-[#012060] text-white rounded-lg text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
+                                    title="Lihat Detail"
+                                  >
+                                    <span className="material-symbols-outlined text-[12px]">visibility</span>
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      window.confirmAction(`Hapus log absensi untuk ${log.name}?`, () => {
+                                        deleteLog(log.id);
+                                        alert("Log absensi berhasil dihapus.");
+                                      });
+                                    }}
+                                    className="py-1 bg-rose-50 text-rose-700 rounded-lg text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer border border-rose-200/60"
+                                    title="Hapus Log"
+                                  >
+                                    <span className="material-symbols-outlined text-[12px]">delete</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* DESKTOP TABLE VIEW */}
+                      <div className="hidden md:block w-full overflow-hidden">
+                        <table className="w-full text-left border-collapse table-fixed">
+                          <colgroup>
+                            <col className="w-[3.5%]" />
+                            <col className="w-[10%]" />
+                            <col className="w-[26%]" />
+                            <col className="w-[15%]" />
+                            <col className="w-[11%]" />
+                            <col className="w-[9.5%]" />
+                            <col className="w-[16%]" />
+                            <col className="w-[9%]" />
+                          </colgroup>
+                          <thead>
+                            <tr className="bg-slate-50/50 border-b border-slate-100">
+                              <th className="py-2.5 px-1.5 text-center">
+                                <input 
+                                  type="checkbox" 
+                                  className="w-4 h-4 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer"
+                                  checked={isGroupAllSelected}
+                                  onChange={(e) => handleSelectGroupLogs(group.logs, e.target.checked)} 
+                                  title="Pilih semua log pada tanggal ini"
+                                />
+                              </th>
+                              <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Waktu</th>
+                              <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Peserta</th>
+                              <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Gugus</th>
+                              <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Pemindai</th>
+                              <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Status</th>
+                              <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Lokasi Scan</th>
+                              <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate text-right">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-slate-100">
+                            {group.logs.map((log) => (
+                              <tr 
+                                key={log.id} 
+                                onClick={() => navigate(`/admin/peserta/${log.nim}`)}
+                                className="hover:bg-[#012060]/[0.03] transition-all group cursor-pointer"
+                              >
+                                <td className="py-2.5 px-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                  <input 
+                                    type="checkbox" 
+                                    className="w-4 h-4 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer"
+                                    checked={selectedIds.includes(log.id)}
+                                    onChange={(e) => handleSelectOne(log.id, e.target.checked)} 
+                                  />
+                                </td>
+                                <td className="py-2.5 px-1.5 truncate">
+                                  <span className="text-[11.5px] font-bold text-slate-700 font-mono block truncate">{log.timestamp}</span>
+                                </td>
+                                <td className="py-2.5 px-1.5 truncate">
+                                  <div className="flex flex-col min-w-0 truncate">
+                                    <span className={`text-[11.5px] font-bold text-slate-800 truncate group-hover:text-[#012060] transition-colors ${log.status === 'Valid' ? '' : 'text-slate-500 italic'}`} title={log.name}>{log.name}</span>
+                                    <span className="text-[10px] text-slate-400 font-mono truncate">NIM: {log.nim}</span>
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-1.5 truncate">
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-semibold text-[10px] border border-slate-200/60 max-w-full truncate" title={log.gugusName}>
+                                    <span className="truncate">{log.gugusName}</span>
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-1.5 truncate">
+                                  <span className="text-[11px] text-slate-700 font-medium truncate block" title={log.scanner}>{log.scanner}</span>
+                                </td>
+                                <td className="py-2.5 px-1.5 truncate">
+                                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold border max-w-full truncate ${
+                                    log.status === 'Valid' 
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                      : 'bg-rose-50 text-rose-700 border-rose-200'
+                                  }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${log.status === 'Valid' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                                    <span className="truncate">{log.status}</span>
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-1.5 truncate" onClick={(e) => e.stopPropagation()}>
+                                  {log.latitude && log.longitude ? (
+                                    <a
+                                      href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[10px] font-bold transition-all bg-emerald-50 text-emerald-700 border border-emerald-200/60 hover:bg-emerald-100 max-w-full truncate"
+                                      title={`Latitude: ${log.latitude}, Longitude: ${log.longitude}`}
+                                    >
+                                      <span className="material-symbols-outlined text-[13px] shrink-0">pin_drop</span>
+                                      <span className="truncate">{log.locationStatus || 'Dalam Area'} {log.distanceMeters ? `(${log.distanceMeters}m)` : ''}</span>
+                                    </a>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200/60 max-w-full truncate">
+                                      <span className="material-symbols-outlined text-[13px] shrink-0">location_off</span>
+                                      <span className="truncate">{log.scanner?.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi'}</span>
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-1.5 text-right truncate" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-end gap-0.5">
+                                    <button 
+                                      onClick={() => navigate(`/admin/peserta/${log.nim}`)}
+                                      className="p-1 text-[#012060] hover:bg-[#012060]/10 rounded-lg transition-colors cursor-pointer"
+                                      title="Lihat Detail Peserta"
+                                    >
+                                      <span className="material-symbols-outlined text-[16px]">visibility</span>
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        window.confirmAction(`Hapus log absensi untuk ${log.name} (${log.nim})?`, () => {
+                                          deleteLog(log.id);
+                                          alert("Log absensi berhasil dihapus.");
+                                        });
+                                      }}
+                                      className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                      title="Hapus Log Absensi"
+                                    >
+                                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-12 text-center text-slate-400 text-body-md border border-slate-100 shadow-sm">
+              Tidak ada log absensi ditemukan.
+            </div>
+          )}
+        </div>
+
       </main>
     </div>
   );

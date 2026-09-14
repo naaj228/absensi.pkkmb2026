@@ -2,6 +2,7 @@ import { useContext, useState } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
+import { groupLogsByDate, formatDDMMYYYY } from '../../utils/dateHelper';
 
 export default function MentorRiwayat() {
   const { logs, gugus, currentUser, hasMentorNotifications } = useContext(AppContext);
@@ -18,9 +19,22 @@ export default function MentorRiwayat() {
   const [activeTab, setActiveTab] = useState('Semua');
   const [showExportDropdown, setShowExportDropdown] = useState(false);
 
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  // Accordion collapse state for date groups
+  const [openDates, setOpenDates] = useState({});
+
+  const toggleDateOpen = (isoDate) => {
+    setOpenDates(prev => ({
+      ...prev,
+      [isoDate]: prev[isoDate] !== undefined ? !prev[isoDate] : false
+    }));
+  };
+
+  const isDateOpen = (isoDate, index) => {
+    if (openDates[isoDate] !== undefined) {
+      return openDates[isoDate];
+    }
+    return index === 0; // Default: only latest date is open
+  };
 
   // Filtering logic: Only show logs from mentor's own gugus
   const mentorLogs = logs.filter(log => log.gugusName.toLowerCase() === mentorGugusName.toLowerCase());
@@ -29,7 +43,7 @@ export default function MentorRiwayat() {
     const term = searchTerm.toLowerCase();
     const matchesSearch = log.name.toLowerCase().includes(term) || 
                           log.nim.includes(term) || 
-                          log.scanner.toLowerCase().includes(term);
+                          (log.scanner && log.scanner.toLowerCase().includes(term));
 
     const matchesDate = !selectedDate || log.date === selectedDate;
 
@@ -43,14 +57,8 @@ export default function MentorRiwayat() {
     return matchesSearch && matchesDate && matchesTab;
   });
 
-  const formatDDMMYYYY = (dateStr) => {
-    if (!dateStr) return '-';
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
-    return dateStr;
-  };
+  // Grouped logs for web view (newest day first)
+  const dateGroupsWeb = groupLogsByDate(filteredLogs, true);
 
   const handleExport = (type) => {
     if (filteredLogs.length === 0) {
@@ -58,8 +66,13 @@ export default function MentorRiwayat() {
       return;
     }
 
+    // Export chronological: oldest day first (Hari 1 -> Hari 2 -> Hari 3)
+    const dateGroupsAsc = groupLogsByDate(filteredLogs, false);
+    const flatLogsChronological = dateGroupsAsc.flatMap(group => group.logs);
+
     if (type === 'Excel') {
-      const data = filteredLogs.map(log => ({
+      // Option A for Mentor: Single sheet flat list, chronological order
+      const data = flatLogsChronological.map(log => ({
         'Tanggal': formatDDMMYYYY(log.date),
         'Waktu': log.timestamp,
         'NIM': log.nim,
@@ -84,16 +97,18 @@ export default function MentorRiwayat() {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Absensi");
       XLSX.writeFile(workbook, `Laporan_Absensi_${mentorGugusName.replace(/\s+/g, '_')}_${selectedDate || 'Semua_Hari'}.xlsx`);
-    } else if (type === 'PDF') {
-      const rowsHtml = filteredLogs.map((log, idx) => `
+    } 
+    else if (type === 'PDF') {
+      // Clean single table PDF format sorted chronologically
+      const rowsHtml = flatLogsChronological.map((log, idx) => `
         <tr>
-          <td>${idx + 1}</td>
-          <td>${formatDDMMYYYY(log.date)} ${log.timestamp}</td>
-          <td>${log.nim}</td>
-          <td>${log.name}</td>
-          <td>${log.gugusName}</td>
+          <td style="text-align: center; width: 35px;">${idx + 1}</td>
+          <td style="width: 85px; font-family: monospace;">${formatDDMMYYYY(log.date)}</td>
+          <td style="width: 75px; font-family: monospace;">${log.timestamp}</td>
+          <td style="width: 100px; font-family: monospace;">${log.nim}</td>
+          <td><strong>${log.name}</strong></td>
           <td>${log.scanner}</td>
-          <td>
+          <td style="text-align: center; width: 75px;">
             <span class="badge ${log.status === 'Valid' ? 'valid' : 'invalid'}">
               ${log.status}
             </span>
@@ -106,36 +121,36 @@ export default function MentorRiwayat() {
           <head>
             <title>Laporan Absensi ${mentorGugusName}</title>
             <style>
-              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 25px; color: #1f2937; }
-              h1 { font-size: 20px; color: #012060; margin: 0 0 5px 0; }
-              .meta { font-size: 13px; color: #4b5563; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 25px; color: #1f2937; line-height: 1.4; }
+              h1 { font-size: 20px; color: #012060; margin: 0 0 4px 0; }
+              .meta { font-size: 12px; color: #4b5563; margin-bottom: 20px; border-bottom: 2px solid #012060; padding-bottom: 10px; }
               table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-              th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; font-size: 12px; }
-              th { background-color: #f3f4f6; color: #374151; font-weight: 600; }
-              tr:nth-child(even) { background-color: #f9fafb; }
-              .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
+              th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; font-size: 11px; }
+              th { background-color: #f8fafc; color: #1e293b; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+              tr:nth-child(even) { background-color: #f8fafc; }
+              .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; text-align: center; }
               .valid { background: #d1fae5; color: #065f46; }
               .invalid { background: #fee2e2; color: #991b1b; }
-              .footer { margin-top: 30px; font-size: 11px; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+              .footer { margin-top: 30px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; }
             </style>
           </head>
           <body>
             <h1>Laporan Riwayat Kehadiran PKKMB 2026</h1>
             <div class="meta">
-              Gugus: ${mentorGugusName} | 
-              Tanggal Laporan: ${new Date().toLocaleDateString('id-ID')} | 
-              Jumlah Data: ${filteredLogs.length}
+              Gugus: <strong>${mentorGugusName}</strong> &nbsp;|&nbsp; 
+              Dicetak: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} &nbsp;|&nbsp; 
+              Total Absensi: <strong>${flatLogsChronological.length} Data</strong>
             </div>
             <table>
               <thead>
                 <tr>
-                  <th>No</th>
-                  <th>Waktu Scan</th>
+                  <th style="text-align: center;">No</th>
+                  <th>Tanggal</th>
+                  <th>Waktu</th>
                   <th>NIM</th>
                   <th>Nama Mahasiswa</th>
-                  <th>Gugus</th>
                   <th>Pemindai</th>
-                  <th>Status</th>
+                  <th style="text-align: center;">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -175,15 +190,9 @@ export default function MentorRiwayat() {
     }
   };
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage) || 1;
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredLogs.slice(indexOfFirstItem, indexOfLastItem);
-
   return (
     <div className="w-full bg-[#f8fafc] min-h-screen pb-16">
-      {/* Header - Fixed to top, padded for mobile hamburger menu */}
+      {/* Header */}
       <header className="fixed top-0 left-0 lg:left-[280px] right-0 h-16 bg-white/90 backdrop-blur-md z-40 flex items-center justify-between pl-16 pr-4 sm:px-6 lg:px-8 shadow-[0_1px_8px_rgba(0,0,0,0.03)] border-b border-slate-100">
         <div className="flex items-center gap-2.5 overflow-hidden">
           <span className="material-symbols-outlined text-[#012060] text-[22px] sm:text-[24px] shrink-0">history</span>
@@ -256,202 +265,200 @@ export default function MentorRiwayat() {
           </div>
         </div>
 
-        {/* Main Table & Filter Section */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col w-full relative z-10">
-          
-          {/* Compact Toolbar (Search, Date Filter, Status Tabs) */}
-          <div className="p-3.5 sm:p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5 bg-[#f8fafc]/50">
-            {/* Search Input */}
-            <div className="relative flex-1 sm:max-w-xs">
-              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px]">search</span>
+        {/* Toolbar (Search, Date Filter, Status Tabs) */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-sm border border-slate-100 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5">
+          {/* Search Input */}
+          <div className="relative flex-1 sm:max-w-xs">
+            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px]">search</span>
+            <input 
+              className="w-full bg-[#f8fafc] border border-slate-200 text-slate-800 text-body-sm font-semibold py-2 pl-8 pr-8 rounded-xl focus:outline-none focus:border-primary transition-all placeholder:text-slate-400" 
+              placeholder="Cari NIM atau Nama..." 
+              type="text" 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+            />
+            {searchTerm && (
+              <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer">
+                <span className="material-symbols-outlined text-[14px]">close</span>
+              </button>
+            )}
+          </div>
+
+          {/* Date Filter & Status Tabs */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+            <div className="relative flex-1 sm:flex-initial">
               <input 
-                className="w-full bg-white border border-slate-200 text-slate-800 text-body-sm font-semibold py-2 pl-8 pr-8 rounded-xl shadow-2xs focus:outline-none focus:border-primary transition-all placeholder:text-slate-400" 
-                placeholder="Cari NIM atau Nama..." 
-                type="text" 
-                value={searchTerm} 
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} 
+                type="date" 
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full bg-[#f8fafc] text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 px-3 rounded-xl focus:outline-none focus:border-primary transition-all"
               />
-              {searchTerm && (
-                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer">
-                  <span className="material-symbols-outlined text-[14px]">close</span>
+              {selectedDate && (
+                <button onClick={() => setSelectedDate('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer" title="Bersihkan tanggal">
+                  <span className="material-symbols-outlined text-[13px]">close</span>
                 </button>
               )}
             </div>
 
-            {/* Date Filter & Status Tabs */}
-            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
-              <div className="relative flex-1 sm:flex-initial">
-                <input 
-                  type="date" 
-                  value={selectedDate}
-                  onChange={(e) => { setSelectedDate(e.target.value); setCurrentPage(1); }}
-                  className="w-full bg-white text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 px-3 rounded-xl shadow-2xs focus:outline-none focus:border-primary transition-all"
-                />
-                {selectedDate && (
-                  <button onClick={() => setSelectedDate('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer" title="Bersihkan tanggal">
-                    <span className="material-symbols-outlined text-[13px]">close</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Status Filter Tabs */}
-              <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
-                {['Semua', 'Valid', 'Invalid'].map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => { setActiveTab(tab); setCurrentPage(1); }}
-                    className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                      activeTab === tab 
-                        ? 'bg-white text-[#012060] shadow-xs' 
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
+            {/* Status Filter Tabs */}
+            <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
+              {['Semua', 'Valid', 'Invalid'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    activeTab === tab 
+                      ? 'bg-white text-[#012060] shadow-xs' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
             </div>
           </div>
+        </div>
 
-          {/* MOBILE VIEW GRID (2 Kolom pada Layar Mobile < md) */}
-          <div className="block md:hidden p-2.5 bg-slate-50/50 border-b border-slate-100">
-            {currentItems.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2.5">
-                {currentItems.map((log) => {
-                  const isValid = log.status === 'Valid';
-                  return (
-                    <div 
-                      key={log.id} 
-                      className={`bg-white rounded-2xl p-2.5 shadow-xs border flex flex-col justify-between gap-2 transition-all relative overflow-hidden ${
-                        isValid ? 'border-l-4 border-l-emerald-500 border-slate-200/80' : 'border-l-4 border-l-rose-500 border-slate-200/80'
-                      }`}
-                    >
-                      {/* Top Bar: Status Badge */}
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-[9px] font-bold text-slate-400 font-mono">{log.timestamp}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[8.5px] font-extrabold shrink-0 border flex items-center gap-1 ${
-                          isValid 
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${isValid ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                          <span>{log.status}</span>
-                        </span>
-                      </div>
+        {/* Grouped Day Accordions */}
+        <div className="space-y-4">
+          {dateGroupsWeb.length > 0 ? (
+            dateGroupsWeb.map((group, groupIdx) => {
+              const isOpen = isDateOpen(group.isoDate, groupIdx);
 
-                      {/* Name & NIM */}
-                      <div className="overflow-hidden">
-                        <h4 className="text-body-xs font-bold text-slate-800 line-clamp-1 leading-snug" title={log.name}>
-                          {log.name}
-                        </h4>
-                        <div className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-[#012060]/5 border border-[#012060]/10">
-                          <span className="text-[7.5px] font-extrabold uppercase text-slate-400">NIM</span>
-                          <span className="text-[9.5px] font-bold text-[#012060] font-mono tracking-tight">{log.nim}</span>
-                        </div>
-                      </div>
-
-                      {/* Details: Date & Scanner */}
-                      <div className="text-[9.5px] space-y-0.5 text-slate-500 border-t border-slate-100 pt-1.5 font-medium">
-                        <div className="truncate text-slate-600 font-semibold">
-                          📅 {log.date}
-                        </div>
-                        <div className="truncate text-slate-400 text-[9px]">
-                          📷 {log.scanner || 'Pemindai QR'}
-                        </div>
+              return (
+                <div key={group.isoDate} className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-200">
+                  {/* Accordion Header */}
+                  <button 
+                    onClick={() => toggleDateOpen(group.isoDate)}
+                    className="w-full px-4 sm:px-6 py-3.5 bg-slate-50/80 hover:bg-slate-100/80 flex items-center justify-between transition-colors border-b border-slate-100 text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                      <span className={`material-symbols-outlined text-[#012060] text-[20px] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                        keyboard_arrow_down
+                      </span>
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="material-symbols-outlined text-primary text-[18px]">calendar_today</span>
+                        <h3 className="text-body-sm sm:text-body-md font-bold text-[#012060] truncate">
+                          {group.indonesianDate}
+                        </h3>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-slate-400 text-body-xs">
-                Tidak ada log pemindaian ditemukan.
-              </div>
-            )}
-          </div>
 
-          {/* DESKTOP TABLE VIEW (Visible on screen >= md) */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead>
-                <tr className="bg-[#f8fafc] border-b border-slate-100">
-                  <th className="py-3 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tanggal & Waktu</th>
-                  <th className="py-3 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mahasiswa</th>
-                  <th className="py-3 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">NIM</th>
-                  <th className="py-3 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pemindai</th>
-                  <th className="py-3 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-slate-100">
-                {currentItems.length > 0 ? (
-                  currentItems.map((log) => {
-                    const isValid = log.status === 'Valid';
-                    return (
-                      <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-3.5 px-5 text-body-sm font-semibold text-slate-700">
-                          {log.date} <span className="text-slate-400 text-[11px] font-mono ml-1">{log.timestamp}</span>
-                        </td>
-                        <td className="py-3.5 px-5 font-bold text-slate-800 text-body-sm">
-                          {log.name}
-                        </td>
-                        <td className="py-3.5 px-5">
-                          <span className="text-body-sm font-bold text-[#012060] font-mono bg-[#012060]/5 px-2 py-0.5 rounded-md border border-[#012060]/10">{log.nim}</span>
-                        </td>
-                        <td className="py-3.5 px-5 text-body-sm text-slate-500 font-medium">
-                          {log.scanner}
-                        </td>
-                        <td className="py-3.5 px-5 text-right">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-label-sm font-bold ${
-                            isValid ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${isValid ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                            {log.status}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan="5" className="text-center py-8 text-slate-400 text-body-sm">Tidak ada data log absensi.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#012060]/5 text-[#012060] border border-[#012060]/10">
+                        {group.totalValid} Hadir
+                      </span>
+                      {group.totalInvalid > 0 && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
+                          {group.totalInvalid} Kendala
+                        </span>
+                      )}
+                    </div>
+                  </button>
 
-          {/* Footer Bar / Pagination */}
-          <div className="p-3 sm:p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#f8fafc]/50">
-            <span className="text-[11px] sm:text-body-sm font-medium text-slate-500">
-              Menampilkan {currentItems.length > 0 ? indexOfFirstItem + 1 : 0} - {Math.min(indexOfLastItem, filteredLogs.length)} dari {filteredLogs.length} data absensi
-            </span>
-            
-            {totalPages > 1 && (
-              <div className="flex items-center gap-1.5">
-                <button 
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer transition-colors shadow-2xs"
-                >
-                  <span className="material-symbols-outlined text-[16px]">chevron_left</span>
-                </button>
+                  {/* Accordion Content */}
+                  {isOpen && (
+                    <div>
+                      {/* MOBILE VIEW GRID */}
+                      <div className="block md:hidden p-3 bg-slate-50/30">
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {group.logs.map((log) => {
+                            const isValid = log.status === 'Valid';
+                            return (
+                              <div 
+                                key={log.id} 
+                                className={`bg-white rounded-2xl p-2.5 shadow-xs border flex flex-col justify-between gap-2 relative overflow-hidden ${
+                                  isValid ? 'border-l-4 border-l-emerald-500 border-slate-200/80' : 'border-l-4 border-l-rose-500 border-slate-200/80'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="text-[9.5px] font-bold text-slate-700 font-mono">{log.timestamp}</span>
+                                  <span className={`px-1.5 py-0.5 rounded-full text-[8.5px] font-extrabold shrink-0 border flex items-center gap-1 ${
+                                    isValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
+                                  }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isValid ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                                    <span>{log.status}</span>
+                                  </span>
+                                </div>
 
-                <span className="text-[11px] font-bold text-[#012060] bg-[#012060]/5 border border-[#012060]/10 px-3 py-1 rounded-lg">
-                  {currentPage} / {totalPages}
-                </span>
+                                <div className="overflow-hidden">
+                                  <h4 className="text-body-xs font-bold text-slate-800 line-clamp-1 leading-snug" title={log.name}>
+                                    {log.name}
+                                  </h4>
+                                  <div className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-[#012060]/5 border border-[#012060]/10">
+                                    <span className="text-[7.5px] font-extrabold uppercase text-slate-400">NIM</span>
+                                    <span className="text-[9.5px] font-bold text-[#012060] font-mono tracking-tight">{log.nim}</span>
+                                  </div>
+                                </div>
 
-                <button 
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer transition-colors shadow-2xs"
-                >
-                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                </button>
-              </div>
-            )}
-          </div>
+                                <div className="text-[9px] text-slate-400 border-t border-slate-100 pt-1.5 truncate">
+                                  📷 {log.scanner || 'Pemindai QR'}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
 
+                      {/* DESKTOP TABLE VIEW */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50/50 border-b border-slate-100">
+                              <th className="py-2.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider w-16 text-center">No</th>
+                              <th className="py-2.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Waktu</th>
+                              <th className="py-2.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mahasiswa</th>
+                              <th className="py-2.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">NIM</th>
+                              <th className="py-2.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pemindai</th>
+                              <th className="py-2.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-slate-100">
+                            {group.logs.map((log, idx) => {
+                              const isValid = log.status === 'Valid';
+                              return (
+                                <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                                  <td className="py-3 px-5 text-body-xs font-semibold text-slate-400 text-center">
+                                    {idx + 1}
+                                  </td>
+                                  <td className="py-3 px-5 text-body-sm font-bold text-slate-700 font-mono">
+                                    {log.timestamp}
+                                  </td>
+                                  <td className="py-3 px-5 font-bold text-slate-800 text-body-sm">
+                                    {log.name}
+                                  </td>
+                                  <td className="py-3 px-5">
+                                    <span className="text-body-sm font-bold text-[#012060] font-mono bg-[#012060]/5 px-2 py-0.5 rounded-md border border-[#012060]/10">{log.nim}</span>
+                                  </td>
+                                  <td className="py-3 px-5 text-body-sm text-slate-500 font-medium">
+                                    {log.scanner}
+                                  </td>
+                                  <td className="py-3 px-5 text-right">
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-label-sm font-bold ${
+                                      isValid ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                    }`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${isValid ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                                      {log.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-12 text-center text-slate-400 text-body-md border border-slate-100 shadow-sm">
+              Tidak ada log absensi ditemukan.
+            </div>
+          )}
         </div>
+
       </main>
     </div>
   );
