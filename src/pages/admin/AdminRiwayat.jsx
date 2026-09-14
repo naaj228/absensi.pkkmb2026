@@ -406,12 +406,24 @@ export default function AdminRiwayat() {
               {/* Date Filter */}
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tanggal</label>
-                <input
-                  className="w-full appearance-none bg-[#f8fafc] border border-slate-200 rounded-xl py-2.5 px-3.5 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer"
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                />
+                <div className="relative min-w-[160px]">
+                  <input
+                    className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl py-2.5 pl-3.5 pr-9 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer"
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                  />
+                  {selectedDate && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDate('')}
+                      className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-600 p-0.5 cursor-pointer bg-[#f8fafc] rounded-full z-10 transition-colors flex items-center justify-center"
+                      title="Bersihkan tanggal"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

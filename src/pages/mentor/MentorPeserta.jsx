@@ -533,32 +533,32 @@ export default function MentorPeserta() {
                 <div>
                   <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">NIM (Nomor Induk Mahasiswa)</label>
                   <div className="relative">
-                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="text" placeholder="Masukkan NIM..." value={formData.id} onChange={(e) => setFormData({...formData, id: e.target.value})} />
-                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">badge</span>
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold py-2.5 sm:py-3 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm transition-all" required type="text" placeholder="Masukkan NIM..." value={formData.id} onChange={(e) => setFormData({...formData, id: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">badge</span>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nama Lengkap</label>
                   <div className="relative">
-                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="text" placeholder="Nama..." value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">person</span>
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold py-2.5 sm:py-3 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm transition-all" required type="text" placeholder="Nama..." value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">person</span>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email Mahasiswa</label>
                   <div className="relative">
-                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="email" placeholder="mahasiswa@student.univ.ac.id" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">mail</span>
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold py-2.5 sm:py-3 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm transition-all" required type="email" placeholder="mahasiswa@student.univ.ac.id" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">mail</span>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jurusan / Program Studi</label>
                   <div className="relative">
-                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="text" placeholder="Cth: Teknik Informatika" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
-                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">school</span>
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold py-2.5 sm:py-3 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm transition-all" required type="text" placeholder="Cth: Teknik Informatika" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">school</span>
                   </div>
                 </div>
               </div>
@@ -605,8 +605,8 @@ export default function MentorPeserta() {
                 <div>
                   <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">NIM (Nomor Induk Mahasiswa)</label>
                   <div className="relative">
-                    <input className="w-full bg-slate-100 text-slate-500 font-mono font-bold p-2.5 sm:p-3 rounded-xl border border-slate-200 text-body-sm pl-9" disabled type="text" value={formData.id} />
-                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">lock</span>
+                    <input className="w-full bg-slate-100 text-slate-500 font-mono font-bold py-2.5 sm:py-3 pl-10 pr-3.5 rounded-xl border border-slate-200 text-body-sm" disabled type="text" value={formData.id} />
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">lock</span>
                   </div>
                 </div>
 
@@ -614,8 +614,8 @@ export default function MentorPeserta() {
                 <div>
                   <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nama Lengkap</label>
                   <div className="relative">
-                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">person</span>
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold py-2.5 sm:py-3 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm transition-all" required type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">person</span>
                   </div>
                 </div>
 
@@ -623,8 +623,8 @@ export default function MentorPeserta() {
                 <div>
                   <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email Mahasiswa</label>
                   <div className="relative">
-                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">mail</span>
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold py-2.5 sm:py-3 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm transition-all" required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">mail</span>
                   </div>
                 </div>
 
@@ -632,8 +632,8 @@ export default function MentorPeserta() {
                 <div>
                   <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jurusan / Program Studi</label>
                   <div className="relative">
-                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold p-2.5 sm:p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm pl-9 transition-all" required type="text" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
-                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">school</span>
+                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold py-2.5 sm:py-3 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm transition-all" required type="text" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">school</span>
                   </div>
                 </div>
               </div>

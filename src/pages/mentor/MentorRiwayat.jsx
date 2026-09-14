@@ -327,16 +327,21 @@ export default function MentorRiwayat() {
 
           {/* Date Filter & Status Tabs */}
           <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
-            <div className="relative flex-1 sm:flex-initial">
+            <div className="relative flex-1 sm:flex-initial min-w-[160px]">
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full bg-[#f8fafc] text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 px-3 rounded-xl focus:outline-none focus:border-primary transition-all"
+                className="w-full bg-[#f8fafc] text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 pl-3 pr-9 rounded-xl focus:outline-none focus:border-primary transition-all cursor-pointer"
               />
               {selectedDate && (
-                <button onClick={() => setSelectedDate('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer" title="Bersihkan tanggal">
-                  <span className="material-symbols-outlined text-[13px]">close</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate('')}
+                  className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-600 p-0.5 cursor-pointer bg-[#f8fafc] rounded-full z-10 transition-colors flex items-center justify-center"
+                  title="Bersihkan tanggal"
+                >
+                  <span className="material-symbols-outlined text-[14px]">close</span>
                 </button>
               )}
             </div>

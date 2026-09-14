@@ -1,6 +1,7 @@
 import { useContext, useEffect } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { formatDDMMYYYY, getTodayISOKey } from '../../utils/dateHelper';
 
 export default function MentorNotifikasi() {
   const { 
@@ -32,6 +33,8 @@ export default function MentorNotifikasi() {
     if (dismissedNotifications.includes(`log-${l.id}`)) return;
     
     const isRejection = l.scanner === 'Admin (Tolak Manual)';
+    const formattedDate = formatDDMMYYYY(l.date);
+    const displayTime = `${formattedDate}${l.timestamp ? ' ' + l.timestamp : ''}`;
     
     notifications.push({
       id: `log-${l.id}`,
@@ -40,7 +43,7 @@ export default function MentorNotifikasi() {
       message: isRejection 
         ? `Pengajuan absensi manual untuk ${l.name} (NIM: ${l.nim}) DITOLAK. Alasan: ${l.note || 'Berkas tidak lengkap.'}`
         : `${l.name} (NIM: ${l.nim}) tercatat ${l.status === 'Valid' ? 'hadir' : 'tidak valid'} via ${l.scanner}`,
-      time: `${l.date} ${l.timestamp}`,
+      time: displayTime,
       icon: isRejection ? 'cancel' : (l.status === 'Valid' ? 'check_circle' : 'warning'),
       color: isRejection || l.status !== 'Valid' ? 'text-error bg-error-container/30' : 'text-green-500 bg-green-50',
       actionLabel: isRejection ? 'Ajukan Kembali' : 'Lihat Anggota',
@@ -54,12 +57,15 @@ export default function MentorNotifikasi() {
   groupClaims.forEach(c => {
     const id = `claim-${c.id}`;
     if (dismissedNotifications.includes(id)) return;
+    const claimDate = c.tanggalHadir || c.date || c.created_at;
+    const formattedDate = claimDate ? formatDDMMYYYY(claimDate) : formatDDMMYYYY(getTodayISOKey());
+    const displayTime = `${formattedDate}${c.time ? ' ' + c.time : ''}`;
     notifications.push({
       id,
       type: 'claim',
       title: 'Status Klaim Manual',
       message: `Klaim absensi manual untuk ${c.name} (${c.nim}) sedang diverifikasi oleh admin.`,
-      time: c.time,
+      time: displayTime,
       icon: 'history',
       color: 'text-amber-500 bg-amber-50',
       actionLabel: 'Kelola Absensi',

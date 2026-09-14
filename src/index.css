@@ -237,3 +237,20 @@
     padding-right: 16px !important;
   }
 }
+
+/* Fix date input styling to prevent text and icon overlap */
+input[type="date"] {
+  min-height: 38px;
+  position: relative;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  padding: 2px;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}

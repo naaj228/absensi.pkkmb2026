@@ -1,6 +1,7 @@
 import { useContext, useEffect } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { formatDDMMYYYY, getTodayISOKey } from '../../utils/dateHelper';
 
 export default function AdminNotifikasi() {
   const { 
@@ -25,12 +26,15 @@ export default function AdminNotifikasi() {
   claims.forEach(c => {
     const id = `claim-${c.id}`;
     if (dismissedNotifications.includes(id)) return;
+    const claimDate = c.tanggalHadir || c.date || c.created_at;
+    const formattedDate = claimDate ? formatDDMMYYYY(claimDate) : formatDDMMYYYY(getTodayISOKey());
+    const displayTime = `${formattedDate}${c.time ? ' ' + c.time : ''}`;
     notifications.push({
       id,
       type: 'claim',
       title: 'Klaim Absensi Manual Baru',
       message: `${c.name} (NIM: ${c.nim}) mengajukan absensi manual: ${c.issue}`,
-      time: c.time,
+      time: displayTime,
       icon: 'assignment_late',
       color: 'text-amber-500 bg-amber-50',
       actionLabel: 'Tinjau Klaim',
@@ -43,12 +47,14 @@ export default function AdminNotifikasi() {
   logs.filter(l => l.status !== 'Valid').forEach(l => {
     const id = `invalid-${l.id}`;
     if (dismissedNotifications.includes(id)) return;
+    const formattedDate = formatDDMMYYYY(l.date);
+    const displayTime = `${formattedDate}${l.timestamp ? ' ' + l.timestamp : ''}`;
     notifications.push({
       id,
       type: 'invalid_scan',
       title: 'Scan Tidak Valid Dideteksi',
       message: `Mahasiswa ${l.name || 'Tidak Dikenal'} (NIM: ${l.nim}) gagal melakukan scan di ${l.gugusName || 'Gugus'}`,
-      time: `${l.date} ${l.timestamp}`,
+      time: displayTime,
       icon: 'warning',
       color: 'text-error bg-error-container/30',
       actionLabel: 'Lihat Riwayat',
@@ -62,12 +68,14 @@ export default function AdminNotifikasi() {
     if (!q) return;
     const id = `qr-${q.id}`;
     if (dismissedNotifications.includes(id)) return;
+    const qrDate = q.date || q.created_at;
+    const formattedDate = qrDate ? formatDDMMYYYY(qrDate) : formatDDMMYYYY(getTodayISOKey());
     notifications.push({
       id,
       type: 'qr',
       title: 'Sesi QR Code Aktif',
       message: `Sesi "${q.title || ''}" ditargetkan ke ${q.targetAudience === 'all' ? 'Semua Peserta' : (q.targetAudience || 'Peserta')} (${q.startTime || '-'} - ${q.endTime || '-'})`,
-      time: 'Hari Ini',
+      time: formattedDate,
       icon: 'qr_code_2',
       color: 'text-primary bg-primary/5',
       actionLabel: 'Kelola QR',
