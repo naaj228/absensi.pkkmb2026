@@ -173,7 +173,8 @@ export default function MentorRiwayat() {
           <head>
             <title>Laporan Absensi ${mentorGugusName}</title>
             <style>
-              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #1f2937; line-height: 1.4; }
+              @page { margin: 0; size: auto; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 15mm 12mm; color: #1f2937; line-height: 1.4; }
               h1 { font-size: 18px; font-weight: 800; color: #012060; margin: 0 0 14px 0; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; }
               table { width: 100%; border-collapse: collapse; margin-top: 6px; }
               th, td { border: 1px solid #cbd5e1; padding: 7px 9px; text-align: left; font-size: 10.5px; }

@@ -2,7 +2,7 @@ import { useContext, useState, useCallback } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { isHadir, getStatusBadge, STATUS_OPTIONS } from '../../utils/statusHelper';
+import { isHadir, getStatusBadge, STATUS_OPTIONS, getLogDisplayStatus } from '../../utils/statusHelper';
 import { toISOKey, getTodayISOKey, formatIndonesianDate } from '../../utils/dateHelper';
 
 export default function AdminPeserta() {

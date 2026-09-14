@@ -1,7 +1,7 @@
 import { useContext, useState, useCallback } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { isHadir } from '../../utils/statusHelper';
+import { isHadir, getLogDisplayStatus } from '../../utils/statusHelper';
 import { toISOKey, getTodayISOKey, formatDDMMYYYY, formatIndonesianDate } from '../../utils/dateHelper';
 
 export default function MentorPeserta() {
