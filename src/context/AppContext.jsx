@@ -69,7 +69,8 @@ const transformClaim = (c) => ({
   issue: c.issue,
   catatan: c.catatan || c.alasan || '',
   time: c.waktu || new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
-  requestedStatus: c.requested_status || 'Hadir Penuh'
+  requestedStatus: c.requested_status || 'Hadir Penuh',
+  tanggalHadir: c.tanggal_hadir || c.tanggalHadir || null
 });
 
 const transformLog = (l) => ({
@@ -615,25 +616,27 @@ export function AppContextProvider({ children }) {
         }
       } else {
         // Direct status sync with attendance logs
-        if (fields.status !== undefined && fields.status !== student.status) {
+        if (fields.status !== undefined) {
           const newStatus = fields.status;
           const group = gugus.find(g => g.id === (fields.gugusId || student.gugusId));
           const groupName = group ? group.name : '-';
           const scannerName = currentUser?.name || 'Admin PKKMB';
 
-          if (newStatus === 'Hadir Penuh' || newStatus === 'Hadir Sebagian') {
-            const hasValidLog = logs.some(l => String(l.nim) === String(id) && l.status === 'Valid');
-            if (!hasValidLog) {
-              await addLog(fields.name || student.name, id, groupName, scannerName, 'Valid', `Ubah Status Manual ke ${newStatus}`);
+          if (newStatus === 'Hadir Penuh' || newStatus === 'Hadir Sebagian' || newStatus === 'Izin') {
+            const existingLog = logs.find(l => String(l.nim) === String(id) && l.status === 'Valid');
+            const noteText = `Ubah Status Manual ke ${newStatus}`;
+            if (existingLog) {
+              await logsDb.update(existingLog.id, { note: noteText, scanner: scannerName });
+              setLogs(prev => prev.map(l => l.id === existingLog.id ? { ...l, note: noteText, scanner: scannerName } : l));
+            } else {
+              await addLog(fields.name || student.name, id, groupName, scannerName, 'Valid', noteText);
             }
-          } else if (newStatus === 'Belum Hadir' || newStatus === 'Alpha' || newStatus === 'Sakit' || newStatus === 'Izin') {
-            // Delete any existing valid logs first to prevent sync conflicts
+          } else if (newStatus === 'Belum Hadir' || newStatus === 'Alpha' || newStatus === 'Sakit') {
+            // Delete any existing valid logs so attendance is cleared
             const studentLogs = logs.filter(l => String(l.nim) === String(id) && l.status === 'Valid');
             if (studentLogs.length > 0) {
               await Promise.all(studentLogs.map(l => deleteLog(l.id)));
             }
-            // Add a status change log in history (Invalid status since they are absent)
-            await addLog(fields.name || student.name, id, groupName, scannerName, 'Invalid', `Ubah Status Manual ke ${newStatus}`);
           }
         }
 
@@ -809,10 +812,10 @@ export function AppContextProvider({ children }) {
     }
   };
 
-  const addLog = async (name, nim, gugusName, scanner, status = 'Valid', note = '', locationData = null) => {
+  const addLog = async (name, nim, gugusName, scanner, status = 'Valid', note = '', locationData = null, customWaktu = null) => {
     try {
       const student = peserta.find(p => p.id === nim);
-      const inserted = await logsDb.add(name, nim, gugusName, scanner, status, note, student?.uuid, currentUser?.id, locationData);
+      const inserted = await logsDb.add(name, nim, gugusName, scanner, status, note, student?.uuid, currentUser?.id, locationData, customWaktu);
       if (inserted) {
         const transformed = transformLog(inserted);
         setLogs(prev => {
@@ -875,14 +878,16 @@ export function AppContextProvider({ children }) {
     }
   };
 
-  const addClaim = async (pesertaId, issue, note = '', requestedStatus = 'Hadir Penuh') => {
+  const addClaim = async (pesertaId, issue, note = '', requestedStatus = 'Hadir Penuh', targetDate = null) => {
     try {
       const student = peserta.find(p => p.id === pesertaId);
       if (!student) return;
       const group = gugus.find(g => g.id === student.gugusId);
       const groupName = group ? group.name : '-';
 
-      const added = await claimsDb.add(pesertaId, issue, note, requestedStatus, student, groupName, currentUser);
+      const tanggalHadir = targetDate || new Date().toISOString().split('T')[0];
+
+      const added = await claimsDb.add(pesertaId, issue, note, requestedStatus, student, groupName, currentUser, null, tanggalHadir);
       if (added) {
         const transformed = transformClaim(added);
         setClaims(prev => {
@@ -923,7 +928,9 @@ export function AppContextProvider({ children }) {
         const targetStatus = claim.requestedStatus || 'Hadir Penuh';
         await pesertaDb.update(claim.nim, { status: targetStatus });
         setPeserta(prev => prev.map(p => p.id === claim.nim ? { ...p, status: targetStatus } : p));
-        await addLog(claim.name, claim.nim, claim.gugusName, 'Admin PKKMB', 'Valid');
+        const timePart = new Date().toISOString().split('T')[1];
+        const customWaktu = claim.tanggalHadir ? `${claim.tanggalHadir}T${timePart}` : null;
+        await addLog(claim.name, claim.nim, claim.gugusName, 'Admin PKKMB', 'Valid', 'Persetujuan Absensi Manual', null, customWaktu);
       }
       await claimsDb.updateStatus(claimId, 'approved');
       setClaims(prev => prev.filter(c => c.id !== claimId));

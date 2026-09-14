@@ -2,15 +2,30 @@ import { useContext, useCallback, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
 import { sendQrEmail } from '../../lib/emailService';
-import { isHadir, STATUS_OPTIONS, getStatusBadge } from '../../utils/statusHelper';
+import { isHadir, STATUS_OPTIONS, getStatusBadge, getLogDisplayStatus } from '../../utils/statusHelper';
+import { getTodayISOKey, toISOKey } from '../../utils/dateHelper';
 
 export default function AdminPesertaDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { peserta, gugus, mentors, logs, updatePeserta, deletePeserta, addLog } = useContext(AppContext);
+  const { peserta, gugus, mentors, logs, updatePeserta, deletePeserta } = useContext(AppContext);
 
   // Find the student
   const student = peserta.find(p => p.id === id);
+
+  // Dynamic effective status for today's active date session
+  const todayKey = getTodayISOKey();
+  const todayLog = logs.find(l => String(l.nim) === String(id) && toISOKey(l.date) === todayKey);
+  
+  const currentEffectiveStatus = (() => {
+    if (todayLog) {
+      return getLogDisplayStatus(todayLog).label;
+    }
+    if (student?.status === 'Izin' || student?.status === 'Alpha') {
+      return student.status;
+    }
+    return 'Belum Hadir';
+  })();
 
   // Email sending state & count tracking
   const [emailSending, setEmailSending] = useState(false);
@@ -118,10 +133,9 @@ export default function AdminPesertaDetail() {
   const studentLogs = logs.filter(log => log.nim === student.id);
 
   const handleStatusChange = (newStatus) => {
-    if (student.status === newStatus) return;
-    window.confirmAction(`Apakah Anda yakin ingin mengubah status kehadiran ${student.name} menjadi "${newStatus}"?`, () => {
-      updatePeserta(student.id, { status: newStatus });
-      addLog(student.name, student.id, groupName, 'Admin (Manual Override)', 'Valid');
+    if (currentEffectiveStatus === newStatus) return;
+    window.confirmAction(`Apakah Anda yakin ingin mengubah status kehadiran ${student.name} menjadi "${newStatus}"?`, async () => {
+      await updatePeserta(student.id, { status: newStatus });
       alert(`Status ${student.name} diubah menjadi ${newStatus}.`);
     });
   };
@@ -163,12 +177,12 @@ export default function AdminPesertaDetail() {
                 <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
                   <h2 className="text-base sm:text-lg md:text-headline-sm font-bold text-on-surface leading-tight">{student.name}</h2>
                   {(() => {
-                    const badge = getStatusBadge(student.status);
+                    const badge = getStatusBadge(currentEffectiveStatus);
                     const borderColor = badge.text.replace('text-', 'border-');
                     return (
                       <span className={`px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold border flex items-center gap-1.5 ${badge.bg} ${badge.text} ${borderColor}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`}></span>
-                        {student.status}
+                        {currentEffectiveStatus}
                       </span>
                     );
                   })()}
@@ -215,7 +229,7 @@ export default function AdminPesertaDetail() {
                   <div className="bg-surface p-3 rounded-xl border border-outline-variant/20 space-y-1">
                     <p className="text-[10px] sm:text-xs text-on-surface-variant uppercase tracking-wider font-semibold">Metode Kehadiran</p>
                     <p className="text-xs sm:text-sm text-[#012060] font-bold">
-                      {isHadir(student.status) ? student.status : 'Belum Terabsen'}
+                      {isHadir(currentEffectiveStatus) ? currentEffectiveStatus : 'Belum Terabsen'}
                     </p>
                   </div>
                 </div>
@@ -229,7 +243,7 @@ export default function AdminPesertaDetail() {
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {STATUS_OPTIONS.map(opt => {
-                    const isActive = student.status === opt.value;
+                    const isActive = currentEffectiveStatus === opt.value;
                     return (
                       <button
                         key={opt.value}
@@ -239,6 +253,7 @@ export default function AdminPesertaDetail() {
                             ? 'ring-2 ring-primary ring-offset-2 opacity-100'
                             : 'opacity-80 hover:opacity-100'
                         } ${
+                          opt.value === 'Belum Hadir'    ? 'bg-slate-500/15 text-slate-700 border-slate-300' :
                           opt.value === 'Hadir Penuh'    ? 'bg-green-500/15 text-green-700 border-green-300' :
                           opt.value === 'Hadir Sebagian' ? 'bg-amber-500/15 text-amber-700 border-amber-300' :
                           opt.value === 'Izin'           ? 'bg-blue-500/15  text-blue-700  border-blue-300'  :
@@ -246,7 +261,8 @@ export default function AdminPesertaDetail() {
                         }`}
                       >
                         <span className="material-symbols-outlined text-[16px] sm:text-[18px]">
-                          {opt.value === 'Hadir Penuh' ? 'check_circle' :
+                          {opt.value === 'Belum Hadir' ? 'radio_button_unchecked' :
+                           opt.value === 'Hadir Penuh' ? 'check_circle' :
                            opt.value === 'Hadir Sebagian' ? 'contrast' :
                            opt.value === 'Izin' ? 'description' : 'cancel'}
                         </span>

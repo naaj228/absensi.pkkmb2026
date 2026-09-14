@@ -154,8 +154,8 @@ export default function AdminGugus() {
       <polygon points="100,0 100,100 0,0"></polygon>
       </svg>
       <div className="flex justify-between items-start mb-3 sm:mb-6">
-      <div className="min-w-0">
-        <h3 className="text-sm sm:text-headline-md font-bold text-on-surface truncate max-w-[80px] sm:max-w-none">{g.name}</h3>
+      <div className="min-w-0 flex-1">
+        <h3 className="text-body-sm sm:text-headline-sm font-bold text-on-surface leading-tight pr-2 break-words">{g.name}</h3>
         <p className="text-[9px] sm:text-body-sm text-on-surface-variant font-mono mt-0.5">ID: {displayGugusId(g.id)}</p>
       </div>
       <div className="flex gap-0.5 relative z-20 shrink-0">

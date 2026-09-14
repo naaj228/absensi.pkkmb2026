@@ -406,11 +406,12 @@ export const claimsDb = {
       issue: c.issue,
       catatan: c.catatan || c.alasan || '',
       time: c.waktu || new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
-      requestedStatus: c.requested_status || 'Hadir Penuh'
+      requestedStatus: c.requested_status || 'Hadir Penuh',
+      tanggalHadir: c.tanggal_hadir || null
     }));
   },
 
-  async add(pesertaId, issue, note = '', requestedStatus = 'Hadir Penuh', student, gugusName, currentUserProfile, catatan = null) {
+  async add(pesertaId, issue, note = '', requestedStatus = 'Hadir Penuh', student, gugusName, currentUserProfile, catatan = null, tanggalHadir = null) {
     // Find the participant uuid from nim or check if student passed in
     const { data, error } = await supabase
       .from('approval_manual')
@@ -425,7 +426,8 @@ export const claimsDb = {
         nim: pesertaId,
         nama: student?.name || student?.nama || '',
         gugus_nama: gugusName,
-        waktu: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+        waktu: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        tanggal_hadir: tanggalHadir || new Date().toISOString().split('T')[0]
       })
       .select()
       .single();
@@ -474,7 +476,7 @@ export const logsDb = {
     }));
   },
 
-  async add(name, nim, gugusName, scanner, status = 'Valid', note = '', studentUuid, scannerUuid, locationData = null) {
+  async add(name, nim, gugusName, scanner, status = 'Valid', note = '', studentUuid, scannerUuid, locationData = null, customWaktu = null) {
     const insertObj = {
       peserta_id: studentUuid || null,
       dicatat_oleh: scannerUuid || null,
@@ -485,7 +487,7 @@ export const logsDb = {
       status_log: status,
       catatan: note,
       status: 'hadir', // internal status matching SQL column
-      waktu: new Date().toISOString()
+      waktu: customWaktu || new Date().toISOString()
     };
 
     if (locationData) {
@@ -498,6 +500,22 @@ export const logsDb = {
     const { data, error } = await supabase
       .from('absensi')
       .insert(insertObj)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id, fields) {
+    const updateObj = {};
+    if (fields.note !== undefined) updateObj.catatan = fields.note;
+    if (fields.status !== undefined) updateObj.status_log = fields.status;
+    if (fields.scanner !== undefined) updateObj.dicatat_nama = fields.scanner;
+
+    const { data, error } = await supabase
+      .from('absensi')
+      .update(updateObj)
+      .eq('id', id)
       .select()
       .single();
     if (error) throw error;

@@ -165,7 +165,7 @@ export default function AdminMentor() {
         </div>
 
         {/* Quick Filter Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
           <div 
             onClick={() => handleFilterToggle('aktif')}
             className={`bg-white rounded-2xl p-3.5 sm:p-5 shadow-xs border transition-all cursor-pointer ${
@@ -188,27 +188,12 @@ export default function AdminMentor() {
             }`}
           >
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] sm:text-label-sm font-bold text-slate-400 uppercase tracking-wider">Unassigned</span>
+              <span className="text-[10px] sm:text-label-sm font-bold text-slate-400 uppercase tracking-wider">Belum Ada Gugus</span>
               <div className="w-7 h-7 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold">
                 <span className="material-symbols-outlined text-[16px]">hourglass_empty</span>
               </div>
             </div>
             <p className="text-body-md sm:text-headline-md font-extrabold text-amber-700">{mentors.filter(m => m.gugusId === 'Unassigned').length}</p>
-          </div>
-
-          <div 
-            onClick={() => handleFilterToggle('alerts')}
-            className={`bg-white rounded-2xl p-3.5 sm:p-5 shadow-xs border transition-all cursor-pointer col-span-2 md:col-span-1 ${
-              activeFilter === 'alerts' ? 'border-rose-500 ring-2 ring-rose-500/10 bg-rose-50/30' : 'border-slate-100 hover:border-slate-200'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] sm:text-label-sm font-bold text-slate-400 uppercase tracking-wider">Perlu Kontak</span>
-              <div className="w-7 h-7 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center font-bold">
-                <span className="material-symbols-outlined text-[16px]">warning</span>
-              </div>
-            </div>
-            <p className="text-body-md sm:text-headline-md font-extrabold text-rose-700">{mentors.filter(m => !m.email || !m.phone).length}</p>
           </div>
         </div>
 

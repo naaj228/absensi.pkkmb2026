@@ -311,7 +311,7 @@ export default function AdminQrManagement() {
         </div>
 
         {/* Stats Widgets */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4">
           <div className="bg-white rounded-2xl p-3 sm:p-5 shadow-sm border border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1">
             <div>
               <p className="text-[9px] sm:text-label-sm font-bold text-slate-400 uppercase tracking-wider">Total QR</p>
@@ -329,19 +329,6 @@ export default function AdminQrManagement() {
             </div>
             <div className="w-8 h-8 rounded-xl bg-[#012060]/5 hidden sm:flex items-center justify-center text-[#012060]">
               <span className="material-symbols-outlined text-[20px]">grid_view</span>
-            </div>
-          </div>
-
-          <div className="bg-emerald-50/70 rounded-2xl p-3 sm:p-5 shadow-sm border border-emerald-200/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1">
-            <div>
-              <p className="text-[9px] sm:text-label-sm font-bold text-emerald-700 uppercase tracking-wider">Sudah Absen</p>
-              <p className="text-body-lg sm:text-headline-lg font-extrabold text-emerald-700 mt-0.5 sm:mt-1">
-                {peserta.filter(p => ['Hadir Penuh','Hadir Sebagian','Izin'].includes(p.status)).length}
-                <span className="text-[10px] sm:text-xs font-normal text-emerald-600/80">/{peserta.length}</span>
-              </p>
-            </div>
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 hidden sm:flex items-center justify-center text-emerald-600">
-              <span className="material-symbols-outlined text-[20px]">check_circle</span>
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@ import { useContext, useState } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { isHadir } from '../../utils/statusHelper';
+import { isHadir, getLogDisplayStatus } from '../../utils/statusHelper';
 import { groupLogsByDate, formatDDMMYYYY } from '../../utils/dateHelper';
 
 export default function AdminRiwayat() {
@@ -70,13 +70,45 @@ export default function AdminRiwayat() {
   const selectedGugusObj = gugus.find(g => g.id === selectedGugus);
   const selectedGugusName = selectedGugusObj ? selectedGugusObj.name : '';
 
+  // 1. Generate synthetic "Belum Hadir" logs for dates that have active scan logs
+  const activeDates = Array.from(new Set(logs.map(l => l.date).filter(Boolean)));
+
+  const belumHadirLogs = [];
+  activeDates.forEach(dateStr => {
+    const logsOnDate = logs.filter(l => l.date === dateStr);
+    const scannedNimsOnDate = new Set(logsOnDate.map(l => String(l.nim)));
+
+    peserta.forEach(p => {
+      if (!scannedNimsOnDate.has(String(p.id))) {
+        const pGugus = gugus.find(g => g.id === p.gugusId);
+        const isAlphaStatus = p.status === 'Alpha';
+        belumHadirLogs.push({
+          id: `belum_hadir_${p.id}_${dateStr}`,
+          nim: p.id,
+          name: p.name,
+          gugusId: p.gugusId,
+          gugusName: pGugus ? pGugus.name : '-',
+          date: dateStr,
+          timestamp: '--:--',
+          scanner: '-',
+          status: isAlphaStatus ? 'Alpha' : 'Belum Hadir',
+          note: isAlphaStatus ? 'Tanpa Keterangan (Alpha)' : 'Belum Melakukan Absensi',
+          isBelumHadir: !isAlphaStatus,
+          isAlpha: isAlphaStatus
+        });
+      }
+    });
+  });
+
+  const combinedLogs = [...logs, ...belumHadirLogs];
+
   // Filtering logic
-  const filteredLogs = logs.filter(log => {
+  const filteredLogs = combinedLogs.filter(log => {
     const term = searchTerm.toLowerCase();
-    const matchesSearch = log.name.toLowerCase().includes(term) || 
-                          log.nim.includes(term) || 
-                          (log.scanner && log.scanner.toLowerCase().includes(term));
-    
+    const matchesSearch = log.name.toLowerCase().includes(term) ||
+      log.nim.includes(term) ||
+      (log.scanner && log.scanner.toLowerCase().includes(term));
+
     let matchesGugus = true;
     if (selectedGugus !== 'all') {
       matchesGugus = log.gugusName.toLowerCase() === selectedGugusName.toLowerCase();
@@ -85,10 +117,19 @@ export default function AdminRiwayat() {
     const matchesDate = !selectedDate || log.date === selectedDate;
 
     let matchesTab = true;
-    if (activeTab === 'Valid') {
-      matchesTab = log.status === 'Valid';
-    } else if (activeTab === 'Invalid') {
-      matchesTab = log.status !== 'Valid';
+    const displayStatus = getLogDisplayStatus(log);
+    if (activeTab === 'Hadir Penuh') {
+      matchesTab = displayStatus.label === 'Hadir Penuh';
+    } else if (activeTab === 'Hadir Sebagian') {
+      matchesTab = displayStatus.label === 'Hadir Sebagian';
+    } else if (activeTab === 'Izin') {
+      matchesTab = displayStatus.label === 'Izin';
+    } else if (activeTab === 'Alpha') {
+      matchesTab = displayStatus.label === 'Alpha';
+    } else if (activeTab === 'Scan Gagal' || activeTab === 'Invalid') {
+      matchesTab = displayStatus.label === 'Scan Gagal';
+    } else if (activeTab === 'Belum Hadir') {
+      matchesTab = displayStatus.label === 'Belum Hadir';
     }
 
     return matchesSearch && matchesGugus && matchesDate && matchesTab;
@@ -115,6 +156,7 @@ export default function AdminRiwayat() {
         const sheetData = group.logs.map(log => {
           const studentInfo = peserta.find(p => p.id === log.nim);
           const jurusan = studentInfo ? studentInfo.fakultas : '-';
+          const displayStatus = getLogDisplayStatus(log);
           return {
             'Tanggal': formatDDMMYYYY(log.date),
             'Waktu': log.timestamp,
@@ -123,7 +165,7 @@ export default function AdminRiwayat() {
             'Gugus': log.gugusName,
             'Fakultas / Jurusan': jurusan,
             'Pemindai (Mentor)': log.scanner,
-            'Status': log.status,
+            'Status': displayStatus.label,
             'Lokasi Scan': log.locationStatus || (log.scanner?.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi')
           };
         });
@@ -149,81 +191,69 @@ export default function AdminRiwayat() {
       });
 
       XLSX.writeFile(workbook, `Laporan_Absensi_PKKMB_2026_${selectedDate || 'Semua_Hari'}.xlsx`);
-    } 
+    }
     else if (type === 'PDF') {
       // Single continuous table format sorted chronologically with Tanggal & Waktu columns
       const rowsHtml = flatLogsChronological.map((log, idx) => {
-        const location = log.latitude && log.longitude 
+        const location = log.latitude && log.longitude
           ? (log.locationStatus || 'Dalam Area')
           : (log.scanner?.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi');
+        const displayStatus = getLogDisplayStatus(log);
 
         return `
           <tr>
-            <td style="text-align: center; width: 35px;">${idx + 1}</td>
-            <td style="width: 80px; font-family: monospace;">${formatDDMMYYYY(log.date)}</td>
-            <td style="width: 70px; font-family: monospace;">${log.timestamp}</td>
-            <td style="width: 95px; font-family: monospace;">${log.nim}</td>
+            <td style="text-align: center; width: 30px;">${idx + 1}</td>
+            <td style="width: 75px; font-family: monospace;">${formatDDMMYYYY(log.date)}</td>
+            <td style="width: 65px; font-family: monospace;">${log.timestamp}</td>
+            <td style="width: 90px; font-family: monospace;">${log.nim}</td>
             <td><strong>${log.name}</strong></td>
-            <td style="width: 90px;">${log.gugusName}</td>
-            <td style="width: 100px;">${log.scanner}</td>
-            <td style="text-align: center; width: 70px;">
-              <span class="badge ${log.status === 'Valid' ? 'valid' : 'invalid'}">
-                ${log.status}
+            <td style="width: 85px;">${log.gugusName}</td>
+            <td style="width: 95px;">${log.scanner}</td>
+            <td style="text-align: center; width: 95px;">
+              <span class="badge" style="${displayStatus.pdfBadge}">
+                ${displayStatus.label}
               </span>
             </td>
-            <td style="width: 95px; font-size: 10px;">${location}</td>
+            <td style="width: 85px; font-size: 10px;">${location}</td>
           </tr>
         `;
       }).join('');
 
       const html = `
+        <!DOCTYPE html>
         <html>
           <head>
-            <title>Laporan Absensi PKKMB 2026</title>
+            <title>Laporan Riwayat Kehadiran PKKMB 2026</title>
             <style>
-              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 25px; color: #1f2937; line-height: 1.4; }
-              h1 { font-size: 20px; color: #012060; margin: 0 0 4px 0; }
-              .meta { font-size: 12px; color: #4b5563; margin-bottom: 20px; border-bottom: 2px solid #012060; padding-bottom: 10px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-              th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; font-size: 11px; }
-              th { background-color: #f8fafc; color: #1e293b; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #1f2937; line-height: 1.4; }
+              h1 { font-size: 18px; font-weight: 800; color: #012060; margin: 0 0 14px 0; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; }
+              table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+              th, td { border: 1px solid #cbd5e1; padding: 7px 9px; text-align: left; font-size: 10.5px; }
+              th { background-color: #012060; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
               tr:nth-child(even) { background-color: #f8fafc; }
-              .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; text-align: center; }
-              .valid { background: #d1fae5; color: #065f46; }
-              .invalid { background: #fee2e2; color: #991b1b; }
-              .footer { margin-top: 30px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+              .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 9.5px; font-weight: 700; text-align: center; }
             </style>
           </head>
           <body>
             <h1>Laporan Riwayat Kehadiran PKKMB 2026</h1>
-            <div class="meta">
-              Gugus: <strong>${selectedGugus === 'all' ? 'Semua Gugus' : selectedGugusName}</strong> &nbsp;|&nbsp; 
-              Filter Tanggal: <strong>${selectedDate ? formatDDMMYYYY(selectedDate) : 'Semua Hari'}</strong> &nbsp;|&nbsp;
-              Kategori: <strong>${activeTab}</strong> &nbsp;|&nbsp;
-              Dicetak: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} &nbsp;|&nbsp; 
-              Total Absensi: <strong>${flatLogsChronological.length} Data</strong>
-            </div>
             <table>
               <thead>
                 <tr>
-                  <th style="text-align: center;">No</th>
-                  <th>Tanggal</th>
-                  <th>Waktu</th>
-                  <th>NIM</th>
+                  <th style="text-align: center; width: 30px;">No</th>
+                  <th style="width: 75px;">Tanggal</th>
+                  <th style="width: 65px;">Waktu</th>
+                  <th style="width: 90px;">NIM</th>
                   <th>Nama Mahasiswa</th>
-                  <th>Gugus</th>
-                  <th>Pemindai</th>
-                  <th style="text-align: center;">Status</th>
-                  <th>Lokasi Scan</th>
+                  <th style="width: 85px;">Gugus</th>
+                  <th style="width: 95px;">Pemindai</th>
+                  <th style="text-align: center; width: 95px;">Status</th>
+                  <th style="width: 85px;">Lokasi Scan</th>
                 </tr>
               </thead>
               <tbody>
                 ${rowsHtml}
               </tbody>
             </table>
-            <div class="footer">
-              Dicetak otomatis oleh Sistem Absensi PKKMB 2026 (Admin Panel)
-            </div>
           </body>
         </html>
       `;
@@ -283,7 +313,7 @@ export default function AdminRiwayat() {
           </h1>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <div 
+          <div
             className="relative group cursor-pointer p-2 rounded-xl hover:bg-slate-100 transition-colors"
             onClick={() => navigate('/admin/notifikasi')}
             title="Notifikasi Admin"
@@ -296,7 +326,7 @@ export default function AdminRiwayat() {
 
       {/* Main Content */}
       <main className="relative pt-20 px-3 sm:px-4 lg:px-6 max-w-container-max mx-auto space-y-4 sm:space-y-6">
-        
+
         {/* Banner & Action Buttons */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
           <div>
@@ -307,16 +337,16 @@ export default function AdminRiwayat() {
           </div>
 
           <div className="flex flex-row w-full sm:w-auto gap-2.5 shrink-0">
-            <button 
-              onClick={() => handleExport('PDF')} 
+            <button
+              onClick={() => handleExport('PDF')}
               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-[#012060] px-4 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-xs cursor-pointer active:scale-98"
             >
               <span className="material-symbols-outlined text-[18px] text-[#012060]">picture_as_pdf</span>
               <span>Ekspor PDF</span>
             </button>
-            
-            <button 
-              onClick={() => handleExport('Excel')} 
+
+            <button
+              onClick={() => handleExport('Excel')}
               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-[#012060] hover:bg-[#022b80] text-white px-4 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-md active:scale-98 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">table_chart</span>
@@ -327,7 +357,7 @@ export default function AdminRiwayat() {
 
         {/* Filters & Quick Metrics Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-          
+
           {/* Filter Panel */}
           <div className="lg:col-span-8 bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col gap-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -336,16 +366,16 @@ export default function AdminRiwayat() {
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cari Peserta / NIM</label>
                 <div className="relative group">
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors text-[18px]">search</span>
-                  <input 
-                    className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl py-2.5 pl-9 pr-8 text-body-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all" 
-                    placeholder="Nama atau NIM..." 
-                    type="text" 
-                    value={searchTerm} 
-                    onChange={(e) => setSearchTerm(e.target.value)} 
+                  <input
+                    className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl py-2.5 pl-9 pr-8 text-body-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all"
+                    placeholder="Nama atau NIM..."
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
                   {searchTerm && (
-                    <button 
-                      onClick={() => setSearchTerm('')} 
+                    <button
+                      onClick={() => setSearchTerm('')}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[15px]">close</span>
@@ -358,9 +388,9 @@ export default function AdminRiwayat() {
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gugus</label>
                 <div className="relative group">
-                  <select 
-                    className="w-full appearance-none bg-[#f8fafc] border border-slate-200 rounded-xl py-2.5 pl-3.5 pr-8 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer" 
-                    value={selectedGugus} 
+                  <select
+                    className="w-full appearance-none bg-[#f8fafc] border border-slate-200 rounded-xl py-2.5 pl-3.5 pr-8 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer"
+                    value={selectedGugus}
                     onChange={(e) => setSelectedGugus(e.target.value)}
                   >
                     <option value="all">Semua Gugus</option>
@@ -375,11 +405,11 @@ export default function AdminRiwayat() {
               {/* Date Filter */}
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tanggal</label>
-                <input 
-                  className="w-full appearance-none bg-[#f8fafc] border border-slate-200 rounded-xl py-2.5 px-3.5 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer" 
-                  type="date" 
-                  value={selectedDate} 
-                  onChange={(e) => setSelectedDate(e.target.value)} 
+                <input
+                  className="w-full appearance-none bg-[#f8fafc] border border-slate-200 rounded-xl py-2.5 px-3.5 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
                 />
               </div>
             </div>
@@ -423,10 +453,10 @@ export default function AdminRiwayat() {
               <span className="material-symbols-outlined text-[#012060] text-[20px]">list_alt</span>
               <h3 className="text-body-md sm:text-headline-sm font-bold text-[#012060]">Total Absensi ({filteredLogs.length})</h3>
             </div>
-            
+
             {selectedIds.length > 0 && (
-              <button 
-                onClick={handleDeleteSelected} 
+              <button
+                onClick={handleDeleteSelected}
                 className="bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer border border-rose-200/60 animate-fade-in"
               >
                 <span className="material-symbols-outlined text-[15px]">delete</span>
@@ -435,21 +465,22 @@ export default function AdminRiwayat() {
             )}
           </div>
 
-          {/* Status Filter Tabs */}
-          <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
-            {['Semua', 'Valid', 'Invalid'].map((tab) => (
-              <button 
-                key={tab}
-                onClick={() => setActiveTab(tab)} 
-                className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-[11px] sm:text-body-sm font-bold transition-all cursor-pointer ${
-                  activeTab === tab 
-                    ? 'bg-white shadow-xs text-[#012060]' 
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+          {/* Status Filter Dropdown Box */}
+          <div className="relative group w-full sm:w-auto">
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              className="w-full sm:w-auto appearance-none bg-[#f8fafc] border border-slate-200 rounded-xl py-2 px-4 pr-9 text-body-sm font-bold text-[#012060] focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer shadow-xs"
+            >
+              <option value="Semua">Status: Semua</option>
+              <option value="Hadir Penuh">✅ Hadir Penuh</option>
+              <option value="Hadir Sebagian">🟡 Hadir Sebagian</option>
+              <option value="Izin">📄 Izin</option>
+              <option value="Alpha">❌ Alpha</option>
+              <option value="Belum Hadir">⚪ Belum Hadir</option>
+              <option value="Scan Gagal">⚠️ Scan Gagal</option>
+            </select>
+            <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[18px]">expand_more</span>
           </div>
         </div>
 
@@ -463,7 +494,7 @@ export default function AdminRiwayat() {
               return (
                 <div key={group.isoDate} className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-200">
                   {/* Accordion Header */}
-                  <div 
+                  <div
                     onClick={() => toggleDateOpen(group.isoDate)}
                     className="w-full px-4 sm:px-6 py-3.5 bg-slate-50/80 hover:bg-slate-100/80 flex items-center justify-between transition-colors border-b border-slate-100 cursor-pointer select-none"
                   >
@@ -471,7 +502,7 @@ export default function AdminRiwayat() {
                       <span className={`material-symbols-outlined text-[#012060] text-[20px] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
                         keyboard_arrow_down
                       </span>
-                      
+
                       <div className="flex items-center gap-2 truncate">
                         <span className="material-symbols-outlined text-primary text-[18px]">calendar_today</span>
                         <h3 className="text-body-sm sm:text-body-md font-bold text-[#012060] truncate">
@@ -482,11 +513,11 @@ export default function AdminRiwayat() {
 
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#012060]/5 text-[#012060] border border-[#012060]/10">
-                        {group.totalValid} Hadir
+                        {group.totalHadir || 0} Hadir
                       </span>
-                      {group.totalInvalid > 0 && (
+                      {(group.totalBelumHadir || group.totalInvalid) > 0 && (
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
-                          {group.totalInvalid} Kendala
+                          {group.totalBelumHadir || group.totalInvalid} Belum Hadir
                         </span>
                       )}
                     </div>
@@ -502,34 +533,34 @@ export default function AdminRiwayat() {
                             const isValid = log.status === 'Valid';
 
                             return (
-                              <div 
-                                key={log.id} 
+                              <div
+                                key={log.id}
                                 onClick={() => navigate(`/admin/peserta/${log.nim}`)}
-                                className={`bg-white rounded-2xl p-2.5 shadow-xs border flex flex-col justify-between gap-2 hover:shadow-md transition-all relative overflow-hidden group cursor-pointer ${
-                                  isValid 
-                                    ? 'border-slate-200/80 border-l-4 border-l-emerald-500' 
+                                className={`bg-white rounded-2xl p-2.5 shadow-xs border flex flex-col justify-between gap-2 hover:shadow-md transition-all relative overflow-hidden group cursor-pointer ${isValid
+                                    ? 'border-slate-200/80 border-l-4 border-l-emerald-500'
                                     : 'border-slate-200/80 border-l-4 border-l-rose-500'
-                                }`}
+                                  }`}
                               >
                                 {/* Top Bar: Checkbox + Status Badge */}
                                 <div className="flex items-center justify-between gap-1">
                                   <div onClick={(e) => e.stopPropagation()} className="flex items-center">
-                                    <input 
-                                      type="checkbox" 
+                                    <input
+                                      type="checkbox"
                                       className="w-3.5 h-3.5 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer"
                                       checked={selectedIds.includes(log.id)}
-                                      onChange={(e) => handleSelectOne(log.id, e.target.checked)} 
+                                      onChange={(e) => handleSelectOne(log.id, e.target.checked)}
                                     />
                                   </div>
 
-                                  <span className={`px-1.5 py-0.5 rounded-full text-[8.5px] font-extrabold shrink-0 border flex items-center gap-1 ${
-                                    isValid 
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                                      : 'bg-rose-50 text-rose-700 border-rose-200'
-                                  }`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${isValid ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                                    <span>{isValid ? 'Valid' : 'Kendala'}</span>
-                                  </span>
+                                  {(() => {
+                                    const b = getLogDisplayStatus(log);
+                                    return (
+                                      <span className={`px-1.5 py-0.5 rounded-full text-[8.5px] font-extrabold shrink-0 border flex items-center gap-1 ${b.bg}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span>
+                                        <span>{b.label}</span>
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
 
                                 {/* Name & NIM */}
@@ -579,14 +610,14 @@ export default function AdminRiwayat() {
 
                                 {/* Action Buttons */}
                                 <div className="grid grid-cols-2 gap-1 pt-1 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
-                                  <button 
+                                  <button
                                     onClick={() => navigate(`/admin/peserta/${log.nim}`)}
                                     className="py-1 bg-[#012060] text-white rounded-lg text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
                                     title="Lihat Detail"
                                   >
                                     <span className="material-symbols-outlined text-[12px]">visibility</span>
                                   </button>
-                                  <button 
+                                  <button
                                     onClick={() => {
                                       window.confirmAction(`Hapus log absensi untuk ${log.name}?`, () => {
                                         deleteLog(log.id);
@@ -621,11 +652,11 @@ export default function AdminRiwayat() {
                           <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100">
                               <th className="py-2.5 px-1.5 text-center">
-                                <input 
-                                  type="checkbox" 
+                                <input
+                                  type="checkbox"
                                   className="w-4 h-4 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer"
                                   checked={isGroupAllSelected}
-                                  onChange={(e) => handleSelectGroupLogs(group.logs, e.target.checked)} 
+                                  onChange={(e) => handleSelectGroupLogs(group.logs, e.target.checked)}
                                   title="Pilih semua log pada tanggal ini"
                                 />
                               </th>
@@ -640,17 +671,17 @@ export default function AdminRiwayat() {
                           </thead>
                           <tbody className="bg-white divide-y divide-slate-100">
                             {group.logs.map((log) => (
-                              <tr 
-                                key={log.id} 
+                              <tr
+                                key={log.id}
                                 onClick={() => navigate(`/admin/peserta/${log.nim}`)}
                                 className="hover:bg-[#012060]/[0.03] transition-all group cursor-pointer"
                               >
                                 <td className="py-2.5 px-1.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                  <input 
-                                    type="checkbox" 
+                                  <input
+                                    type="checkbox"
                                     className="w-4 h-4 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer"
                                     checked={selectedIds.includes(log.id)}
-                                    onChange={(e) => handleSelectOne(log.id, e.target.checked)} 
+                                    onChange={(e) => handleSelectOne(log.id, e.target.checked)}
                                   />
                                 </td>
                                 <td className="py-2.5 px-1.5 truncate">
@@ -671,14 +702,15 @@ export default function AdminRiwayat() {
                                   <span className="text-[11px] text-slate-700 font-medium truncate block" title={log.scanner}>{log.scanner}</span>
                                 </td>
                                 <td className="py-2.5 px-1.5 truncate">
-                                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold border max-w-full truncate ${
-                                    log.status === 'Valid' 
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                                      : 'bg-rose-50 text-rose-700 border-rose-200'
-                                  }`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${log.status === 'Valid' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                                    <span className="truncate">{log.status}</span>
-                                  </span>
+                                  {(() => {
+                                    const b = getLogDisplayStatus(log);
+                                    return (
+                                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold border max-w-full truncate ${b.bg}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${b.dot}`}></span>
+                                        <span className="truncate">{b.label}</span>
+                                      </span>
+                                    );
+                                  })()}
                                 </td>
                                 <td className="py-2.5 px-1.5 truncate" onClick={(e) => e.stopPropagation()}>
                                   {log.latitude && log.longitude ? (
@@ -701,14 +733,14 @@ export default function AdminRiwayat() {
                                 </td>
                                 <td className="py-2.5 px-1.5 text-right truncate" onClick={(e) => e.stopPropagation()}>
                                   <div className="flex items-center justify-end gap-0.5">
-                                    <button 
+                                    <button
                                       onClick={() => navigate(`/admin/peserta/${log.nim}`)}
                                       className="p-1 text-[#012060] hover:bg-[#012060]/10 rounded-lg transition-colors cursor-pointer"
                                       title="Lihat Detail Peserta"
                                     >
                                       <span className="material-symbols-outlined text-[16px]">visibility</span>
                                     </button>
-                                    <button 
+                                    <button
                                       onClick={() => {
                                         window.confirmAction(`Hapus log absensi untuk ${log.name} (${log.nim})?`, () => {
                                           deleteLog(log.id);

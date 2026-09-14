@@ -2,10 +2,11 @@ import { useContext, useState } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
+import { isHadir, getLogDisplayStatus } from '../../utils/statusHelper';
 import { groupLogsByDate, formatDDMMYYYY } from '../../utils/dateHelper';
 
 export default function MentorRiwayat() {
-  const { logs, gugus, currentUser, hasMentorNotifications } = useContext(AppContext);
+  const { logs, gugus, peserta, currentUser, hasMentorNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
   // Get gugus ID and name of current mentor
@@ -38,20 +39,64 @@ export default function MentorRiwayat() {
 
   // Filtering logic: Only show logs from mentor's own gugus
   const mentorLogs = logs.filter(log => log.gugusName.toLowerCase() === mentorGugusName.toLowerCase());
+  const mentorPeserta = peserta.filter(p => {
+    const pGugus = gugus.find(g => g.id === p.gugusId);
+    return pGugus && pGugus.name.toLowerCase() === mentorGugusName.toLowerCase();
+  });
 
-  const filteredLogs = mentorLogs.filter(log => {
+  // Generate synthetic "Belum Hadir" / "Alpha" logs for active dates in mentor's gugus
+  const activeDates = Array.from(new Set(mentorLogs.map(l => l.date).filter(Boolean)));
+  const belumHadirLogs = [];
+
+  activeDates.forEach(dateStr => {
+    const logsOnDate = mentorLogs.filter(l => l.date === dateStr);
+    const scannedNimsOnDate = new Set(logsOnDate.map(l => String(l.nim)));
+
+    mentorPeserta.forEach(p => {
+      if (!scannedNimsOnDate.has(String(p.id))) {
+        const isAlphaStatus = p.status === 'Alpha';
+        belumHadirLogs.push({
+          id: `belum_hadir_${p.id}_${dateStr}`,
+          nim: p.id,
+          name: p.name,
+          gugusId: p.gugusId,
+          gugusName: mentorGugusName,
+          date: dateStr,
+          timestamp: '--:--',
+          scanner: '-',
+          status: isAlphaStatus ? 'Alpha' : 'Belum Hadir',
+          note: isAlphaStatus ? 'Tanpa Keterangan (Alpha)' : 'Belum Melakukan Absensi',
+          isBelumHadir: !isAlphaStatus,
+          isAlpha: isAlphaStatus
+        });
+      }
+    });
+  });
+
+  const combinedLogs = [...mentorLogs, ...belumHadirLogs];
+
+  const filteredLogs = combinedLogs.filter(log => {
     const term = searchTerm.toLowerCase();
-    const matchesSearch = log.name.toLowerCase().includes(term) || 
-                          log.nim.includes(term) || 
-                          (log.scanner && log.scanner.toLowerCase().includes(term));
+    const matchesSearch = log.name.toLowerCase().includes(term) ||
+      log.nim.includes(term) ||
+      (log.scanner && log.scanner.toLowerCase().includes(term));
 
     const matchesDate = !selectedDate || log.date === selectedDate;
 
     let matchesTab = true;
-    if (activeTab === 'Valid') {
-      matchesTab = log.status === 'Valid';
-    } else if (activeTab === 'Invalid') {
-      matchesTab = log.status !== 'Valid';
+    const displayStatus = getLogDisplayStatus(log);
+    if (activeTab === 'Hadir Penuh') {
+      matchesTab = displayStatus.label === 'Hadir Penuh';
+    } else if (activeTab === 'Hadir Sebagian') {
+      matchesTab = displayStatus.label === 'Hadir Sebagian';
+    } else if (activeTab === 'Izin') {
+      matchesTab = displayStatus.label === 'Izin';
+    } else if (activeTab === 'Alpha') {
+      matchesTab = displayStatus.label === 'Alpha';
+    } else if (activeTab === 'Scan Gagal' || activeTab === 'Invalid') {
+      matchesTab = displayStatus.label === 'Scan Gagal';
+    } else if (activeTab === 'Belum Hadir') {
+      matchesTab = displayStatus.label === 'Belum Hadir';
     }
 
     return matchesSearch && matchesDate && matchesTab;
@@ -72,15 +117,18 @@ export default function MentorRiwayat() {
 
     if (type === 'Excel') {
       // Option A for Mentor: Single sheet flat list, chronological order
-      const data = flatLogsChronological.map(log => ({
-        'Tanggal': formatDDMMYYYY(log.date),
-        'Waktu': log.timestamp,
-        'NIM': log.nim,
-        'Nama Peserta': log.name,
-        'Gugus': log.gugusName,
-        'Pemindai': log.scanner,
-        'Status': log.status
-      }));
+      const data = flatLogsChronological.map(log => {
+        const displayStatus = getLogDisplayStatus(log);
+        return {
+          'Tanggal': formatDDMMYYYY(log.date),
+          'Waktu': log.timestamp,
+          'NIM': log.nim,
+          'Nama Peserta': log.name,
+          'Gugus': log.gugusName,
+          'Pemindai': log.scanner,
+          'Status': displayStatus.label
+        };
+      });
 
       const worksheet = XLSX.utils.json_to_sheet(data);
 
@@ -97,69 +145,61 @@ export default function MentorRiwayat() {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Absensi");
       XLSX.writeFile(workbook, `Laporan_Absensi_${mentorGugusName.replace(/\s+/g, '_')}_${selectedDate || 'Semua_Hari'}.xlsx`);
-    } 
+    }
     else if (type === 'PDF') {
       // Clean single table PDF format sorted chronologically
-      const rowsHtml = flatLogsChronological.map((log, idx) => `
-        <tr>
-          <td style="text-align: center; width: 35px;">${idx + 1}</td>
-          <td style="width: 85px; font-family: monospace;">${formatDDMMYYYY(log.date)}</td>
-          <td style="width: 75px; font-family: monospace;">${log.timestamp}</td>
-          <td style="width: 100px; font-family: monospace;">${log.nim}</td>
-          <td><strong>${log.name}</strong></td>
-          <td>${log.scanner}</td>
-          <td style="text-align: center; width: 75px;">
-            <span class="badge ${log.status === 'Valid' ? 'valid' : 'invalid'}">
-              ${log.status}
-            </span>
-          </td>
-        </tr>
-      `).join('');
+      const rowsHtml = flatLogsChronological.map((log, idx) => {
+        const displayStatus = getLogDisplayStatus(log);
+        return `
+          <tr>
+            <td style="text-align: center; width: 30px;">${idx + 1}</td>
+            <td style="width: 75px; font-family: monospace;">${formatDDMMYYYY(log.date)}</td>
+            <td style="width: 65px; font-family: monospace;">${log.timestamp}</td>
+            <td style="width: 90px; font-family: monospace;">${log.nim}</td>
+            <td><strong>${log.name}</strong></td>
+            <td style="width: 95px;">${log.scanner}</td>
+            <td style="text-align: center; width: 95px;">
+              <span class="badge" style="${displayStatus.pdfBadge}">
+                ${displayStatus.label}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
 
       const html = `
+        <!DOCTYPE html>
         <html>
           <head>
             <title>Laporan Absensi ${mentorGugusName}</title>
             <style>
-              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 25px; color: #1f2937; line-height: 1.4; }
-              h1 { font-size: 20px; color: #012060; margin: 0 0 4px 0; }
-              .meta { font-size: 12px; color: #4b5563; margin-bottom: 20px; border-bottom: 2px solid #012060; padding-bottom: 10px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-              th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; font-size: 11px; }
-              th { background-color: #f8fafc; color: #1e293b; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #1f2937; line-height: 1.4; }
+              h1 { font-size: 18px; font-weight: 800; color: #012060; margin: 0 0 14px 0; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; }
+              table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+              th, td { border: 1px solid #cbd5e1; padding: 7px 9px; text-align: left; font-size: 10.5px; }
+              th { background-color: #012060; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
               tr:nth-child(even) { background-color: #f8fafc; }
-              .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; text-align: center; }
-              .valid { background: #d1fae5; color: #065f46; }
-              .invalid { background: #fee2e2; color: #991b1b; }
-              .footer { margin-top: 30px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+              .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 9.5px; font-weight: 700; text-align: center; }
             </style>
           </head>
           <body>
-            <h1>Laporan Riwayat Kehadiran PKKMB 2026</h1>
-            <div class="meta">
-              Gugus: <strong>${mentorGugusName}</strong> &nbsp;|&nbsp; 
-              Dicetak: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} &nbsp;|&nbsp; 
-              Total Absensi: <strong>${flatLogsChronological.length} Data</strong>
-            </div>
+            <h1>Laporan Riwayat Kehadiran PKKMB 2026 — ${mentorGugusName}</h1>
             <table>
               <thead>
                 <tr>
-                  <th style="text-align: center;">No</th>
-                  <th>Tanggal</th>
-                  <th>Waktu</th>
-                  <th>NIM</th>
+                  <th style="text-align: center; width: 30px;">No</th>
+                  <th style="width: 75px;">Tanggal</th>
+                  <th style="width: 65px;">Waktu</th>
+                  <th style="width: 90px;">NIM</th>
                   <th>Nama Mahasiswa</th>
-                  <th>Pemindai</th>
-                  <th style="text-align: center;">Status</th>
+                  <th style="width: 95px;">Pemindai</th>
+                  <th style="text-align: center; width: 95px;">Status</th>
                 </tr>
               </thead>
               <tbody>
                 ${rowsHtml}
               </tbody>
             </table>
-            <div class="footer">
-              Dicetak otomatis oleh Sistem Absensi PKKMB 2026
-            </div>
           </body>
         </html>
       `;
@@ -201,7 +241,7 @@ export default function MentorRiwayat() {
           </h1>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <div 
+          <div
             className="relative group cursor-pointer p-2 rounded-xl hover:bg-slate-100 transition-colors"
             onClick={() => navigate('/mentor/notifikasi')}
             title="Notifikasi Mentor"
@@ -214,7 +254,7 @@ export default function MentorRiwayat() {
 
       {/* Main Content */}
       <main className="relative pt-20 px-3 sm:px-6 lg:px-8 max-w-container-max mx-auto space-y-4 sm:space-y-6">
-        
+
         {/* Banner & Action Buttons */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
           <div>
@@ -233,26 +273,26 @@ export default function MentorRiwayat() {
           </div>
 
           <div className="relative w-full sm:w-auto shrink-0">
-            <button 
+            <button
               onClick={() => setShowExportDropdown(!showExportDropdown)}
               className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-[#012060] hover:bg-[#022b80] active:scale-95 text-white px-3.5 py-2 rounded-xl text-body-sm font-bold transition-all shadow-md cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">download</span>
               <span>Unduh Laporan</span>
             </button>
-            
+
             {showExportDropdown && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowExportDropdown(false)}></div>
                 <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white shadow-2xl border border-slate-100 py-1.5 z-50 animate-fade-in">
-                  <button 
+                  <button
                     onClick={() => { handleExport('Excel'); setShowExportDropdown(false); }}
                     className="w-full text-left px-4 py-2.5 text-body-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2.5 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-emerald-600 text-[18px]">table_view</span>
                     <span>Ekspor Excel</span>
                   </button>
-                  <button 
+                  <button
                     onClick={() => { handleExport('PDF'); setShowExportDropdown(false); }}
                     className="w-full text-left px-4 py-2.5 text-body-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2.5 cursor-pointer"
                   >
@@ -270,12 +310,12 @@ export default function MentorRiwayat() {
           {/* Search Input */}
           <div className="relative flex-1 sm:max-w-xs">
             <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px]">search</span>
-            <input 
-              className="w-full bg-[#f8fafc] border border-slate-200 text-slate-800 text-body-sm font-semibold py-2 pl-8 pr-8 rounded-xl focus:outline-none focus:border-primary transition-all placeholder:text-slate-400" 
-              placeholder="Cari NIM atau Nama..." 
-              type="text" 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
+            <input
+              className="w-full bg-[#f8fafc] border border-slate-200 text-slate-800 text-body-sm font-semibold py-2 pl-8 pr-8 rounded-xl focus:outline-none focus:border-primary transition-all placeholder:text-slate-400"
+              placeholder="Cari NIM atau Nama..."
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
             {searchTerm && (
               <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer">
@@ -287,8 +327,8 @@ export default function MentorRiwayat() {
           {/* Date Filter & Status Tabs */}
           <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
             <div className="relative flex-1 sm:flex-initial">
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="w-full bg-[#f8fafc] text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 px-3 rounded-xl focus:outline-none focus:border-primary transition-all"
@@ -300,21 +340,22 @@ export default function MentorRiwayat() {
               )}
             </div>
 
-            {/* Status Filter Tabs */}
-            <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
-              {['Semua', 'Valid', 'Invalid'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                    activeTab === tab 
-                      ? 'bg-white text-[#012060] shadow-xs' 
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
+            {/* Status Filter Dropdown Box */}
+            <div className="relative group shrink-0 w-full sm:w-auto">
+              <select
+                value={activeTab}
+                onChange={(e) => setActiveTab(e.target.value)}
+                className="w-full sm:w-auto appearance-none bg-[#f8fafc] border border-slate-200 rounded-xl py-2 px-3.5 pr-8 text-body-sm font-bold text-[#012060] focus:outline-none focus:border-primary transition-all cursor-pointer shadow-xs"
+              >
+                <option value="Semua">Status: Semua</option>
+                <option value="Hadir Penuh">✅ Hadir Penuh</option>
+                <option value="Hadir Sebagian">🟡 Hadir Sebagian</option>
+                <option value="Izin">📄 Izin</option>
+                <option value="Alpha">❌ Alpha</option>
+                <option value="Belum Hadir">⚪ Belum Hadir</option>
+                <option value="Scan Gagal">⚠️ Scan Gagal</option>
+              </select>
+              <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[18px]">expand_more</span>
             </div>
           </div>
         </div>
@@ -328,7 +369,7 @@ export default function MentorRiwayat() {
               return (
                 <div key={group.isoDate} className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-200">
                   {/* Accordion Header */}
-                  <button 
+                  <button
                     onClick={() => toggleDateOpen(group.isoDate)}
                     className="w-full px-4 sm:px-6 py-3.5 bg-slate-50/80 hover:bg-slate-100/80 flex items-center justify-between transition-colors border-b border-slate-100 text-left cursor-pointer"
                   >
@@ -346,11 +387,11 @@ export default function MentorRiwayat() {
 
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#012060]/5 text-[#012060] border border-[#012060]/10">
-                        {group.totalValid} Hadir
+                        {group.totalHadir || 0} Hadir
                       </span>
-                      {group.totalInvalid > 0 && (
+                      {(group.totalBelumHadir || group.totalInvalid) > 0 && (
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
-                          {group.totalInvalid} Kendala
+                          {group.totalBelumHadir || group.totalInvalid} Belum Hadir
                         </span>
                       )}
                     </div>
@@ -365,19 +406,17 @@ export default function MentorRiwayat() {
                           {group.logs.map((log) => {
                             const isValid = log.status === 'Valid';
                             return (
-                              <div 
-                                key={log.id} 
-                                className={`bg-white rounded-2xl p-2.5 shadow-xs border flex flex-col justify-between gap-2 relative overflow-hidden ${
-                                  isValid ? 'border-l-4 border-l-emerald-500 border-slate-200/80' : 'border-l-4 border-l-rose-500 border-slate-200/80'
-                                }`}
+                              <div
+                                key={log.id}
+                                className={`bg-white rounded-2xl p-2.5 shadow-xs border flex flex-col justify-between gap-2 relative overflow-hidden ${isValid ? 'border-l-4 border-l-emerald-500 border-slate-200/80' : 'border-l-4 border-l-rose-500 border-slate-200/80'
+                                  }`}
                               >
                                 <div className="flex items-center justify-between gap-1">
                                   <span className="text-[9.5px] font-bold text-slate-700 font-mono">{log.timestamp}</span>
-                                  <span className={`px-1.5 py-0.5 rounded-full text-[8.5px] font-extrabold shrink-0 border flex items-center gap-1 ${
-                                    isValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
-                                  }`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${isValid ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                                    <span>{log.status}</span>
+                                  <span className={`px-1.5 py-0.5 rounded-full text-[8.5px] font-extrabold shrink-0 border flex items-center gap-1 ${getLogDisplayStatus(log).bg
+                                    }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${getLogDisplayStatus(log).dot}`}></span>
+                                    <span>{getLogDisplayStatus(log).label}</span>
                                   </span>
                                 </div>
 
@@ -434,12 +473,15 @@ export default function MentorRiwayat() {
                                     {log.scanner}
                                   </td>
                                   <td className="py-3 px-5 text-right">
-                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-label-sm font-bold ${
-                                      isValid ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
-                                    }`}>
-                                      <span className={`w-1.5 h-1.5 rounded-full ${isValid ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                                      {log.status}
-                                    </span>
+                                    {(() => {
+                                      const b = getLogDisplayStatus(log);
+                                      return (
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${b.bg}`}>
+                                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${b.dot}`}></span>
+                                          <span>{b.label}</span>
+                                        </span>
+                                      );
+                                    })()}
                                   </td>
                                 </tr>
                               );

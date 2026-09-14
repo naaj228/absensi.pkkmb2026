@@ -1,4 +1,5 @@
 // Utility helpers for date formatting and grouping across absensi PKKMB 2026
+import { getLogDisplayStatus } from './statusHelper';
 
 export function toISOKey(dateStr) {
   if (!dateStr) return '';
@@ -90,12 +91,19 @@ export function groupLogsByDate(logsList, newestFirst = true) {
         indonesianDate: formatIndonesianDate(log.date),
         logs: [],
         totalValid: 0,
-        totalInvalid: 0
+        totalInvalid: 0,
+        totalHadir: 0,
+        totalBelumHadir: 0
       };
     }
     map[key].logs.push(log);
-    if (log.status === 'Valid') {
+    const displayStatus = getLogDisplayStatus(log);
+    if (displayStatus.label === 'Hadir Penuh' || displayStatus.label === 'Hadir Sebagian') {
+      map[key].totalHadir += 1;
       map[key].totalValid += 1;
+    } else if (displayStatus.label === 'Belum Hadir') {
+      map[key].totalBelumHadir += 1;
+      map[key].totalInvalid += 1;
     } else {
       map[key].totalInvalid += 1;
     }

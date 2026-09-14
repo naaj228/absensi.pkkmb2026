@@ -1,6 +1,7 @@
 import { useContext, useState } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { formatIndonesianDate } from '../../utils/dateHelper';
 
 export default function AdminApproval() {
   const { claims, peserta, approveClaim, rejectClaim, hasAdminNotifications } = useContext(AppContext);
@@ -247,9 +248,15 @@ export default function AdminApproval() {
                           </div>
                         )}
 
-                        <div className="text-slate-400 text-[9.5px] flex items-center gap-1 pt-0.5">
-                          <span className="material-symbols-outlined text-[12px] text-slate-400">schedule</span>
-                          <span>{c.time}</span>
+                        <div className="text-slate-400 text-[9.5px] flex items-center justify-between gap-1 pt-0.5 font-medium">
+                          <div className="flex items-center gap-1 text-slate-500">
+                            <span className="material-symbols-outlined text-[12px] text-slate-400">calendar_today</span>
+                            <span>{c.tanggalHadir ? formatIndonesianDate(c.tanggalHadir) : 'Hari Ini'}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-slate-400">
+                            <span className="material-symbols-outlined text-[12px] text-slate-400">schedule</span>
+                            <span>{c.time}</span>
+                          </div>
                         </div>
                       </div>
 

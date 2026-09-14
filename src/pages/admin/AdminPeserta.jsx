@@ -1,17 +1,19 @@
-import { useContext, useState } from 'react';
+import { useContext, useState, useCallback } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { isHadir, getStatusBadge, STATUS_OPTIONS } from '../../utils/statusHelper';
+import { toISOKey, getTodayISOKey, formatIndonesianDate } from '../../utils/dateHelper';
 
 export default function AdminPeserta() {
   const { peserta, gugus, logs, addPeserta, updatePeserta, deletePeserta, hasAdminNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
-  // Filter & Search states
+  // Filter & Search & Date states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGugus, setSelectedGugus] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [selectedDate, setSelectedDate] = useState(getTodayISOKey());
 
   // Selection states
   const [selectedIds, setSelectedIds] = useState([]);
@@ -36,13 +38,67 @@ export default function AdminPeserta() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
 
+  const targetDateKey = toISOKey(selectedDate);
+
+  const getStudentDailyStatus = useCallback((student) => {
+    const studentLogOnDate = logs.find(l => 
+      String(l.nim) === String(student.id) && 
+      toISOKey(l.date) === targetDateKey
+    );
+
+    if (studentLogOnDate) {
+      const display = getLogDisplayStatus(studentLogOnDate);
+      return {
+        label: display.label,
+        bg: display.bg,
+        dot: display.dot,
+        isPresent: display.label === 'Hadir Penuh' || display.label === 'Hadir Sebagian',
+        isPending: false
+      };
+    }
+
+    if (student.status === 'Izin') {
+      return { label: 'Izin', bg: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500', isPresent: false, isPending: false };
+    }
+
+    if (student.status === 'Alpha') {
+      return { label: 'Alpha', bg: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500', isPresent: false, isPending: false };
+    }
+
+    if (student.status === 'Manual (Pending)') {
+      return { label: 'Pending', bg: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500', isPresent: false, isPending: true };
+    }
+
+    if (student.status === 'Manual (Ditolak)') {
+      return { label: 'Ditolak', bg: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500', isPresent: false, isPending: false };
+    }
+
+    return { label: 'Belum Hadir', bg: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400', isPresent: false, isPending: false };
+  }, [logs, targetDateKey]);
+
   // Filtered participants
   const filteredPeserta = peserta.filter((student) => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.id.includes(searchTerm);
     const matchesGugus = selectedGugus === '' || 
       (selectedGugus === 'unassigned' ? (!student.gugusId || student.gugusId === 'Unassigned') : student.gugusId === selectedGugus);
-    const matchesStatus = selectedStatus === '' || student.status === selectedStatus;
+    
+    const dailyStatus = getStudentDailyStatus(student);
+    let matchesStatus = true;
+    if (selectedStatus === 'Hadir' || selectedStatus === 'Hadir Penuh') {
+      matchesStatus = dailyStatus.isPresent;
+    } else if (selectedStatus === 'Belum Hadir') {
+      matchesStatus = !dailyStatus.isPresent && !dailyStatus.isPending;
+    } else if (selectedStatus === 'Pending' || selectedStatus === 'Manual (Pending)') {
+      matchesStatus = dailyStatus.isPending;
+    } else if (selectedStatus === 'Izin') {
+      matchesStatus = student.status === 'Izin';
+    } else if (selectedStatus === 'Alpha') {
+      matchesStatus = !dailyStatus.isPresent && !dailyStatus.isPending && student.status !== 'Izin';
+    } else if (selectedStatus) {
+      matchesStatus = dailyStatus.label.toLowerCase() === selectedStatus.toLowerCase();
+    }
+
     return matchesSearch && matchesGugus && matchesStatus;
   });
 
@@ -258,7 +314,10 @@ export default function AdminPeserta() {
     return g ? g.name : '-';
   };
 
-  const totalHadir = peserta.filter(p => isHadir(p.status)).length;
+  let totalHadir = 0;
+  peserta.forEach(student => {
+    if (getStudentDailyStatus(student).isPresent) totalHadir++;
+  });
   const persentaseKehadiran = peserta.length > 0 ? ((totalHadir / peserta.length) * 100).toFixed(1) : '0';
 
   return (
@@ -278,7 +337,25 @@ export default function AdminPeserta() {
       <main className="relative pt-16 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto">
         <div className="flex flex-col w-full space-y-gutter relative">
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter mt-2">
+          {/* Date Selector Bar */}
+          <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-2">
+            <div className="flex items-center gap-2 text-slate-700">
+              <span className="material-symbols-outlined text-primary text-[20px]">calendar_today</span>
+              <span className="text-body-sm font-bold text-slate-600">Presensi Tanggal:</span>
+              <strong className="text-body-sm text-primary font-extrabold">{formatIndonesianDate(selectedDate)}</strong>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Pilih Tanggal:</label>
+              <input 
+                type="date" 
+                value={selectedDate} 
+                onChange={(e) => { setSelectedDate(e.target.value); setCurrentPage(1); }}
+                className="bg-[#f8fafc] border border-slate-200 text-slate-800 text-body-sm font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-primary cursor-pointer w-full sm:w-auto"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter">
             <div className="bg-surface-container rounded-xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
               <div className="absolute -right-4 -top-4 w-32 h-32 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
               <div className="flex items-center justify-between mb-4 relative z-10">
@@ -428,11 +505,11 @@ export default function AdminPeserta() {
               <table className="w-full text-left border-collapse table-fixed">
                 <colgroup>
                   <col className="w-[4%]" />
-                  <col className="w-[30%]" />
-                  <col className="w-[17%]" />
-                  <col className="w-[18%]" />
+                  <col className="w-[26%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[26%]" />
                   <col className="w-[16%]" />
-                  <col className="w-[15%]" />
+                  <col className="w-[16%]" />
                 </colgroup>
                 <thead>
                   <tr className="bg-surface/50 border-b border-surface-variant">
@@ -443,7 +520,7 @@ export default function AdminPeserta() {
                     <th className="py-3.5 px-3 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold truncate">NIM</th>
                     <th className="py-3.5 px-3 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold truncate">Gugus</th>
                     <th className="py-3.5 px-3 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold truncate">Status</th>
-                    <th className="py-3.5 px-4 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold text-right truncate">Aksi</th>
+                    <th className="py-3.5 px-4 text-label-sm font-label-md text-on-surface-variant uppercase tracking-wider font-semibold text-right pr-4">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-variant bg-white">
@@ -474,14 +551,14 @@ export default function AdminPeserta() {
                           </span>
                         </td>
                         <td className="py-3 px-3 truncate">
-                          {(() => { const b = getStatusBadge(student.status); return (
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-label-sm font-bold max-w-full truncate ${b.bg} ${b.text}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${b.dot}`}></span>
+                          {(() => { const b = getStudentDailyStatus(student); return (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-label-sm font-bold max-w-full truncate ${b.bg}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${b.dot} ${b.isPresent ? 'animate-pulse' : ''}`}></span>
                               <span className="truncate">{b.label}</span>
                             </span>
                           ); })()}
                         </td>
-                        <td className="py-3 px-4 text-right truncate" onClick={(e) => e.stopPropagation()}>
+                        <td className="py-3 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => navigate(`/admin/peserta/${student.id}`)} className="p-1.5 text-on-surface-variant hover:text-primary hover:bg-primary/5 rounded-lg transition-colors cursor-pointer" title="Lihat Detail">
                               <span className="material-symbols-outlined text-[18px]">visibility</span>
@@ -521,9 +598,9 @@ export default function AdminPeserta() {
                           <p className="text-label-sm text-on-surface-variant truncate">{student.fakultas}</p>
                         </div>
                       </div>
-                      {(() => { const b = getStatusBadge(student.status); return (
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label-sm font-medium shrink-0 ${b.bg} ${b.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`}></span>
+                      {(() => { const b = getStudentDailyStatus(student); return (
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label-sm font-bold shrink-0 ${b.bg}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${b.dot} ${b.isPresent ? 'animate-pulse' : ''}`}></span>
                           {b.label}
                         </span>
                       ); })()}
