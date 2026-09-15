@@ -90,7 +90,7 @@ export default function MentorAbsensiManual() {
     const dailyStatus = getStudentDailyStatus(student);
 
     let matchesTab = true;
-    if (filterTab === 'Alpha') matchesTab = !dailyStatus.isPresent && !dailyStatus.isPending;
+    if (filterTab === 'Alpha' || filterTab === 'Belum Hadir') matchesTab = !dailyStatus.isPresent && !dailyStatus.isPending;
     else if (filterTab === 'Hadir') matchesTab = dailyStatus.isPresent;
     else if (filterTab === 'Pending') matchesTab = dailyStatus.isPending;
     return matchesSearch && matchesTab;
@@ -98,9 +98,9 @@ export default function MentorAbsensiManual() {
 
   const handleOpenModal = (student) => {
     setSelectedStudent(student);
+    setRequestedStatus('Hadir Penuh');
     setReason('jaringan');
     setNote('');
-    setRequestedStatus('Hadir Penuh');
     setShowModal(true);
   };
 
@@ -127,7 +127,7 @@ export default function MentorAbsensiManual() {
     { key: 'Semua', label: 'Semua', count: totalStudents },
     { key: 'Hadir', label: 'Hadir', count: hadirStudents },
     { key: 'Pending', label: 'Pending', count: pendingStudents },
-    { key: 'Alpha', label: 'Alpha', count: alphaStudents },
+    { key: 'Belum Hadir', label: 'Belum Hadir', count: alphaStudents },
   ];
 
   return (
@@ -166,9 +166,6 @@ export default function MentorAbsensiManual() {
               <h2 className="text-body-lg sm:text-headline-lg font-extrabold tracking-tight">
                 Pengajuan Absensi Manual
               </h2>
-              <p className="text-[11px] sm:text-body-sm text-white/80 max-w-xl mt-0.5 leading-snug">
-                Fasilitasi absensi peserta yang mengalami kendala teknis kamera, QR Code, atau jaringan per tanggal.
-              </p>
             </div>
 
             {/* Attendance Percentage Badge */}

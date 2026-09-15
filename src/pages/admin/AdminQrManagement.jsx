@@ -2,6 +2,8 @@ import { useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { sendQrEmail, sendBulkQrEmail, checkEmailServerHealth } from '../../lib/emailService';
+import JSZip from 'jszip';
+import QRCode from 'qrcode';
 
 export default function AdminQrManagement() {
   const { peserta, gugus, hasAdminNotifications } = useContext(AppContext);
@@ -211,18 +213,42 @@ export default function AdminQrManagement() {
         prodi: p.fakultas
       }));
       
-      const res = await fetch(`${API_BASE}/generate-gugus-zip`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students: studentsData })
-      });
-      
-      if (!res.ok) {
-        throw new Error('Gagal menghubungi backend email. Pastikan server sudah dijalankan.');
+      let zipBlob = null;
+
+      try {
+        const res = await fetch(`${API_BASE}/generate-gugus-zip`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ students: studentsData })
+        });
+        if (res.ok) {
+          zipBlob = await res.blob();
+        }
+      } catch (serverErr) {
+        console.warn("Backend server email tidak terhubung, membuat ZIP langsung di browser...", serverErr);
       }
       
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      if (!zipBlob) {
+        const zip = new JSZip();
+        for (const student of peserta) {
+          const folderName = `${student.name.replace(/[^a-zA-Z0-9]/g, '_')}_${student.id}`;
+          const folder = zip.folder(folderName);
+          try {
+            const qrDataUrl = await QRCode.toDataURL(student.id, {
+              width: 350,
+              margin: 2,
+              color: { dark: '#012060', light: '#ffffff' }
+            });
+            const base64Data = qrDataUrl.replace(/^data:image\/png;base64,/, "");
+            folder.file(`QR_Code_${student.id}.png`, base64Data, { base64: true });
+          } catch (qrErr) {
+            console.warn(`Gagal generate QR client-side untuk ${student.id}:`, qrErr);
+          }
+        }
+        zipBlob = await zip.generateAsync({ type: 'blob' });
+      }
+      
+      const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `ID_Cards_PKKMB_All.zip`;
@@ -233,7 +259,7 @@ export default function AdminQrManagement() {
       
       alert('File ZIP berhasil dibuat dan mulai diunduh!');
     } catch (err) {
-      alert(`Gagal membuat file ZIP: ${err.message}. Pastikan server email berjalan.`);
+      alert(`Gagal membuat file ZIP: ${err.message}`);
     }
   };
 

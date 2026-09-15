@@ -3,6 +3,8 @@ import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { isHadir, getLogDisplayStatus } from '../../utils/statusHelper';
 import { toISOKey, getTodayISOKey, formatDDMMYYYY, formatIndonesianDate } from '../../utils/dateHelper';
+import JSZip from 'jszip';
+import QRCode from 'qrcode';
 
 export default function MentorPeserta() {
   const { peserta, gugus, logs, addPeserta, updatePeserta, currentUser, hasMentorNotifications } = useContext(AppContext);
@@ -11,10 +13,7 @@ export default function MentorPeserta() {
   // Get gugus ID from the currently logged-in mentor
   const mentorGugusId = currentUser?.gugusId || '';
   const mentorGugus = gugus.find(g => g.id === mentorGugusId);
-  const rawGugusName = mentorGugus?.name || 'Gugus Saya';
-  const mentorGugusName = rawGugusName.toLowerCase().includes('panitia')
-    ? 'Gugus'
-    : (rawGugusName.startsWith('Gugus') ? rawGugusName : `Gugus ${rawGugusName}`);
+  const mentorGugusName = mentorGugus?.name || 'Gugus Saya';
 
   // Search, Filter & Date states
   const [searchTerm, setSearchTerm] = useState('');
@@ -112,23 +111,50 @@ export default function MentorPeserta() {
       const studentsData = mentorStudents.map(p => ({
         id: p.id,
         name: p.name,
-        gugusName: mentorGugusName
+        gugusName: mentorGugusName,
+        prodi: p.fakultas
       }));
 
-      const response = await fetch(`${serverUrl}/api/generate-gugus-zip`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ students: studentsData }),
-      });
+      let zipBlob = null;
 
-      if (!response.ok) {
-        throw new Error('Gagal mengunduh file ZIP dari server.');
+      // Try server endpoint first (generates full ID cards + QR codes)
+      try {
+        const response = await fetch(`${serverUrl}/api/generate-gugus-zip`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ students: studentsData }),
+        });
+
+        if (response.ok) {
+          zipBlob = await response.blob();
+        }
+      } catch (serverErr) {
+        console.warn("Backend server tidak terhubung, mengunduh ZIP langsung via browser...", serverErr);
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      // Client-side fallback if server is offline or fails
+      if (!zipBlob) {
+        const zip = new JSZip();
+        for (const student of mentorStudents) {
+          const folderName = `${student.name.replace(/[^a-zA-Z0-9]/g, '_')}_${student.id}`;
+          const folder = zip.folder(folderName);
+
+          try {
+            const qrDataUrl = await QRCode.toDataURL(student.id, {
+              width: 350,
+              margin: 2,
+              color: { dark: '#012060', light: '#ffffff' }
+            });
+            const base64Data = qrDataUrl.replace(/^data:image\/png;base64,/, "");
+            folder.file(`QR_Code_${student.id}.png`, base64Data, { base64: true });
+          } catch (qrErr) {
+            console.warn(`Gagal generate QR client-side untuk ${student.id}:`, qrErr);
+          }
+        }
+        zipBlob = await zip.generateAsync({ type: 'blob' });
+      }
+
+      const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `ID_Cards_${mentorGugusName.replace(/\s+/g, '_')}.zip`;
@@ -249,9 +275,6 @@ export default function MentorPeserta() {
               </span>
             </div>
             <h2 className="text-body-lg sm:text-headline-md font-bold text-[#012060]">Daftar Anggota Gugus</h2>
-            <p className="text-[11px] sm:text-body-sm text-slate-500 mt-0.5">
-              Kelola data presensi mahasiswa bimbingan Anda per harinya, unduh QR Code, atau ajukan penambahan peserta.
-            </p>
           </div>
 
           <div className="flex flex-row w-full sm:w-auto gap-2.5 shrink-0">

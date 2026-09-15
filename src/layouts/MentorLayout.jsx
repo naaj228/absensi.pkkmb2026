@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, Navigate, useLocation } from 'react-router-dom';
-import { useContext, useState } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { AppContext } from '../context/AppContext';
 import logo from '../assets/logo.png';
 
@@ -18,6 +18,18 @@ export default function MentorLayout() {
   const location = useLocation();
 
   const isSubPage = location.pathname.endsWith('/notifikasi');
+
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (isSidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isSidebarOpen]);
 
   console.log('--- MentorLayout render, currentUser:', currentUser);
 
@@ -113,7 +125,8 @@ export default function MentorLayout() {
       {isSidebarOpen && (
         <div 
           onClick={() => setIsSidebarOpen(false)} 
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
+          onTouchMove={(e) => e.preventDefault()}
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden touch-none"
         />
       )}
 

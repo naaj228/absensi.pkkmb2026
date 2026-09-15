@@ -268,9 +268,6 @@ export default function MentorRiwayat() {
               </span>
             </div>
             <h2 className="text-body-md sm:text-headline-md font-bold text-[#012060]">Riwayat Absensi</h2>
-            <p className="text-[10.5px] sm:text-body-sm text-slate-500 mt-0.5">
-              Pantau seluruh catatan log pemindaian QR peserta gugus Anda.
-            </p>
           </div>
 
           <div className="relative w-full sm:w-auto shrink-0">
@@ -392,9 +389,11 @@ export default function MentorRiwayat() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#012060]/5 text-[#012060] border border-[#012060]/10">
-                        {group.totalHadir || 0} Hadir
-                      </span>
+                      {group.totalHadir > 0 && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#012060]/5 text-[#012060] border border-[#012060]/10">
+                          {group.totalHadir} Hadir
+                        </span>
+                      )}
                       {(group.totalBelumHadir || group.totalInvalid) > 0 && (
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
                           {group.totalBelumHadir || group.totalInvalid} Belum Hadir

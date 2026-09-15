@@ -11,10 +11,7 @@ export default function MentorDashboard() {
   // Get gugus ID from the currently logged-in mentor
   const mentorGugusId = currentUser?.gugusId || '';
   const mentorGugus = gugus.find(g => g.id === mentorGugusId);
-  const rawGugusName = mentorGugus?.name || 'Gugus Saya';
-  const mentorGugusName = rawGugusName.toLowerCase().includes('panitia')
-    ? 'Gugus'
-    : (rawGugusName.startsWith('Gugus') ? rawGugusName : `Gugus ${rawGugusName}`);
+  const mentorGugusName = mentorGugus?.name || 'Gugus Saya';
 
   // Filter participants belonging to mentor's group
   const gugusStudents = peserta.filter(p => p.gugusId === mentorGugusId);
@@ -22,7 +19,7 @@ export default function MentorDashboard() {
   // Filter logs for TODAY ONLY for mentor's gugus
   const todayKey = getTodayISOKey();
   const todayMentorLogs = logs.filter(log => 
-    log.gugusName.toLowerCase() === rawGugusName.toLowerCase() && 
+    log.gugusName.toLowerCase() === mentorGugusName.toLowerCase() && 
     toISOKey(log.date) === todayKey
   );
 
