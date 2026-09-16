@@ -321,13 +321,28 @@ export default function MentorPeserta() {
               </div>
 
               {/* Date Filter */}
-              <div className="relative flex items-center">
+              <div className="relative flex items-center min-w-[160px]">
                 <input 
                   type="date" 
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full sm:w-auto bg-white text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 px-3 rounded-xl focus:outline-none focus:border-primary transition-all cursor-pointer"
+                  className="w-full bg-white text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 pl-3.5 pr-9 rounded-xl focus:outline-none focus:border-primary transition-all cursor-pointer"
                 />
+                {!selectedDate && (
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-body-sm font-medium pointer-events-none">
+                    dd/mm/yyyy
+                  </span>
+                )}
+                {selectedDate && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate('')}
+                    className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-600 p-0.5 cursor-pointer bg-white rounded-full z-10 transition-colors flex items-center justify-center"
+                    title="Bersihkan tanggal"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">close</span>
+                  </button>
+                )}
               </div>
             </div>
 

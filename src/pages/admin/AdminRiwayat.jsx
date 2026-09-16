@@ -413,6 +413,11 @@ export default function AdminRiwayat() {
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
                   />
+                  {!selectedDate && (
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-body-sm font-medium pointer-events-none">
+                      dd/mm/yyyy
+                    </span>
+                  )}
                   {selectedDate && (
                     <button
                       type="button"

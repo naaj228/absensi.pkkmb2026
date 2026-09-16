@@ -329,8 +329,13 @@ export default function MentorRiwayat() {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full bg-[#f8fafc] text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 pl-3 pr-9 rounded-xl focus:outline-none focus:border-primary transition-all cursor-pointer"
+                className="w-full bg-[#f8fafc] text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 pl-3.5 pr-9 rounded-xl focus:outline-none focus:border-primary transition-all cursor-pointer"
               />
+              {!selectedDate && (
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-body-sm font-medium pointer-events-none">
+                  dd/mm/yyyy
+                </span>
+              )}
               {selectedDate && (
                 <button
                   type="button"

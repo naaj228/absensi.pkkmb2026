@@ -192,12 +192,29 @@ export default function MentorAbsensiManual() {
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Pilih Tanggal:</label>
-            <input 
-              type="date" 
-              value={selectedDate} 
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-[#f8fafc] border border-slate-200 text-slate-800 text-body-sm font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-primary cursor-pointer w-full sm:w-auto"
-            />
+            <div className="relative flex-1 sm:flex-initial min-w-[160px]">
+              <input 
+                type="date" 
+                value={selectedDate} 
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-[#f8fafc] border border-slate-200 text-slate-800 text-body-sm font-semibold rounded-xl pl-3.5 pr-9 py-1.5 focus:outline-none focus:border-primary cursor-pointer w-full"
+              />
+              {!selectedDate && (
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-body-sm font-medium pointer-events-none">
+                  dd/mm/yyyy
+                </span>
+              )}
+              {selectedDate && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate('')}
+                  className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-600 p-0.5 cursor-pointer bg-[#f8fafc] rounded-full z-10 transition-colors flex items-center justify-center"
+                  title="Bersihkan tanggal"
+                >
+                  <span className="material-symbols-outlined text-[14px]">close</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

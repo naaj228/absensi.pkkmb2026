@@ -238,10 +238,15 @@
   }
 }
 
-/* Fix date input styling to prevent text and icon overlap */
+/* Fix date input styling to prevent text and icon overlap & ensure mobile visibility */
 input[type="date"] {
   min-height: 38px;
   position: relative;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.5em;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator {
