@@ -729,7 +729,8 @@ export const locationSettingsDb = {
 
     const dbLocationName = `${settings.locationName}|CONFIG:${JSON.stringify(configPayload)}`;
 
-    const upsertObj = {
+    // Core upsert using standard columns guaranteed to exist in Supabase table
+    const coreUpsertObj = {
       id: 1,
       latitude: settings.latitude,
       longitude: settings.longitude,
@@ -737,19 +738,29 @@ export const locationSettingsDb = {
       location_name: dbLocationName,
       updated_at: new Date().toISOString()
     };
-    if (settings.startTime !== undefined) upsertObj.start_time = settings.startTime;
-    if (settings.onTimeLimit !== undefined) upsertObj.on_time_limit = settings.onTimeLimit;
-    if (settings.endTime !== undefined) upsertObj.end_time = settings.endTime;
-    if (settings.scannerStatus !== undefined) upsertObj.scanner_status = settings.scannerStatus;
 
+    const { error: coreError } = await supabase
+      .from('location_settings')
+      .upsert(coreUpsertObj)
+      .select()
+      .maybeSingle();
+
+    if (coreError) {
+      console.error("Supabase location_settings core upsert error:", coreError);
+    } else {
+      console.log("Supabase location_settings updated successfully to DB!");
+    }
+
+    // Secondary silent update if optional DB columns exist
     try {
-      await supabase
-        .from('location_settings')
-        .upsert(upsertObj)
-        .select()
-        .single();
+      await supabase.from('location_settings').update({
+        start_time: settings.startTime,
+        on_time_limit: settings.onTimeLimit,
+        end_time: settings.endTime,
+        scanner_status: settings.scannerStatus
+      }).eq('id', 1);
     } catch (e) {
-      console.warn("Could not save extra columns to Supabase location_settings, using local fallback:", e);
+      // Optional columns missing in DB schema, safely ignored
     }
 
     return localPayload;
