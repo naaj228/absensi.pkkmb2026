@@ -1,7 +1,7 @@
 import { useContext, useEffect } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { formatDDMMYYYY, getTodayISOKey } from '../../utils/dateHelper';
+import { formatFriendlyDateTime, getTodayISOKey } from '../../utils/dateHelper';
 
 export default function MentorNotifikasi() {
   const { 
@@ -27,25 +27,24 @@ export default function MentorNotifikasi() {
 
   const notifications = [];
 
-  // 1. Scans in mentor's gugus
-  const groupLogs = logs.filter(l => l.gugusName === mentorGugusName);
+  // 1. Rejections and Invalid Scans in mentor's gugus (Exclude regular successful scans)
+  const groupLogs = logs.filter(l => l.gugusName === mentorGugusName && (l.status !== 'Valid' || l.scanner === 'Admin (Tolak Manual)'));
   groupLogs.forEach(l => {
     if (dismissedNotifications.includes(`log-${l.id}`)) return;
     
     const isRejection = l.scanner === 'Admin (Tolak Manual)';
-    const formattedDate = formatDDMMYYYY(l.date);
-    const displayTime = `${formattedDate}${l.timestamp ? ' ' + l.timestamp : ''}`;
+    const displayTime = formatFriendlyDateTime(l.date, l.timestamp);
     
     notifications.push({
       id: `log-${l.id}`,
       type: 'scan',
-      title: isRejection ? 'Pengajuan Absensi Ditolak' : (l.status === 'Valid' ? 'Kehadiran Terdaftar' : 'Pemberitahuan Scan'),
+      title: isRejection ? 'Pengajuan Absensi Ditolak' : 'Scan Tidak Valid',
       message: isRejection 
-        ? `Pengajuan absensi manual untuk ${l.name} (NIM: ${l.nim}) DITOLAK. Alasan: ${l.note || 'Berkas tidak lengkap.'}`
-        : `${l.name} (NIM: ${l.nim}) tercatat ${l.status === 'Valid' ? 'hadir' : 'tidak valid'} via ${l.scanner}`,
+        ? `Pengajuan absensi manual untuk ${l.name} (NIM: ${l.nim}) ditolak. Alasan: ${l.note || 'Berkas tidak lengkap.'}`
+        : `Scan untuk ${l.name || 'Mahasiswa'} (NIM: ${l.nim}) gagal / tidak valid.`,
       time: displayTime,
-      icon: isRejection ? 'cancel' : (l.status === 'Valid' ? 'check_circle' : 'warning'),
-      color: isRejection || l.status !== 'Valid' ? 'text-error bg-error-container/30' : 'text-green-500 bg-green-50',
+      icon: isRejection ? 'cancel' : 'warning',
+      color: 'text-rose-600 bg-rose-50 border border-rose-200',
       actionLabel: isRejection ? 'Ajukan Kembali' : 'Lihat Anggota',
       action: () => navigate(isRejection ? '/mentor/absensi-manual' : '/mentor/peserta'),
       originalData: l
@@ -58,16 +57,15 @@ export default function MentorNotifikasi() {
     const id = `claim-${c.id}`;
     if (dismissedNotifications.includes(id)) return;
     const claimDate = c.tanggalHadir || c.date || c.created_at;
-    const formattedDate = claimDate ? formatDDMMYYYY(claimDate) : formatDDMMYYYY(getTodayISOKey());
-    const displayTime = `${formattedDate}${c.time ? ' ' + c.time : ''}`;
+    const displayTime = formatFriendlyDateTime(claimDate, c.time);
     notifications.push({
       id,
       type: 'claim',
       title: 'Status Klaim Manual',
-      message: `Klaim absensi manual untuk ${c.name} (${c.nim}) sedang diverifikasi oleh admin.`,
+      message: `Klaim absensi manual untuk ${c.name} (NIM: ${c.nim}) sedang diverifikasi oleh Admin.`,
       time: displayTime,
-      icon: 'history',
-      color: 'text-amber-500 bg-amber-50',
+      icon: 'pending_actions',
+      color: 'text-amber-600 bg-amber-50 border border-amber-200',
       actionLabel: 'Kelola Absensi',
       action: () => navigate('/mentor/absensi-manual'),
       originalData: c
@@ -88,37 +86,29 @@ export default function MentorNotifikasi() {
     });
   };
 
-  // Group notifications for hierarchical display
-  const approvalNotifs = notifications.filter(n => 
-    n.type === 'claim' || 
-    n.title === 'Pengajuan Absensi Ditolak' || 
-    (n.type === 'scan' && n.originalData && n.originalData.status !== 'Valid')
-  );
-  const successNotifs = notifications.filter(n => 
-    n.type === 'scan' && 
-    (!n.originalData || n.originalData.status === 'Valid') && 
-    n.title !== 'Pengajuan Absensi Ditolak'
-  );
-
   const renderNotifItem = (n) => (
-    <div key={n.id} className="p-4 sm:p-5 flex items-start gap-3 sm:gap-4 hover:bg-surface-container-lowest transition-colors group">
-      <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${n.color}`}>
-        <span className="material-symbols-outlined text-[16px] sm:text-[20px]">{n.icon}</span>
+    <div key={n.id} className="p-4 sm:p-5 flex items-start gap-3.5 hover:bg-slate-50/80 transition-colors group border-b border-slate-100 last:border-0">
+      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 ${n.color}`}>
+        <span className="material-symbols-outlined text-[20px]">{n.icon}</span>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4">
-          <h3 className="text-xs sm:text-body-md font-bold text-on-surface leading-tight">{n.title}</h3>
-          <span className="text-[10px] sm:text-label-sm text-on-surface-variant/70 shrink-0 font-mono">{n.time}</span>
+          <h3 className="text-body-sm sm:text-body-md font-bold text-[#012060] leading-tight">{n.title}</h3>
+          <span className="text-[11px] font-semibold text-slate-400 shrink-0 flex items-center gap-1">
+            <span className="material-symbols-outlined text-[13px]">schedule</span>
+            <span>{n.time}</span>
+          </span>
         </div>
-        <p className="text-xs sm:text-body-sm text-on-surface-variant mt-1 leading-relaxed">{n.message}</p>
-        <div className="mt-2 sm:mt-3 flex items-center gap-3">
-          <button onClick={n.action} className="text-primary hover:underline text-[10px] sm:text-label-sm font-semibold cursor-pointer">
-            {n.actionLabel}
+        <p className="text-body-xs text-slate-600 mt-1 leading-relaxed">{n.message}</p>
+        <div className="mt-2.5 flex items-center gap-3">
+          <button onClick={n.action} className="inline-flex items-center gap-1 text-primary hover:text-[#012060] text-[11px] font-bold cursor-pointer transition-colors bg-primary/5 hover:bg-primary/10 px-2.5 py-1 rounded-lg">
+            <span>{n.actionLabel}</span>
+            <span className="material-symbols-outlined text-[14px]">chevron_right</span>
           </button>
         </div>
       </div>
-      <button onClick={() => handleRemove(n.id)} className="text-on-surface-variant/40 hover:text-error opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-surface-variant shrink-0 cursor-pointer">
-        <span className="material-symbols-outlined text-[16px] sm:text-[18px]">close</span>
+      <button onClick={() => handleRemove(n.id)} className="text-slate-400 hover:text-rose-600 opacity-60 hover:opacity-100 transition-opacity p-1 rounded-full shrink-0 cursor-pointer" title="Hapus Notifikasi">
+        <span className="material-symbols-outlined text-[18px]">close</span>
       </button>
     </div>
   );
@@ -152,38 +142,18 @@ export default function MentorNotifikasi() {
             )}
           </div>
 
-          <div className="space-y-6">
-            {approvalNotifs.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <h3 className="text-label-md font-bold text-primary px-2 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px]">assignment_late</span>
-                  Persetujuan & Kendala Absensi ({approvalNotifs.length})
-                </h3>
-                <div className="bg-surface rounded-2xl border border-outline-variant/30 overflow-hidden shadow-sm divide-y divide-outline-variant/20">
-                  {approvalNotifs.map(renderNotifItem)}
-                </div>
+          <div className="space-y-4">
+            {notifications.length > 0 ? (
+              <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
+                {notifications.map(renderNotifItem)}
               </div>
-            )}
-
-            {successNotifs.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <h3 className="text-label-md font-bold text-green-600 px-2 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                  Kehadiran Berhasil Terdaftar ({successNotifs.length})
-                </h3>
-                <div className="bg-surface rounded-2xl border border-outline-variant/30 overflow-hidden shadow-sm divide-y divide-outline-variant/20">
-                  {successNotifs.map(renderNotifItem)}
+            ) : (
+              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center py-16 text-slate-400 px-6">
+                <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-3 text-slate-300">
+                  <span className="material-symbols-outlined text-[32px]">notifications_off</span>
                 </div>
-              </div>
-            )}
-
-            {notifications.length === 0 && (
-              <div className="bg-surface rounded-3xl border border-outline-variant/30 overflow-hidden shadow-sm flex flex-col items-center justify-center text-center py-20 text-on-surface-variant px-6">
-                <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center mb-4 text-on-surface-variant/40">
-                  <span className="material-symbols-outlined text-[36px]">notifications_off</span>
-                </div>
-                <h3 className="font-headline-sm text-headline-sm text-on-surface mb-1">Tidak Ada Notifikasi</h3>
-                <p className="text-body-sm max-w-xs">Kotak masuk Gugus Anda bersih! Pemberitahuan scan atau verifikasi klaim akan muncul di sini.</p>
+                <h3 className="text-body-lg font-bold text-[#012060] mb-1">Tidak Ada Notifikasi</h3>
+                <p className="text-body-sm max-w-xs text-slate-500">Kotak masuk Gugus Anda bersih! Pemberitahuan status klaim atau penolakan akan muncul di sini.</p>
               </div>
             )}
           </div>

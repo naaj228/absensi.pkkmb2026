@@ -2,7 +2,7 @@ import { useContext, useState, useCallback } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { isHadir, getStatusBadge, STATUS_OPTIONS, getLogDisplayStatus } from '../../utils/statusHelper';
+import { isHadir, getStatusBadge, STATUS_OPTIONS, getLogDisplayStatus, JURUSAN_LIST, ALL_JURUSAN_OPTIONS, normalizeJurusan } from '../../utils/statusHelper';
 import { toISOKey, getTodayISOKey, formatIndonesianDate } from '../../utils/dateHelper';
 
 export default function AdminPeserta() {
@@ -12,6 +12,7 @@ export default function AdminPeserta() {
   // Filter & Search & Date states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGugus, setSelectedGugus] = useState('');
+  const [selectedJurusan, setSelectedJurusan] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedDate, setSelectedDate] = useState(getTodayISOKey());
 
@@ -23,6 +24,8 @@ export default function AdminPeserta() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editStudentId, setEditStudentId] = useState(null);
   const [importResult, setImportResult] = useState(null); // { added, skipped, skippedRows }
+
+
 
   // Form states
   const [formData, setFormData] = useState({
@@ -99,7 +102,9 @@ export default function AdminPeserta() {
       matchesStatus = dailyStatus.label.toLowerCase() === selectedStatus.toLowerCase();
     }
 
-    return matchesSearch && matchesGugus && matchesStatus;
+    const matchesJurusan = selectedJurusan === '' || student.fakultas === selectedJurusan || normalizeJurusan(student.fakultas) === selectedJurusan;
+
+    return matchesSearch && matchesGugus && matchesJurusan && matchesStatus;
   });
 
   // Pagination calculation
@@ -148,7 +153,7 @@ export default function AdminPeserta() {
       name: '',
       email: '',
       gugusId: gugus[0]?.id || '',
-      fakultas: 'Informatika',
+      fakultas: 'S1 Informatika',
       status: 'Belum Hadir'
     });
     setShowAddModal(true);
@@ -179,6 +184,10 @@ export default function AdminPeserta() {
         setShowAddModal(false);
         alert("Peserta berhasil ditambahkan.");
       } else if (showEditModal) {
+        if (formData.id !== editStudentId && peserta.some(p => p.id === formData.id)) {
+          alert("NIM sudah digunakan oleh peserta lain!");
+          return;
+        }
         await updatePeserta(editStudentId, formData);
         setShowEditModal(false);
         alert("Peserta berhasil diperbarui.");
@@ -300,7 +309,7 @@ export default function AdminPeserta() {
               name: nama,
               email: email || `${finalNim}@student.ac.id`,
               gugusId,
-              fakultas: jurusan || 'Belum Diisi',
+              fakultas: normalizeJurusan(jurusan || 'S1 Informatika'),
               status: 'Belum Hadir'
             });
 
@@ -364,11 +373,6 @@ export default function AdminPeserta() {
                   onChange={(e) => { setSelectedDate(e.target.value); setCurrentPage(1); }}
                   className="bg-[#f8fafc] border border-slate-200 text-slate-800 text-body-sm font-semibold rounded-xl pl-3.5 pr-9 py-1.5 focus:outline-none focus:border-primary cursor-pointer w-full"
                 />
-                {!selectedDate && (
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-body-sm font-medium pointer-events-none">
-                    dd/mm/yyyy
-                  </span>
-                )}
                 {selectedDate && (
                   <button
                     type="button"
@@ -462,7 +466,7 @@ export default function AdminPeserta() {
               {/* Bottom Row: Search & Filters Bar */}
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 pt-1">
                 {/* Search Input */}
-                <div className="sm:col-span-5 relative">
+                <div className="sm:col-span-3 relative">
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
                   <input 
                     className="w-full pl-9 pr-8 py-2 bg-[#f8fafc] rounded-xl text-body-sm font-medium text-on-surface placeholder:text-on-surface-variant/60 border border-outline-variant focus:border-primary focus:outline-none transition-colors" 
@@ -494,6 +498,25 @@ export default function AdminPeserta() {
                   <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
                 </div>
 
+                {/* Jurusan Filter */}
+                <div className="sm:col-span-3 relative">
+                  <select 
+                    className="w-full appearance-none pl-3.5 pr-8 py-2 bg-[#f8fafc] rounded-xl text-body-sm font-medium text-on-surface border border-outline-variant focus:border-primary focus:outline-none transition-colors cursor-pointer" 
+                    value={selectedJurusan} 
+                    onChange={(e) => { setSelectedJurusan(e.target.value); setCurrentPage(1); }}
+                  >
+                    <option value="">Semua Jurusan</option>
+                    {JURUSAN_LIST.map(group => (
+                      <optgroup key={group.group} label={group.group}>
+                        {group.options.map(j => (
+                          <option key={j} value={j}>{j}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">expand_more</span>
+                </div>
+
                 {/* Status Filter */}
                 <div className="sm:col-span-3 relative">
                   <select 
@@ -514,14 +537,15 @@ export default function AdminPeserta() {
                 </div>
 
                 {/* Reset Filter Button */}
-                {(searchTerm || selectedGugus || selectedStatus) && (
-                  <div className="sm:col-span-1">
+                {(searchTerm || selectedGugus || selectedJurusan || selectedStatus) && (
+                  <div className="sm:col-span-12 flex justify-end">
                     <button 
-                      className="w-full h-full bg-error/10 border border-error/20 text-error p-2 rounded-xl hover:bg-error/20 transition-colors flex items-center justify-center text-label-sm font-bold cursor-pointer" 
+                      className="bg-error/10 border border-error/20 text-error px-3 py-1.5 rounded-xl hover:bg-error/20 transition-colors flex items-center gap-1.5 text-body-sm font-bold cursor-pointer" 
                       title="Reset Semua Filter" 
-                      onClick={() => { setSearchTerm(''); setSelectedGugus(''); setSelectedStatus(''); setCurrentPage(1); }}
+                      onClick={() => { setSearchTerm(''); setSelectedGugus(''); setSelectedJurusan(''); setSelectedStatus(''); setCurrentPage(1); }}
                     >
                       <span className="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                      <span>Reset Filter</span>
                     </button>
                   </div>
                 )}
@@ -717,7 +741,16 @@ export default function AdminPeserta() {
                   </div>
                   <div>
                     <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Jurusan</label>
-                    <input className="w-full bg-surface-container text-on-surface py-2 px-3 rounded-lg border border-outline-variant focus:outline-none focus:border-primary text-xs sm:text-sm font-medium" type="text" placeholder="Cth: Teknik Informatika" value={formData.fakultas} onChange={(e) => setFormData({ ...formData, fakultas: e.target.value })} />
+                    <select className="w-full bg-surface-container text-on-surface py-2 px-3 rounded-lg border border-outline-variant focus:outline-none focus:border-primary cursor-pointer text-xs sm:text-sm font-medium" value={formData.fakultas} onChange={(e) => setFormData({ ...formData, fakultas: e.target.value })}>
+                      <option value="">-- Pilih Jurusan --</option>
+                      {JURUSAN_LIST.map(group => (
+                        <optgroup key={group.group} label={group.group}>
+                          {group.options.map(j => (
+                            <option key={j} value={j}>{j}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -742,7 +775,7 @@ export default function AdminPeserta() {
               <div className="p-4 sm:p-5 space-y-3 max-h-[60vh] overflow-y-auto">
                 <div>
                   <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">NIM</label>
-                  <input className="w-full bg-surface-container-low text-on-surface-variant/70 py-2 px-3 rounded-lg border border-outline-variant/50 opacity-60 text-xs sm:text-sm font-medium cursor-not-allowed" disabled type="text" value={formData.id} />
+                  <input className="w-full bg-surface-container text-on-surface py-2 px-3 rounded-lg border border-outline-variant focus:outline-none focus:border-primary text-xs sm:text-sm font-medium" required type="text" value={formData.id} onChange={(e) => setFormData({ ...formData, id: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Nama Lengkap</label>
@@ -764,7 +797,16 @@ export default function AdminPeserta() {
                   </div>
                   <div>
                     <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Jurusan</label>
-                    <input className="w-full bg-surface-container text-on-surface py-2 px-3 rounded-lg border border-outline-variant focus:outline-none focus:border-primary text-xs sm:text-sm font-medium" type="text" placeholder="Cth: Teknik Informatika" value={formData.fakultas} onChange={(e) => setFormData({ ...formData, fakultas: e.target.value })} />
+                    <select className="w-full bg-surface-container text-on-surface py-2 px-3 rounded-lg border border-outline-variant focus:outline-none focus:border-primary cursor-pointer text-xs sm:text-sm font-medium" value={formData.fakultas} onChange={(e) => setFormData({ ...formData, fakultas: e.target.value })}>
+                      <option value="">-- Pilih Jurusan --</option>
+                      {JURUSAN_LIST.map(group => (
+                        <optgroup key={group.group} label={group.group}>
+                          {group.options.map(j => (
+                            <option key={j} value={j}>{j}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div>

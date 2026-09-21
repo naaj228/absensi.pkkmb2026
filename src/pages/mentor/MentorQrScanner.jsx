@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect, useRef } from 'react';
+import { checkScannerOperationalStatus } from '../../utils/dateHelper';
 import { useNavigate } from 'react-router-dom';
 import jsQR from 'jsqr';
 import { AppContext } from '../../context/AppContext';
@@ -107,8 +107,14 @@ export default function MentorQrScanner() {
   };
 
   // Process a scanned / typed NIM
-  const processNim = (nim) => {
+  const processNim = async (nim) => {
     if (!nim) return;
+
+    const opStatus = checkScannerOperationalStatus(locationSettings);
+    if (!opStatus.isOpen) {
+      showResult('invalid', 'Scanner Ditutup', opStatus.message);
+      return;
+    }
     const students = pesertaRef.current;
     const gugusId  = mentorGugusIdRef.current;
     const gugusName = mentorGugusNameRef.current;
@@ -146,8 +152,21 @@ export default function MentorQrScanner() {
       locationStatus: 'Dalam Area',
       distanceMeters: distanceToCenterRef.current || 0
     };
-    recordScanRef.current(student.id, locationData);
-    showResult('success', student.name, '✅ Berhasil Absen');
+
+    try {
+      const res = await recordScanRef.current(student.id, locationData);
+      if (res?.isLate) {
+        showResult('late', student.name, `⚠️ ABSEN TERLAMBAT (${res.currentTimeStr} WIB)`);
+      } else {
+        showResult('success', student.name, '✅ Berhasil Absen (Tepat Waktu)');
+      }
+    } catch (err) {
+      if (err?.message?.includes('SUDAH_ABSEN') || err?.message?.includes('sudah melakukan absensi')) {
+        showResult('already', student.name, '⚠️ Sudah melakukan absensi hari ini');
+      } else {
+        showResult('invalid', student.name, err?.message || 'Gagal menyimpan absensi');
+      }
+    }
   };
 
   // rAF scan loop
@@ -367,6 +386,30 @@ export default function MentorQrScanner() {
                 </div>
               )}
 
+              {(() => {
+                const opStatus = checkScannerOperationalStatus(locationSettings);
+                if (!opStatus.isOpen) {
+                  return (
+                    <div className="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center z-40 gap-3 text-white p-6 text-center animate-fade-in">
+                      <div className="w-14 h-14 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center mb-1 shadow-lg">
+                        <span className="material-symbols-outlined text-[32px]">lock_clock</span>
+                      </div>
+                      <div>
+                        <p className="font-bold text-body-lg text-rose-300">Scanner Absensi Ditutup</p>
+                        <p className="text-white/85 text-[11px] sm:text-xs mt-1.5 max-w-xs mx-auto leading-relaxed">
+                          {opStatus.message}
+                        </p>
+                      </div>
+                      <div className="bg-slate-900/90 border border-slate-800 px-3.5 py-2 rounded-xl flex items-center gap-2 text-[11px] font-semibold text-slate-300 mt-2">
+                        <span className="material-symbols-outlined text-[16px] text-amber-400">schedule</span>
+                        <span>Jam Operasional Hari Ini: <strong className="text-white">{locationSettings?.startTime || '07:00'} - {locationSettings?.endTime || '12:00'} WIB</strong></span>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {/* Viewfinder Target Box */}
               <div className="relative w-52 h-52 sm:w-64 sm:h-64 md:w-72 md:h-72 z-20">
                 <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -381,14 +424,20 @@ export default function MentorQrScanner() {
               </div>
 
               {/* Scan Feedback Dialog */}
-              <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-30 transition-all duration-300 border border-white/20 max-w-[90%] ${
-                feedbackType === 'success' ? 'bg-emerald-600/95' : feedbackType === 'already' ? 'bg-amber-600/95' : 'bg-rose-600/95'
-              } text-white ${showFeedback ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
+              <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-30 transition-all duration-300 border max-w-[90%] ${
+                feedbackType === 'success' 
+                  ? 'bg-emerald-600/95 text-white border-white/20' 
+                  : feedbackType === 'late'
+                  ? 'bg-amber-400 text-amber-950 border-amber-200 font-extrabold shadow-amber-950/50'
+                  : feedbackType === 'already' 
+                  ? 'bg-amber-600/95 text-white border-white/20' 
+                  : 'bg-rose-600/95 text-white border-white/20'
+              } ${showFeedback ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
                 <span className="material-symbols-outlined text-[32px] shrink-0">
-                  {feedbackType === 'success' ? 'check_circle' : feedbackType === 'already' ? 'warning' : 'cancel'}
+                  {feedbackType === 'success' ? 'check_circle' : feedbackType === 'late' ? 'alarm' : feedbackType === 'already' ? 'warning' : 'cancel'}
                 </span>
                 <div className="overflow-hidden">
-                  <p className="text-[10px] uppercase tracking-wider font-extrabold opacity-85">{feedbackMsg}</p>
+                  <p className={`text-[10px] uppercase tracking-wider font-extrabold ${feedbackType === 'late' ? 'text-amber-950' : 'opacity-85'}`}>{feedbackMsg}</p>
                   <p className="text-body-md font-extrabold truncate">{scannedName}</p>
                 </div>
               </div>

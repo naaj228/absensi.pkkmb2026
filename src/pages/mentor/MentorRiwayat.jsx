@@ -422,7 +422,13 @@ export default function MentorRiwayat() {
                                   }`}
                               >
                                 <div className="flex items-center justify-between gap-1">
-                                  <span className="text-[9.5px] font-bold text-slate-700 font-mono">{log.timestamp}</span>
+                                  {log.note && (log.note.includes('Terlambat') || log.note.includes('terlambat')) ? (
+                                    <span className="text-[9px] font-mono font-extrabold text-amber-900 bg-amber-100 border border-amber-300 px-1 py-0.5 rounded-md">
+                                      {log.timestamp} ⚠️
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9.5px] font-bold text-slate-700 font-mono">{log.timestamp}</span>
+                                  )}
                                   <span className={`px-1.5 py-0.5 rounded-full text-[8.5px] font-extrabold shrink-0 border flex items-center gap-1 ${getLogDisplayStatus(log).bg
                                     }`}>
                                     <span className={`w-1.5 h-1.5 rounded-full ${getLogDisplayStatus(log).dot}`}></span>
@@ -470,8 +476,16 @@ export default function MentorRiwayat() {
                                   <td className="py-3 px-5 text-body-xs font-semibold text-slate-400 text-center">
                                     {idx + 1}
                                   </td>
-                                  <td className="py-3 px-5 text-body-sm font-bold text-slate-700 font-mono">
-                                    {log.timestamp}
+                                  <td className="py-3 px-5 font-mono">
+                                    {log.note && (log.note.includes('Terlambat') || log.note.includes('terlambat')) ? (
+                                      <span className="text-body-xs font-mono font-extrabold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md inline-block">
+                                        {log.timestamp} (Terlambat) ⚠️
+                                      </span>
+                                    ) : (
+                                      <span className="text-body-sm font-bold text-slate-700">
+                                        {log.timestamp}
+                                      </span>
+                                    )}
                                   </td>
                                   <td className="py-3 px-5 font-bold text-slate-800 text-body-sm">
                                     {log.name}

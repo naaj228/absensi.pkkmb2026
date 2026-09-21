@@ -27,18 +27,31 @@ export default function MentorAbsensiManual() {
   const targetDateKey = toISOKey(selectedDate);
 
   const getStudentDailyStatus = useCallback((student) => {
-    const hasValidLogOnDate = logs.some(l => 
+    const validLogOnDate = logs.find(l => 
       String(l.nim) === String(student.id) && 
       l.status === 'Valid' && 
       toISOKey(l.date) === targetDateKey
     );
 
-    if (hasValidLogOnDate) {
+    if (validLogOnDate) {
+      const isLate = validLogOnDate.note && (validLogOnDate.note.includes('Terlambat') || validLogOnDate.note.includes('terlambat'));
+      if (isLate) {
+        return { 
+          label: 'Terlambat', 
+          bg: 'bg-amber-100 text-amber-900 border-amber-300 font-bold', 
+          dot: 'bg-amber-500', 
+          isPresent: true,
+          isLate: true,
+          isPending: false,
+          isDitolak: false
+        };
+      }
       return { 
         label: 'Hadir', 
         bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', 
         dot: 'bg-emerald-500', 
         isPresent: true,
+        isLate: false,
         isPending: false,
         isDitolak: false
       };
@@ -50,7 +63,7 @@ export default function MentorAbsensiManual() {
         bg: 'bg-amber-50 text-amber-700 border-amber-200', 
         dot: 'bg-amber-500', 
         isPresent: false,
-        isPending: true,
+        isPending: false,
         isDitolak: false
       };
     }
@@ -97,8 +110,9 @@ export default function MentorAbsensiManual() {
   });
 
   const handleOpenModal = (student) => {
+    const dailyStatus = getStudentDailyStatus(student);
     setSelectedStudent(student);
-    setRequestedStatus('Hadir Penuh');
+    setRequestedStatus(dailyStatus.isPresent ? 'Hadir Sebagian' : 'Hadir Penuh');
     setReason('jaringan');
     setNote('');
     setShowModal(true);
@@ -199,11 +213,6 @@ export default function MentorAbsensiManual() {
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="bg-[#f8fafc] border border-slate-200 text-slate-800 text-body-sm font-semibold rounded-xl pl-3.5 pr-9 py-1.5 focus:outline-none focus:border-primary cursor-pointer w-full"
               />
-              {!selectedDate && (
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-body-sm font-medium pointer-events-none">
-                  dd/mm/yyyy
-                </span>
-              )}
               {selectedDate && (
                 <button
                   type="button"
@@ -311,10 +320,13 @@ export default function MentorAbsensiManual() {
                           <span>Pending</span>
                         </div>
                       ) : b.isPresent ? (
-                        <div className="w-full py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[9.5px] font-bold flex items-center justify-center gap-1">
-                          <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                          <span>Sudah Hadir</span>
-                        </div>
+                        <button
+                          onClick={() => handleOpenModal(student)}
+                          className="w-full py-1.5 bg-[#012060]/5 hover:bg-[#012060]/10 border border-[#012060]/20 text-[#012060] rounded-lg text-[9.5px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">edit_note</span>
+                          <span>Ubah Status / Izin</span>
+                        </button>
                       ) : (
                         <button
                           onClick={() => handleOpenModal(student)}
@@ -366,10 +378,13 @@ export default function MentorAbsensiManual() {
                         Menunggu Persetujuan Admin
                       </div>
                     ) : b.isPresent ? (
-                      <div className="w-full bg-emerald-50 border border-emerald-200 py-2 rounded-xl text-body-xs font-bold text-emerald-700 flex items-center justify-center gap-1.5">
-                        <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                        Sudah Terdaftar Hadir
-                      </div>
+                      <button
+                        onClick={() => handleOpenModal(student)}
+                        className="w-full bg-[#012060]/5 hover:bg-[#012060]/10 border border-[#012060]/20 text-[#012060] py-2 rounded-xl text-body-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-98"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">edit_note</span>
+                        <span>Ajukan Ubah Status / Izin</span>
+                      </button>
                     ) : (
                       <button
                         onClick={() => handleOpenModal(student)}

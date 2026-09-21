@@ -1,7 +1,7 @@
 import { useContext, useState, useCallback } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { isHadir, getLogDisplayStatus } from '../../utils/statusHelper';
+import { isHadir, getLogDisplayStatus, JURUSAN_LIST, ALL_JURUSAN_OPTIONS } from '../../utils/statusHelper';
 import { toISOKey, getTodayISOKey, formatDDMMYYYY, formatIndonesianDate } from '../../utils/dateHelper';
 import JSZip from 'jszip';
 import QRCode from 'qrcode';
@@ -328,11 +328,6 @@ export default function MentorPeserta() {
                   onChange={(e) => setSelectedDate(e.target.value)}
                   className="w-full bg-white text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 pl-3.5 pr-9 rounded-xl focus:outline-none focus:border-primary transition-all cursor-pointer"
                 />
-                {!selectedDate && (
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-body-sm font-medium pointer-events-none">
-                    dd/mm/yyyy
-                  </span>
-                )}
                 {selectedDate && (
                   <button
                     type="button"
@@ -595,8 +590,18 @@ export default function MentorPeserta() {
                 <div>
                   <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jurusan / Program Studi</label>
                   <div className="relative">
-                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold py-2.5 sm:py-3 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm transition-all" required type="text" placeholder="Cth: Teknik Informatika" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
+                    <select className="w-full bg-[#f8fafc] text-slate-800 font-semibold py-2.5 sm:py-3 pl-10 pr-8 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm transition-all appearance-none cursor-pointer" required value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})}>
+                      <option value="">-- Pilih Jurusan --</option>
+                      {JURUSAN_LIST.map(group => (
+                        <optgroup key={group.group} label={group.group}>
+                          {group.options.map(j => (
+                            <option key={j} value={j}>{j}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
                     <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">school</span>
+                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[18px]">expand_more</span>
                   </div>
                 </div>
               </div>
@@ -670,8 +675,18 @@ export default function MentorPeserta() {
                 <div>
                   <label className="block text-[9.5px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jurusan / Program Studi</label>
                   <div className="relative">
-                    <input className="w-full bg-[#f8fafc] text-slate-800 font-semibold py-2.5 sm:py-3 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm transition-all" required type="text" value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})} />
+                    <select className="w-full bg-[#f8fafc] text-slate-800 font-semibold py-2.5 sm:py-3 pl-10 pr-8 rounded-xl border border-slate-200 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 text-body-sm transition-all appearance-none cursor-pointer" required value={formData.fakultas} onChange={(e) => setFormData({...formData, fakultas: e.target.value})}>
+                      <option value="">-- Pilih Jurusan --</option>
+                      {JURUSAN_LIST.map(group => (
+                        <optgroup key={group.group} label={group.group}>
+                          {group.options.map(j => (
+                            <option key={j} value={j}>{j}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
                     <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px] sm:text-[18px]">school</span>
+                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[18px]">expand_more</span>
                   </div>
                 </div>
               </div>

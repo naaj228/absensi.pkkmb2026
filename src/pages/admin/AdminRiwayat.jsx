@@ -413,11 +413,6 @@ export default function AdminRiwayat() {
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
                   />
-                  {!selectedDate && (
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-body-sm font-medium pointer-events-none">
-                      dd/mm/yyyy
-                    </span>
-                  )}
                   {selectedDate && (
                     <button
                       type="button"
@@ -705,7 +700,13 @@ export default function AdminRiwayat() {
                                   />
                                 </td>
                                 <td className="py-2.5 px-1.5 truncate">
-                                  <span className="text-[11.5px] font-bold text-slate-700 font-mono block truncate">{log.timestamp}</span>
+                                  {log.note && (log.note.includes('Terlambat') || log.note.includes('terlambat')) ? (
+                                    <span className="text-[10px] font-mono font-extrabold text-amber-900 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md inline-block truncate" title={log.note}>
+                                      {log.timestamp} ⚠️
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11.5px] font-bold text-slate-700 font-mono block truncate">{log.timestamp}</span>
+                                  )}
                                 </td>
                                 <td className="py-2.5 px-1.5 truncate">
                                   <div className="flex flex-col min-w-0 truncate">

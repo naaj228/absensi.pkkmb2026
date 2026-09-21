@@ -12,6 +12,9 @@ import {
   getWibDateString
 } from '../lib/db';
 
+import { normalizeJurusan } from '../utils/statusHelper';
+import { checkIsLate } from '../utils/dateHelper';
+
 export const AppContext = createContext();
 
 // Helper to parse DB date strings safely as UTC if they lack timezone offsets
@@ -39,7 +42,7 @@ const transformPeserta = (p) => ({
   name: p.nama,
   email: p.email,
   gugusId: p.gugus_id || '',
-  fakultas: p.jurusan || '',
+  fakultas: normalizeJurusan(p.jurusan || ''),
   status: p.status || 'Belum Hadir',
   fotoUrl: p.foto_url || ''
 });
@@ -118,7 +121,11 @@ export function AppContextProvider({ children }) {
     latitude: -6.966748,
     longitude: 107.672466,
     radiusMeters: 150,
-    locationName: 'Gedung Utama PKKMB (Digitech University)'
+    locationName: 'Gedung Utama PKKMB (Digitech University)',
+    startTime: '07:00',
+    onTimeLimit: '07:30',
+    endTime: '12:00',
+    scannerStatus: 'auto'
   });
 
   const [adminUser, setAdminUser] = useState(() => {
@@ -183,7 +190,7 @@ export function AppContextProvider({ children }) {
   const adminNotificationsCount = activeAdminNotifications.length;
 
   const activeMentorNotifications = [
-    ...logs.filter(l => l.gugusName === mentorGugusName).map(l => `log-${l.id}`),
+    ...logs.filter(l => l.gugusName === mentorGugusName && (l.status !== 'Valid' || l.scanner === 'Admin (Tolak Manual)')).map(l => `log-${l.id}`),
     ...claims.filter(c => c.gugusName === mentorGugusName).map(c => `claim-${c.id}`)
   ].filter(id => !dismissedNotifications.includes(id));
 
@@ -581,6 +588,11 @@ export function AppContextProvider({ children }) {
       const student = peserta.find(p => p.id === id);
       if (!student) return;
 
+      const newId = fields.id || id;
+      if (newId !== id && peserta.some(p => p.id === newId)) {
+        throw new Error(`NIM ${newId} sudah digunakan oleh peserta lain.`);
+      }
+
       // Validate gugus capacity on update if changing gugus
       if (fields.gugusId !== undefined && fields.gugusId !== student.gugusId) {
         if (fields.gugusId && fields.gugusId !== 'Unassigned') {
@@ -605,7 +617,7 @@ export function AppContextProvider({ children }) {
           student,
           groupName,
           currentUser,
-          JSON.stringify({ ...fields, id })
+          JSON.stringify({ ...fields, id: newId })
         );
         if (newClaim) {
           const transformed = transformClaim(newClaim);
@@ -627,9 +639,9 @@ export function AppContextProvider({ children }) {
             const noteText = `Ubah Status Manual ke ${newStatus}`;
             if (existingLog) {
               await logsDb.update(existingLog.id, { note: noteText, scanner: scannerName });
-              setLogs(prev => prev.map(l => l.id === existingLog.id ? { ...l, note: noteText, scanner: scannerName } : l));
+              setLogs(prev => prev.map(l => l.id === existingLog.id ? { ...l, note: noteText, scanner: scannerName, nim: newId } : l));
             } else {
-              await addLog(fields.name || student.name, id, groupName, scannerName, 'Valid', noteText);
+              await addLog(fields.name || student.name, newId, groupName, scannerName, 'Valid', noteText);
             }
           } else if (newStatus === 'Belum Hadir' || newStatus === 'Alpha' || newStatus === 'Sakit') {
             // Delete any existing valid logs so attendance is cleared
@@ -640,7 +652,11 @@ export function AppContextProvider({ children }) {
           }
         }
 
-        setPeserta(prev => prev.map(p => p.id === id ? { ...p, ...fields } : p));
+        setPeserta(prev => prev.map(p => p.id === id ? { ...p, ...fields, id: newId } : p));
+        if (newId !== id) {
+          setLogs(prev => prev.map(l => String(l.nim) === String(id) ? { ...l, nim: newId } : l));
+          setClaims(prev => prev.map(c => String(c.nim) === String(id) ? { ...c, nim: newId, pesertaId: newId } : c));
+        }
         try {
           await pesertaDb.update(id, fields);
         } catch (err) {
@@ -814,6 +830,11 @@ export function AppContextProvider({ children }) {
 
   const addLog = async (name, nim, gugusName, scanner, status = 'Valid', note = '', locationData = null, customWaktu = null) => {
     try {
+      const todayStr = getTodayWibString();
+      if (status === 'Valid' && logs.some(l => String(l.nim) === String(nim) && l.date === todayStr && l.status === 'Valid')) {
+        throw new Error(`SUDAH_ABSEN: Mahasiswa dengan NIM ${nim} sudah melakukan absensi hari ini.`);
+      }
+
       const student = peserta.find(p => p.id === nim);
       const inserted = await logsDb.add(name, nim, gugusName, scanner, status, note, student?.uuid, currentUser?.id, locationData, customWaktu);
       if (inserted) {
@@ -823,8 +844,10 @@ export function AppContextProvider({ children }) {
           return [transformed, ...prev];
         });
       }
+      return inserted;
     } catch (err) {
       console.error("Error writing scan log:", err);
+      throw err;
     }
   };
 
@@ -866,9 +889,13 @@ export function AppContextProvider({ children }) {
         setLocationSettings({
           latitude: updated.latitude,
           longitude: updated.longitude,
-          radiusMeters: updated.radius_meters,
-          locationName: updated.location_name,
-          updatedAt: updated.updated_at
+          radiusMeters: updated.radiusMeters,
+          locationName: updated.locationName,
+          startTime: updated.startTime,
+          onTimeLimit: updated.onTimeLimit,
+          endTime: updated.endTime,
+          scannerStatus: updated.scannerStatus,
+          updatedAt: updated.updatedAt
         });
         return true;
       }
@@ -1004,13 +1031,21 @@ export function AppContextProvider({ children }) {
     const groupName = group ? group.name : '-';
 
     try {
+      const lateInfo = checkIsLate(locationSettings?.onTimeLimit || '07:30');
+      const scanNote = lateInfo.isLate ? `Terlambat (${lateInfo.currentTimeStr} WIB)` : '';
+
+      await addLog(student.name, student.id, groupName, currentUser ? currentUser.name : 'Mentor', 'Valid', scanNote, locationData);
       await pesertaDb.update(studentId, { status: 'Hadir Penuh' });
       setPeserta(prev => prev.map(p => String(p.id) === String(studentId) ? { ...p, status: 'Hadir Penuh' } : p));
-      await addLog(student.name, student.id, groupName, currentUser ? currentUser.name : 'Mentor', 'Valid', '', locationData);
-      return true;
+      return { 
+        success: true, 
+        isLate: lateInfo.isLate, 
+        currentTimeStr: lateInfo.currentTimeStr, 
+        diffMinutes: lateInfo.diffMinutes 
+      };
     } catch (err) {
       console.error("Error recording scan:", err);
-      return false;
+      throw err;
     }
   };
 

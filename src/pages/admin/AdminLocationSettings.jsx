@@ -1,4 +1,5 @@
-import { useContext, useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { checkScannerOperationalStatus } from '../../utils/dateHelper';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import L from 'leaflet';
@@ -172,6 +173,10 @@ export default function AdminLocationSettings() {
   const [tempLat, setTempLat] = useState(-6.966748);
   const [tempLng, setTempLng] = useState(107.672466);
   const [radius, setRadius] = useState(100);
+  const [startTime, setStartTime] = useState('07:00');
+  const [onTimeLimit, setOnTimeLimit] = useState('07:30');
+  const [endTime, setEndTime] = useState('12:00');
+  const [scannerStatus, setScannerStatus] = useState('auto');
   
   const [saving, setSaving] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -219,6 +224,10 @@ export default function AdminLocationSettings() {
       setTempLat(activeLat);
       setTempLng(activeLng);
       setRadius(locationSettings.radiusMeters || 100);
+      if (locationSettings.startTime) setStartTime(locationSettings.startTime);
+      if (locationSettings.onTimeLimit) setOnTimeLimit(locationSettings.onTimeLimit);
+      if (locationSettings.endTime) setEndTime(locationSettings.endTime);
+      if (locationSettings.scannerStatus) setScannerStatus(locationSettings.scannerStatus);
       
       if (locationSettings.updatedAt) {
         const date = new Date(locationSettings.updatedAt);
@@ -498,9 +507,13 @@ export default function AdminLocationSettings() {
         latitude: latVal,
         longitude: lngVal,
         radiusMeters: parseInt(radius, 10),
-        locationName: locationName.trim()
+        locationName: locationName.trim(),
+        startTime,
+        onTimeLimit,
+        endTime,
+        scannerStatus
       });
-      alert("Pengaturan geofencing berhasil disimpan!");
+      alert("Pengaturan lokasi & batas waktu scanner berhasil disimpan!");
     } catch (err) {
       alert("Gagal menyimpan lokasi: " + err.message);
     } finally {
@@ -515,7 +528,7 @@ export default function AdminLocationSettings() {
         <div className="flex items-center gap-2.5 overflow-hidden">
           <span className="material-symbols-outlined text-[#012060] text-[22px] sm:text-[24px] shrink-0">pin_drop</span>
           <h1 className="text-body-md sm:text-title-md font-bold text-[#012060] font-sans truncate">
-            Pengaturan Lokasi & Geofencing
+            Pengaturan Lokasi & Batas Waktu Scanner
           </h1>
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -605,6 +618,192 @@ export default function AdminLocationSettings() {
             mobileTab === 'form' || mobileTab === 'guide' ? 'block' : 'hidden lg:flex'
           }`}>
             
+            {/* Card 0: Batas Waktu Scanner */}
+            <div className={`bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col gap-5 ${
+              mobileTab === 'guide' ? 'hidden lg:flex' : 'flex'
+            }`}>
+              <div className="flex justify-between items-start gap-3">
+                <div className="flex gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-600 shrink-0">
+                    <span className="material-symbols-outlined text-[22px]">schedule</span>
+                  </div>
+                  <div>
+                    <h3 className="text-body-md sm:text-body-lg font-bold text-[#012060]">Batas Waktu Scanner</h3>
+                    <p className="text-[11px] sm:text-[12px] text-slate-400 mt-0.5 leading-relaxed">
+                      Atur jam operasional presensi harian dan status akses scanner untuk semua mentor.
+                    </p>
+                  </div>
+                </div>
+                {(() => {
+                  const timeStatus = checkScannerOperationalStatus({ startTime, endTime, scannerStatus });
+                  return (
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-bold shrink-0 flex items-center gap-1 border ${
+                      timeStatus.isOpen 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                        : 'bg-rose-50 text-rose-700 border-rose-200'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${timeStatus.isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                      {timeStatus.isOpen ? 'AKTIF' : 'DITUTUP'}
+                    </span>
+                  );
+                })()}
+              </div>
+
+              {/* Status Mode Radio Options */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mode Status Access</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setScannerStatus('auto')}
+                    className={`py-2 px-2.5 rounded-xl border text-[11px] sm:text-xs font-bold transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                      scannerStatus === 'auto'
+                        ? 'bg-primary/10 border-primary text-primary shadow-xs'
+                        : 'bg-[#f8fafc] border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">access_time</span>
+                    <span>Otomatis (Jam)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setScannerStatus('open')}
+                    className={`py-2 px-2.5 rounded-xl border text-[11px] sm:text-xs font-bold transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                      scannerStatus === 'open'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-xs'
+                        : 'bg-[#f8fafc] border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">lock_open</span>
+                    <span>Buka Manual</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setScannerStatus('closed')}
+                    className={`py-2 px-2.5 rounded-xl border text-[11px] sm:text-xs font-bold transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                      scannerStatus === 'closed'
+                        ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-xs'
+                        : 'bg-[#f8fafc] border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">lock</span>
+                    <span>Tutup Manual</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Jam Buka, Batas Tepat Waktu & Jam Tutup Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Jam Buka (WIB)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 bg-[#f8fafc] rounded-xl border border-slate-200 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary cursor-pointer"
+                    />
+                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">alarm</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1">
+                    <span>Batas Tepat Waktu</span>
+                    <span className="text-[9px] px-1 rounded bg-amber-100 text-amber-700 font-extrabold">Dispensi</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="time"
+                      value={onTimeLimit}
+                      onChange={(e) => setOnTimeLimit(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 bg-amber-50/50 rounded-xl border border-amber-300 text-body-sm font-bold text-amber-900 focus:outline-none focus:border-amber-500 cursor-pointer shadow-2xs"
+                    />
+                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-500 text-[18px]">timer</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jam Tutup (WIB)</label>
+                  <div className="relative">
+                    <input
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 bg-[#f8fafc] rounded-xl border border-slate-200 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary cursor-pointer"
+                    />
+                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">alarm_off</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informational Note for On-Time Limit */}
+              <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-2.5 flex items-start gap-2 text-[11px] text-amber-800">
+                <span className="material-symbols-outlined text-amber-600 text-[16px] shrink-0 mt-0.5">info</span>
+                <p className="leading-snug">
+                  Peserta yang di-scan <strong>sebelum {onTimeLimit} WIB</strong> akan ditandai <strong className="text-emerald-700">Tepat Waktu (Hijau)</strong>. Di atas jam tersebut akan otomatis ditandai <strong className="text-amber-800">Terlambat (Kuning)</strong> di riwayat absensi.
+                </p>
+              </div>
+
+              {/* Perpanjang Waktu Cepat (+15m, +30m, +1j) */}
+              <div className="flex items-center justify-between gap-2 bg-[#f8fafc] p-2.5 rounded-xl border border-slate-200/80">
+                <span className="text-[11px] font-bold text-slate-500">Perpanjang Selesai:</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const [h, m] = (endTime || '12:00').split(':').map(Number);
+                      let total = (h || 0) * 60 + (m || 0) + 15;
+                      if (total >= 1440) total = 1439;
+                      setEndTime(`${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`);
+                    }}
+                    className="px-2.5 py-1 bg-white border border-slate-200 hover:border-primary hover:text-primary rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    +15m
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const [h, m] = (endTime || '12:00').split(':').map(Number);
+                      let total = (h || 0) * 60 + (m || 0) + 30;
+                      if (total >= 1440) total = 1439;
+                      setEndTime(`${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`);
+                    }}
+                    className="px-2.5 py-1 bg-white border border-slate-200 hover:border-primary hover:text-primary rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    +30m
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const [h, m] = (endTime || '12:00').split(':').map(Number);
+                      let total = (h || 0) * 60 + (m || 0) + 60;
+                      if (total >= 1440) total = 1439;
+                      setEndTime(`${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`);
+                    }}
+                    className="px-2.5 py-1 bg-white border border-slate-200 hover:border-primary hover:text-primary rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    +1j
+                  </button>
+                </div>
+              </div>
+
+              {/* Save Button for Scanner Time Settings */}
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full py-2.5 bg-[#012060] hover:bg-[#022b80] text-white rounded-xl text-body-sm font-bold shadow-md active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-1"
+              >
+                <span className="material-symbols-outlined text-[18px]">{saving ? 'sync' : 'save'}</span>
+                <span>{saving ? 'Menyimpan Batas Waktu...' : 'Simpan Batas Waktu Scanner'}</span>
+              </button>
+            </div>
+
             {/* Card 1: Form Titik Absensi Aktif */}
             <div className={`bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col gap-5 ${
               mobileTab === 'guide' ? 'hidden lg:flex' : 'flex'

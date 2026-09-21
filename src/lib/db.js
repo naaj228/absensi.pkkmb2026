@@ -91,6 +91,7 @@ export const pesertaDb = {
 
   async update(nim, fields) {
     const payload = {};
+    if (fields.id !== undefined && fields.id !== nim) payload.nim = fields.id;
     if (fields.name !== undefined) payload.nama = fields.name;
     if (fields.email !== undefined) payload.email = fields.email;
     if (fields.gugusId !== undefined) payload.gugus_id = fields.gugusId || null;
@@ -107,6 +108,16 @@ export const pesertaDb = {
     if (!data || data.length === 0) {
       throw new Error("Gagal memperbarui status peserta di database. Anda mungkin tidak memiliki izin RLS.");
     }
+
+    if (fields.id !== undefined && fields.id !== nim) {
+      try {
+        await supabase.from('absensi').update({ peserta_nim: fields.id }).eq('peserta_nim', nim);
+        await supabase.from('approval_manual').update({ nim: fields.id }).eq('nim', nim);
+      } catch (e) {
+        console.warn("Could not cascade nim update to related tables:", e);
+      }
+    }
+
     return data;
   },
 
@@ -516,6 +527,22 @@ export const logsDb = {
   },
 
   async add(name, nim, gugusName, scanner, status = 'Valid', note = '', studentUuid, scannerUuid, locationData = null, customWaktu = null) {
+    if (status === 'Valid') {
+      const todayWib = getTodayWibString();
+      const { data: existingLogs } = await supabase
+        .from('absensi')
+        .select('*')
+        .eq('peserta_nim', nim)
+        .eq('status_log', 'Valid');
+
+      if (existingLogs && existingLogs.length > 0) {
+        const hasTodayLog = existingLogs.some(l => getWibDateString(l.waktu) === todayWib);
+        if (hasTodayLog) {
+          throw new Error(`SUDAH_ABSEN: Mahasiswa dengan NIM ${nim} sudah melakukan absensi hari ini.`);
+        }
+      }
+    }
+
     const insertObj = {
       peserta_id: studentUuid || null,
       dicatat_oleh: scannerUuid || null,
@@ -640,36 +667,73 @@ export const qrSessionsDb = {
 // ----------------------------------------------------
 export const locationSettingsDb = {
   async fetch() {
+    let savedLocal = null;
+    try {
+      const stored = localStorage.getItem('pkkmb_location_settings');
+      if (stored) savedLocal = JSON.parse(stored);
+    } catch {}
+
     const { data, error } = await supabase
       .from('location_settings')
       .select('*')
       .eq('id', 1)
       .maybeSingle();
-    if (error) throw error;
-    return data ? {
-      latitude: data.latitude,
-      longitude: data.longitude,
-      radiusMeters: data.radius_meters,
-      locationName: data.location_name,
-      updatedAt: data.updated_at
-    } : null;
+    if (error) console.warn("Supabase location_settings fetch warning:", error);
+
+    return {
+      latitude: data?.latitude ?? savedLocal?.latitude ?? -6.966748,
+      longitude: data?.longitude ?? savedLocal?.longitude ?? 107.672466,
+      radiusMeters: data?.radius_meters ?? savedLocal?.radiusMeters ?? 150,
+      locationName: data?.location_name ?? savedLocal?.locationName ?? 'Gedung Utama PKKMB (Digitech University)',
+      updatedAt: savedLocal?.updatedAt ?? data?.updated_at ?? new Date().toISOString(),
+      startTime: savedLocal?.startTime ?? data?.start_time ?? '07:00',
+      onTimeLimit: savedLocal?.onTimeLimit ?? data?.on_time_limit ?? '07:30',
+      endTime: savedLocal?.endTime ?? data?.end_time ?? '12:00',
+      scannerStatus: savedLocal?.scannerStatus ?? data?.scanner_status ?? 'auto'
+    };
   },
 
   async update(settings) {
-    const { data, error } = await supabase
-      .from('location_settings')
-      .upsert({
-        id: 1,
-        latitude: settings.latitude,
-        longitude: settings.longitude,
-        radius_meters: settings.radiusMeters,
-        location_name: settings.locationName,
-        updated_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const localPayload = {
+      latitude: settings.latitude,
+      longitude: settings.longitude,
+      radiusMeters: settings.radiusMeters,
+      locationName: settings.locationName,
+      startTime: settings.startTime || '07:00',
+      onTimeLimit: settings.onTimeLimit || '07:30',
+      endTime: settings.endTime || '12:00',
+      scannerStatus: settings.scannerStatus || 'auto',
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      localStorage.setItem('pkkmb_location_settings', JSON.stringify(localPayload));
+    } catch {}
+
+    const upsertObj = {
+      id: 1,
+      latitude: settings.latitude,
+      longitude: settings.longitude,
+      radius_meters: settings.radiusMeters,
+      location_name: settings.locationName,
+      updated_at: new Date().toISOString()
+    };
+    if (settings.startTime !== undefined) upsertObj.start_time = settings.startTime;
+    if (settings.onTimeLimit !== undefined) upsertObj.on_time_limit = settings.onTimeLimit;
+    if (settings.endTime !== undefined) upsertObj.end_time = settings.endTime;
+    if (settings.scannerStatus !== undefined) upsertObj.scanner_status = settings.scannerStatus;
+
+    try {
+      await supabase
+        .from('location_settings')
+        .upsert(upsertObj)
+        .select()
+        .single();
+    } catch (e) {
+      console.warn("Could not save extra columns to Supabase location_settings, using local fallback:", e);
+    }
+
+    return localPayload;
   }
 };
 

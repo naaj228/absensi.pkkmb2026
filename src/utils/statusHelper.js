@@ -57,6 +57,63 @@ export const CLAIM_STATUS_OPTIONS = [
   { value: STATUS.IZIN,           label: '📄 Izin — Ada keperluan resmi / sakit' },
 ];
 
+// List of 9 standard Jurusan (Diploma D3 & Sarjana S1)
+export const JURUSAN_LIST = [
+  {
+    group: 'Jenjang Diploma (D3)',
+    options: [
+      'D3 Manajemen Perusahaan',
+      'D3 Manajemen Informatika',
+      'D3 Akuntansi'
+    ]
+  },
+  {
+    group: 'Jenjang Sarjana (S1)',
+    options: [
+      'S1 Manajemen',
+      'S1 Akuntansi',
+      'S1 Hukum',
+      'S1 Desain Komunikasi Visual (DKV)',
+      'S1 Teknik Industri',
+      'S1 Informatika'
+    ]
+  }
+];
+
+export const ALL_JURUSAN_OPTIONS = [
+  'D3 Manajemen Perusahaan',
+  'D3 Manajemen Informatika',
+  'D3 Akuntansi',
+  'S1 Manajemen',
+  'S1 Akuntansi',
+  'S1 Hukum',
+  'S1 Desain Komunikasi Visual (DKV)',
+  'S1 Teknik Industri',
+  'S1 Informatika'
+];
+
+export function normalizeJurusan(jurusanStr) {
+  if (!jurusanStr) return 'S1 Informatika';
+  let raw = String(jurusanStr).trim();
+  raw = raw.replace(/^(S1|D3)\s*-\s*/i, '$1 ');
+  const lower = raw.toLowerCase();
+
+  if (ALL_JURUSAN_OPTIONS.includes(raw)) return raw;
+
+  if (lower.includes('manajemen perusahaan') || lower === 'mp') return 'D3 Manajemen Perusahaan';
+  if (lower.includes('manajemen informatika') || lower === 'mi') return 'D3 Manajemen Informatika';
+  if (lower.includes('d3') && lower.includes('akuntansi')) return 'D3 Akuntansi';
+
+  if (lower.includes('informatika') || lower.includes('if') || lower.includes('ti') || lower.includes('teknik informatika')) return 'S1 Informatika';
+  if (lower.includes('industri')) return 'S1 Teknik Industri';
+  if (lower.includes('desain') || lower.includes('dkv') || lower.includes('visual')) return 'S1 Desain Komunikasi Visual (DKV)';
+  if (lower.includes('hukum')) return 'S1 Hukum';
+  if (lower.includes('akuntansi')) return 'S1 Akuntansi';
+  if (lower.includes('manajemen')) return 'S1 Manajemen';
+
+  return raw;
+}
+
 // Map a scan log item to display status & badge styling
 export function getLogDisplayStatus(log) {
   if (!log) return { label: 'Scan Gagal', bg: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500', pdfBadge: 'background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;' };
@@ -80,6 +137,14 @@ export function getLogDisplayStatus(log) {
   }
 
   if (log.status === 'Valid') {
+    if (log.note && (log.note.includes('Terlambat') || log.note.includes('terlambat'))) {
+      return { 
+        label: 'Terlambat', 
+        bg: 'bg-amber-100 text-amber-800 border-amber-300 font-bold', 
+        dot: 'bg-amber-500', 
+        pdfBadge: 'background: #fef3c7; color: #92400e; border: 1px solid #fde68a;' 
+      };
+    }
     if (log.note && (log.note.includes('Hadir Sebagian') || log.note.includes('Sebagian'))) {
       return { 
         label: 'Hadir Sebagian', 
