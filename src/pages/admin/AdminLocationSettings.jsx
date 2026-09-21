@@ -695,44 +695,64 @@ export default function AdminLocationSettings() {
               </div>
 
               {/* Jam Buka, Batas Tepat Waktu & Jam Tutup Inputs */}
-              <div className="grid grid-cols-1 gap-3">
-                <div className="flex items-center justify-between gap-3 bg-[#f8fafc] p-2.5 rounded-xl border border-slate-200">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-                    <span className="material-symbols-outlined text-slate-500 text-[18px]">alarm</span>
-                    <span>Jam Buka (WIB)</span>
-                  </label>
+              <div className="flex flex-col gap-2.5">
+                {/* Jam Buka */}
+                <div className="flex items-center justify-between gap-3 bg-[#f8fafc] p-3 rounded-2xl border border-slate-200/80 hover:border-slate-300 transition-colors">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-slate-200/60 flex items-center justify-center text-slate-600 shrink-0">
+                      <span className="material-symbols-outlined text-[18px]">alarm</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-xs sm:text-body-sm font-bold text-slate-700">Jam Buka</span>
+                      <span className="text-[11px] font-semibold text-slate-400">(WIB)</span>
+                    </div>
+                  </div>
                   <input
                     type="time"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    className="w-36 min-w-[140px] px-2.5 py-1.5 bg-white rounded-lg border border-slate-300 text-body-sm font-bold text-slate-800 focus:outline-none focus:border-primary cursor-pointer shadow-2xs font-mono"
+                    style={{ colorScheme: 'light' }}
+                    className="w-28 sm:w-32 pl-3 pr-2 py-1.5 bg-white rounded-xl border border-slate-300 text-body-sm font-bold text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 cursor-pointer shadow-2xs font-mono text-left shrink-0"
                   />
                 </div>
 
-                <div className="flex items-center justify-between gap-3 bg-amber-50/60 p-2.5 rounded-xl border border-amber-300">
-                  <label className="text-[11px] font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-                    <span className="material-symbols-outlined text-amber-600 text-[18px]">timer</span>
-                    <span>Batas Tepat Waktu</span>
-                    <span className="text-[8.5px] px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900 font-extrabold">Dispensi</span>
-                  </label>
+                {/* Batas Tepat Waktu */}
+                <div className="flex items-center justify-between gap-3 bg-amber-50/60 p-3 rounded-2xl border border-amber-200 hover:border-amber-300 transition-colors">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-700 shrink-0">
+                      <span className="material-symbols-outlined text-[18px]">timer</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                      <span className="text-xs sm:text-body-sm font-bold text-amber-950">Batas Tepat Waktu</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-950 font-extrabold shrink-0">DISPENSI</span>
+                    </div>
+                  </div>
                   <input
                     type="time"
                     value={onTimeLimit}
                     onChange={(e) => setOnTimeLimit(e.target.value)}
-                    className="w-36 min-w-[140px] px-2.5 py-1.5 bg-white rounded-lg border border-amber-400 text-body-sm font-extrabold text-amber-900 focus:outline-none focus:border-amber-600 cursor-pointer shadow-2xs font-mono"
+                    style={{ colorScheme: 'light' }}
+                    className="w-28 sm:w-32 pl-3 pr-2 py-1.5 bg-white rounded-xl border border-amber-400 text-body-sm font-extrabold text-amber-900 focus:outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 cursor-pointer shadow-2xs font-mono text-left shrink-0"
                   />
                 </div>
 
-                <div className="flex items-center justify-between gap-3 bg-[#f8fafc] p-2.5 rounded-xl border border-slate-200">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-                    <span className="material-symbols-outlined text-slate-500 text-[18px]">alarm_off</span>
-                    <span>Jam Tutup (WIB)</span>
-                  </label>
+                {/* Jam Tutup */}
+                <div className="flex items-center justify-between gap-3 bg-[#f8fafc] p-3 rounded-2xl border border-slate-200/80 hover:border-slate-300 transition-colors">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-slate-200/60 flex items-center justify-center text-slate-600 shrink-0">
+                      <span className="material-symbols-outlined text-[18px]">alarm_off</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-xs sm:text-body-sm font-bold text-slate-700">Jam Tutup</span>
+                      <span className="text-[11px] font-semibold text-slate-400">(WIB)</span>
+                    </div>
+                  </div>
                   <input
                     type="time"
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="w-36 min-w-[140px] px-2.5 py-1.5 bg-white rounded-lg border border-slate-300 text-body-sm font-bold text-slate-800 focus:outline-none focus:border-primary cursor-pointer shadow-2xs font-mono"
+                    style={{ colorScheme: 'light' }}
+                    className="w-28 sm:w-32 pl-3 pr-2 py-1.5 bg-white rounded-xl border border-slate-300 text-body-sm font-bold text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 cursor-pointer shadow-2xs font-mono text-left shrink-0"
                   />
                 </div>
               </div>

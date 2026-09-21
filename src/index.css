@@ -238,24 +238,30 @@
   }
 }
 
-/* Fix date input styling to prevent text and icon overlap & ensure mobile visibility */
-input[type="date"] {
+/* Fix date & time input styling to prevent text and icon overlap & ensure mobile visibility */
+input[type="date"],
+input[type="time"] {
   min-height: 38px;
   position: relative;
 }
 
-input[type="date"]::-webkit-date-and-time-value {
-  text-align: left;
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: left !important;
   min-height: 1.5em;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
-  opacity: 0.6;
+  opacity: 0.75;
   transition: opacity 0.2s;
-  padding: 2px;
+  padding: 0px;
+  margin-left: auto;
+  margin-right: 2px;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator:hover {
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
 }
