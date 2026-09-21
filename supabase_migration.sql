@@ -17,6 +17,24 @@ ALTER TABLE public.approval_manual
   ADD COLUMN IF NOT EXISTS gugus_nama text,
   ADD COLUMN IF NOT EXISTS waktu text;
 
+-- 2b. Perbarui Foreign Key approval_manual agar ON DELETE SET NULL (Mencegah error saat hapus mentor)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'approval_manual_diajukan_oleh_fkey') THEN
+    ALTER TABLE public.approval_manual DROP CONSTRAINT approval_manual_diajukan_oleh_fkey;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'approval_manual_disetujui_oleh_fkey') THEN
+    ALTER TABLE public.approval_manual DROP CONSTRAINT approval_manual_disetujui_oleh_fkey;
+  END IF;
+END $$;
+
+ALTER TABLE public.approval_manual
+  ADD CONSTRAINT approval_manual_diajukan_oleh_fkey
+    FOREIGN KEY (diajukan_oleh) REFERENCES public.profiles(id) ON DELETE SET NULL,
+  ADD CONSTRAINT approval_manual_disetujui_oleh_fkey
+    FOREIGN KEY (disetujui_oleh) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+
 -- 3. Tambah kolom yang kurang di tabel profiles
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS nip text,

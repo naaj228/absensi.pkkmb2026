@@ -373,16 +373,55 @@ export const mentorsDb = {
   },
 
   async delete(id) {
-    // Clear mentor from any gugus
+    // 1. Clear mentor from any gugus
     await supabase
       .from('gugus')
       .update({ mentor_id: null })
       .eq('mentor_id', id);
 
+    // 2. Clear or delete mentor references in approval_manual table
+    try {
+      await supabase
+        .from('approval_manual')
+        .update({ diajukan_oleh: null })
+        .eq('diajukan_oleh', id);
+    } catch {
+      // Ignore if update fails
+    }
+
+    try {
+      await supabase
+        .from('approval_manual')
+        .update({ disetujui_oleh: null })
+        .eq('disetujui_oleh', id);
+    } catch {
+      // Ignore if update fails
+    }
+
+    // Delete any approval_manual rows that still reference this mentor directly if setting null is constrained
+    await supabase
+      .from('approval_manual')
+      .delete()
+      .or(`diajukan_oleh.eq.${id},disetujui_oleh.eq.${id}`);
+
+    // 3. Clear mentor references in absensi table (dicatat_oleh)
+    await supabase
+      .from('absensi')
+      .update({ dicatat_oleh: null })
+      .eq('dicatat_oleh', id);
+
+    // 4. Clear mentor references in qr_sessions table (dibuat_oleh)
+    await supabase
+      .from('qr_sessions')
+      .update({ dibuat_oleh: null })
+      .eq('dibuat_oleh', id);
+
+    // 5. Delete profile from public.profiles
     const { error } = await supabase
       .from('profiles')
       .delete()
       .eq('id', id);
+
     if (error) throw error;
   }
 };

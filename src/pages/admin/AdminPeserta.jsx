@@ -270,30 +270,41 @@ export default function AdminPeserta() {
             const gugusRaw = iGugus !== -1 ? row[iGugus] : '';
             const jurusan = iFakultas !== -1 ? String(row[iFakultas] || '').trim() : '';
 
-            if (!nama || !nim) {
+            if (!nama) {
               skipped++;
-              skippedRows.push(`Baris ${i + 1}: nama/NIM kosong`);
+              skippedRows.push(`Baris ${i + 1}: Nama peserta kosong`);
               continue;
             }
 
-            if (currentNIMs.has(nim)) {
+            let finalNim = nim;
+            let isAutoNim = false;
+            if (!finalNim || finalNim === '-' || finalNim === '0') {
+              finalNim = `AUTO-${Date.now().toString().slice(-4)}-${i}`;
+              isAutoNim = true;
+            }
+
+            if (!isAutoNim && currentNIMs.has(finalNim)) {
               skipped++;
-              skippedRows.push(`Baris ${i + 1}: NIM ${nim} (${nama}) sudah terdaftar`);
+              skippedRows.push(`Baris ${i + 1}: NIM ${finalNim} (${nama}) sudah terdaftar`);
               continue;
+            }
+
+            while (currentNIMs.has(finalNim)) {
+              finalNim = `AUTO-${Date.now().toString().slice(-4)}-${i}-${Math.floor(Math.random() * 1000)}`;
             }
 
             const gugusId = resolveGugusId(gugusRaw);
 
             addPeserta({
-              id: nim,
+              id: finalNim,
               name: nama,
-              email: email || `${nim}@student.ac.id`,
+              email: email || `${finalNim}@student.ac.id`,
               gugusId,
               fakultas: jurusan || 'Belum Diisi',
               status: 'Belum Hadir'
             });
 
-            currentNIMs.add(nim);
+            currentNIMs.add(finalNim);
             added++;
           }
 

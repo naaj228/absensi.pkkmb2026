@@ -87,6 +87,18 @@ export default function AdminGugus() {
 
 
 
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredGugus = gugus.filter((g) => {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return true;
+    const gName = g.name.toLowerCase();
+    const gId = displayGugusId(g.id).toLowerCase();
+    const mName = getMentorName(g.mentorId).toLowerCase();
+    return gName.includes(term) || gId.includes(term) || mName.includes(term);
+  });
+
   return (
 <div className="w-full"><header className="fixed top-0 left-[280px] right-0 h-16 bg-surface/60 backdrop-blur-xl z-40 flex items-center justify-between px-margin-desktop shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div className="flex items-center gap-4"><h1 className="text-headline-sm font-headline-md text-on-surface">Gugus</h1></div><div className="flex items-center gap-6"><div className="relative group"><span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/admin/notifikasi')}>notifications</span>{hasAdminNotifications && <span className="absolute top-0 right-0 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>}</div></div></header><main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto"><div className="flex flex-col w-full relative">
 {/* Decorative Background Blur */}
@@ -140,12 +152,60 @@ export default function AdminGugus() {
     </div>
   </div>
 </div>
+
+{/* Search Bar Section */}
+<div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between mb-6 relative z-10">
+  <div className="relative w-full sm:max-w-md">
+    <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/70 text-[20px] pointer-events-none">
+      search
+    </span>
+    <input
+      type="text"
+      placeholder="Cari nama gugus, ID, atau nama mentor..."
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+      className="w-full pl-10 pr-10 py-2.5 bg-surface text-on-surface text-xs sm:text-sm font-medium rounded-xl border border-outline-variant/50 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+    />
+    {searchTerm && (
+      <button
+        onClick={() => setSearchTerm('')}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface p-1 rounded-full transition-colors cursor-pointer"
+        title="Bersihkan pencarian"
+      >
+        <span className="material-symbols-outlined text-[18px]">close</span>
+      </button>
+    )}
+  </div>
+  {searchTerm && (
+    <span className="text-xs text-on-surface-variant font-medium shrink-0">
+      Menampilkan <strong className="text-primary">{filteredGugus.length}</strong> dari {gugus.length} Gugus
+    </span>
+  )}
+</div>
+
 {/* Gugus Grid */}
 <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 relative z-10">
-  {gugus.map((g) => {
-    const sCount = getStudentCount(g.id);
-    const percentage = Math.min(Math.round((sCount / g.capacity) * 100), 100);
-    const strokeDash = `${percentage}, 100`;
+  {filteredGugus.length === 0 ? (
+    <div className="col-span-full bg-surface rounded-2xl p-8 sm:p-12 text-center border border-dashed border-outline-variant/60 flex flex-col items-center justify-center">
+      <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-container flex items-center justify-center mb-3 text-on-surface-variant/60">
+        <span className="material-symbols-outlined text-[32px] sm:text-[40px]">search_off</span>
+      </div>
+      <h3 className="text-body-lg sm:text-title-md font-bold text-on-surface mb-1">Gugus Tidak Ditemukan</h3>
+      <p className="text-xs sm:text-body-sm text-on-surface-variant max-w-sm mb-4">
+        Tidak ada data gugus yang cocok dengan pencarian <span className="font-semibold text-primary">"{searchTerm}"</span>.
+      </p>
+      <button
+        onClick={() => setSearchTerm('')}
+        className="px-4 py-2 bg-primary/10 text-primary font-bold text-xs sm:text-label-md rounded-xl hover:bg-primary/20 transition-colors cursor-pointer"
+      >
+        Bersihkan Pencarian
+      </button>
+    </div>
+  ) : (
+    filteredGugus.map((g) => {
+      const sCount = getStudentCount(g.id);
+      const percentage = Math.min(Math.round((sCount / g.capacity) * 100), 100);
+      const strokeDash = `${percentage}, 100`;
 
     return (
       <div key={g.id} className="bg-surface rounded-xl p-3 sm:p-6 shadow-sm hover:shadow-md transition-all flex flex-col group relative overflow-hidden">
@@ -202,7 +262,8 @@ export default function AdminGugus() {
       </div>
       </div>
     );
-  })}
+  })
+)}
 </div>
 </div>
 </main>

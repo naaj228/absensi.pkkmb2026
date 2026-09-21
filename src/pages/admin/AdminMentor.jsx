@@ -101,9 +101,13 @@ export default function AdminMentor() {
   };
 
   const handleDelete = (id, name) => {
-    window.confirmAction(`Hapus mentor ${name}?`, () => {
-      deleteMentor(id);
-      alert("Mentor berhasil dihapus.");
+    window.confirmAction(`Hapus mentor ${name}?`, async () => {
+      try {
+        await deleteMentor(id);
+        alert("Mentor berhasil dihapus.");
+      } catch {
+        // Handled by AppContext
+      }
     });
   };
 
