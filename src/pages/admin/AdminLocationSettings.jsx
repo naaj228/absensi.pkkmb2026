@@ -695,49 +695,45 @@ export default function AdminLocationSettings() {
               </div>
 
               {/* Jam Buka, Batas Tepat Waktu & Jam Tutup Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <div className="grid grid-cols-1 gap-3">
+                <div className="flex items-center justify-between gap-3 bg-[#f8fafc] p-2.5 rounded-xl border border-slate-200">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                    <span className="material-symbols-outlined text-slate-500 text-[18px]">alarm</span>
                     <span>Jam Buka (WIB)</span>
                   </label>
-                  <div className="relative">
-                    <input
-                      type="time"
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 bg-[#f8fafc] rounded-xl border border-slate-200 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary cursor-pointer"
-                    />
-                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">alarm</span>
-                  </div>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-36 min-w-[140px] px-2.5 py-1.5 bg-white rounded-lg border border-slate-300 text-body-sm font-bold text-slate-800 focus:outline-none focus:border-primary cursor-pointer shadow-2xs font-mono"
+                  />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1">
+                <div className="flex items-center justify-between gap-3 bg-amber-50/60 p-2.5 rounded-xl border border-amber-300">
+                  <label className="text-[11px] font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                    <span className="material-symbols-outlined text-amber-600 text-[18px]">timer</span>
                     <span>Batas Tepat Waktu</span>
-                    <span className="text-[9px] px-1 rounded bg-amber-100 text-amber-700 font-extrabold">Dispensi</span>
+                    <span className="text-[8.5px] px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900 font-extrabold">Dispensi</span>
                   </label>
-                  <div className="relative">
-                    <input
-                      type="time"
-                      value={onTimeLimit}
-                      onChange={(e) => setOnTimeLimit(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 bg-amber-50/50 rounded-xl border border-amber-300 text-body-sm font-bold text-amber-900 focus:outline-none focus:border-amber-500 cursor-pointer shadow-2xs"
-                    />
-                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-500 text-[18px]">timer</span>
-                  </div>
+                  <input
+                    type="time"
+                    value={onTimeLimit}
+                    onChange={(e) => setOnTimeLimit(e.target.value)}
+                    className="w-36 min-w-[140px] px-2.5 py-1.5 bg-white rounded-lg border border-amber-400 text-body-sm font-extrabold text-amber-900 focus:outline-none focus:border-amber-600 cursor-pointer shadow-2xs font-mono"
+                  />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jam Tutup (WIB)</label>
-                  <div className="relative">
-                    <input
-                      type="time"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 bg-[#f8fafc] rounded-xl border border-slate-200 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary cursor-pointer"
-                    />
-                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">alarm_off</span>
-                  </div>
+                <div className="flex items-center justify-between gap-3 bg-[#f8fafc] p-2.5 rounded-xl border border-slate-200">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                    <span className="material-symbols-outlined text-slate-500 text-[18px]">alarm_off</span>
+                    <span>Jam Tutup (WIB)</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-36 min-w-[140px] px-2.5 py-1.5 bg-white rounded-lg border border-slate-300 text-body-sm font-bold text-slate-800 focus:outline-none focus:border-primary cursor-pointer shadow-2xs font-mono"
+                  />
                 </div>
               </div>
 
