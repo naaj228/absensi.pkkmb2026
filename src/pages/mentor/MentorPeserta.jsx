@@ -1,7 +1,7 @@
 import { useContext, useState, useCallback } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { isHadir, getLogDisplayStatus, JURUSAN_LIST, ALL_JURUSAN_OPTIONS } from '../../utils/statusHelper';
+import { isHadir, getLogDisplayStatus, isAttendanceLog, JURUSAN_LIST, ALL_JURUSAN_OPTIONS } from '../../utils/statusHelper';
 import { toISOKey, getTodayISOKey, formatDDMMYYYY, formatIndonesianDate } from '../../utils/dateHelper';
 import JSZip from 'jszip';
 import QRCode from 'qrcode';
@@ -47,9 +47,8 @@ export default function MentorPeserta() {
     const studentLogOnDate = logs.find(l => 
       String(l.nim) === String(student.id) && 
       toISOKey(l.date) === targetDateKey &&
-      l.status !== 'Info' &&
-      l.scanner !== 'Admin (Tolak)' &&
-      !l.note?.startsWith('Persetujuan')
+      isAttendanceLog(l) &&
+      l.scanner !== 'Admin (Tolak)'
     );
 
     if (studentLogOnDate) {
@@ -60,6 +59,14 @@ export default function MentorPeserta() {
         dot: display.dot,
         isPresent: display.label === 'Hadir Penuh' || display.label === 'Hadir Sebagian'
       };
+    }
+
+    if (student.status === 'Hadir Penuh') {
+      return { label: 'Hadir Penuh', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', isPresent: true };
+    }
+
+    if (student.status === 'Hadir Sebagian') {
+      return { label: 'Hadir Sebagian', bg: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500', isPresent: true };
     }
 
     if (student.status === 'Izin') {

@@ -96,16 +96,8 @@ function buildEmailHtml({ toName, nim, gugus, mentor, qrUrl, appName, hasIdCards
           <span class="info-value">${toName}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">NIM</span>
-          <span class="info-value"><span class="nim-badge">${nim}</span></span>
-        </div>
-        <div class="info-row">
           <span class="info-label">Gugus</span>
           <span class="info-value">${gugus || 'Belum Ditentukan'}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Mentor</span>
-          <span class="info-value">${mentor || 'Belum Ditentukan'}</span>
         </div>
       </div>
       <div class="qr-section">

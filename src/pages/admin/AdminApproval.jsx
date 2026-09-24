@@ -4,10 +4,25 @@ import { useNavigate } from 'react-router-dom';
 import { formatIndonesianDate } from '../../utils/dateHelper';
 
 export default function AdminApproval() {
-  const { claims, peserta, approveClaim, rejectClaim, hasAdminNotifications } = useContext(AppContext);
+  const { claims, peserta, mentors, gugus, approveClaim, rejectClaim, hasAdminNotifications } = useContext(AppContext);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGugus, setSelectedGugus] = useState('all');
+
+  const getSubmittingMentorName = (c) => {
+    if (c.diajukanOleh) {
+      const match = (mentors || []).find(m => String(m.id) === String(c.diajukanOleh) || m.name === c.diajukanOleh || m.email === c.diajukanOleh);
+      if (match) return match.name;
+    }
+    if (c.gugusName && gugus && mentors) {
+      const gObj = gugus.find(g => g.name.toLowerCase() === c.gugusName.toLowerCase());
+      if (gObj) {
+        const mentorOfG = mentors.find(m => String(m.id) === String(gObj.mentorId) || String(m.gugusId) === String(gObj.id));
+        if (mentorOfG) return mentorOfG.name;
+      }
+    }
+    return 'Mentor';
+  };
 
   const handleApprove = (id, name) => {
     window.confirmAction(
@@ -136,34 +151,26 @@ export default function AdminApproval() {
               )}
             </div>
 
-            {/* Gugus Filter Pills */}
-            <div className="flex gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-              <button 
-                onClick={() => setSelectedGugus('all')} 
-                className={`px-3.5 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  selectedGugus === 'all' 
-                    ? 'bg-[#012060] text-white shadow-xs' 
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
+            {/* Gugus Filter Select Dropdown */}
+            <div className="relative w-full md:w-auto shrink-0">
+              <select
+                value={selectedGugus}
+                onChange={(e) => setSelectedGugus(e.target.value)}
+                className="w-full md:w-auto bg-white border border-slate-200 text-slate-800 text-body-sm font-bold py-2.5 pl-3.5 pr-8 rounded-xl shadow-2xs focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer appearance-none"
               >
-                Semua Gugus ({pendingClaims.length})
-              </button>
-              {activeGugusWithClaims.map(gName => {
-                const count = pendingClaims.filter(c => c.gugusName.toLowerCase() === gName.toLowerCase()).length;
-                return (
-                  <button 
-                    key={gName} 
-                    onClick={() => setSelectedGugus(gName)} 
-                    className={`px-3.5 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
-                      selectedGugus.toLowerCase() === gName.toLowerCase() 
-                        ? 'bg-[#012060] text-white shadow-xs' 
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {gName} ({count})
-                  </button>
-                );
-              })}
+                <option value="all">Semua Gugus ({pendingClaims.length})</option>
+                {activeGugusWithClaims.map(gName => {
+                  const count = pendingClaims.filter(c => c.gugusName.toLowerCase() === gName.toLowerCase()).length;
+                  return (
+                    <option key={gName} value={gName}>
+                      {gName} ({count})
+                    </option>
+                  );
+                })}
+              </select>
+              <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[18px]">
+                expand_more
+              </span>
             </div>
           </div>
 
@@ -172,6 +179,7 @@ export default function AdminApproval() {
             {filteredClaims.length > 0 ? (
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 {filteredClaims.map((c) => {
+                  const mentorName = getSubmittingMentorName(c);
                   let detailsText = '';
                   if (c.issue === 'Edit Peserta' && c.catatan) {
                     try {
@@ -197,6 +205,7 @@ export default function AdminApproval() {
 
                   const isReg = c.issue === 'Tambah Peserta';
                   const isEdit = c.issue === 'Edit Peserta';
+                  const mentorNote = c.alasan || c.catatan;
 
                   return (
                     <div 
@@ -220,7 +229,7 @@ export default function AdminApproval() {
                           <span>{isReg ? 'Registrasi' : isEdit ? 'Ubah Data' : 'Absensi'}</span>
                         </span>
 
-                        <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60 truncate max-w-[70px]">
+                        <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60 truncate max-w-[70px]" title={c.gugusName}>
                           {c.gugusName}
                         </span>
                       </div>
@@ -234,6 +243,12 @@ export default function AdminApproval() {
                           <span className="text-[8px] font-extrabold uppercase text-slate-400">NIM</span>
                           <span className="text-[10px] font-bold text-[#012060] font-mono tracking-tight">{c.nim}</span>
                         </div>
+                      </div>
+
+                      {/* Submitting Mentor Info */}
+                      <div className="flex items-center gap-1 text-[9.5px] font-semibold text-slate-500 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200/60 truncate" title={`Pengaju: ${mentorName}`}>
+                        <span className="material-symbols-outlined text-[12px] text-slate-400 shrink-0">badge</span>
+                        <span className="truncate">Pengaju: <strong className="text-slate-700">{mentorName}</strong></span>
                       </div>
 
                       {/* Issue details or Catatan */}
@@ -257,9 +272,9 @@ export default function AdminApproval() {
                             <div className="text-[10px] text-amber-900 font-semibold leading-tight">
                               Kendala: <span className="font-extrabold">{c.issue}</span>
                             </div>
-                            {c.catatan && (
-                              <div className="text-[9.5px] text-slate-600 italic leading-tight">
-                                "{c.catatan}"
+                            {mentorNote && (
+                              <div className="text-[9.5px] text-amber-950 bg-amber-100/70 p-1.5 rounded-lg border border-amber-200/80 italic leading-tight mt-1">
+                                Catatan: "{mentorNote}"
                               </div>
                             )}
                           </div>
@@ -316,20 +331,21 @@ export default function AdminApproval() {
 
           {/* DESKTOP TABLE VIEW (Visible on screen >= md) */}
           <div className="hidden md:block overflow-x-auto border-t border-slate-100">
-            <table className="w-full text-left border-collapse table-auto min-w-[650px]">
+            <table className="w-full text-left border-collapse table-auto min-w-[850px]">
               <thead>
                 <tr className="bg-[#f8fafc] border-b border-slate-100">
-                  <th className="py-3.5 pl-4 sm:pl-6 pr-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Peserta</th>
-                  <th className="py-3.5 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">NIM</th>
-                  <th className="py-3.5 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gugus</th>
-                  <th className="py-3.5 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Tipe Pengajuan</th>
-                  <th className="py-3.5 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Waktu</th>
-                  <th className="py-3.5 pl-2 pr-4 sm:pr-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right whitespace-nowrap">Aksi</th>
+                  <th className="py-3.5 pl-4 sm:pl-6 pr-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider min-w-[180px]">Peserta</th>
+                  <th className="py-3.5 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap min-w-[120px]">NIM</th>
+                  <th className="py-3.5 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider min-w-[170px]">Gugus & Mentor Pengaju</th>
+                  <th className="py-3.5 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider min-w-[210px]">Tipe Pengajuan</th>
+                  <th className="py-3.5 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap min-w-[90px]">Waktu</th>
+                  <th className="py-3.5 pl-3 pr-4 sm:pr-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right whitespace-nowrap min-w-[160px]">Aksi</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-100">
                 {filteredClaims.length > 0 ? (
                   filteredClaims.map((c) => {
+                    const mentorName = getSubmittingMentorName(c);
                     let detailsText = '';
                     if (c.issue === 'Edit Peserta' && c.catatan) {
                       try {
@@ -355,31 +371,38 @@ export default function AdminApproval() {
 
                     const isReg = c.issue === 'Tambah Peserta';
                     const isEdit = c.issue === 'Edit Peserta';
+                    const mentorNote = c.alasan || (isReg || isEdit ? '' : c.catatan);
 
                     return (
                       <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
-                        <td className="py-3.5 pl-4 sm:pl-6 pr-2 max-w-[150px] lg:max-w-[200px]">
+                        <td className="py-3.5 pl-4 sm:pl-6 pr-3 min-w-[180px] align-top">
                           <div className="flex flex-col min-w-0">
-                            <span className="text-body-sm font-bold text-slate-800 truncate" title={c.name}>{c.name}</span>
+                            <span className="text-body-sm font-bold text-slate-800 break-words" title={c.name}>{c.name}</span>
                             {detailsText ? (
-                              <span className="text-[10px] text-blue-700 font-semibold bg-blue-50 px-2 py-0.5 rounded mt-0.5 w-max max-w-[180px] lg:max-w-[220px] truncate leading-tight border border-blue-100" title={detailsText}>{detailsText}</span>
+                              <span className="text-[10px] text-blue-700 font-semibold bg-blue-50 px-2 py-0.5 rounded-md mt-1 border border-blue-100 max-w-[200px] break-words leading-tight" title={detailsText}>{detailsText}</span>
                             ) : (
-                              <span className="text-[11px] text-slate-400 truncate">{c.fakultas || '-'}</span>
+                              <span className="text-[11px] text-slate-400 truncate mt-0.5">{c.fakultas || '-'}</span>
                             )}
                           </div>
                         </td>
 
-                        <td className="py-3.5 px-2 whitespace-nowrap">
-                          <span className="text-body-sm font-bold text-[#012060] font-mono bg-[#012060]/5 px-2.5 py-1 rounded-lg border border-[#012060]/10">{c.nim}</span>
+                        <td className="py-3.5 px-3 whitespace-nowrap align-top">
+                          <span className="text-body-sm font-bold text-[#012060] font-mono bg-[#012060]/5 px-2.5 py-1 rounded-lg border border-[#012060]/10 inline-block">{c.nim}</span>
                         </td>
 
-                        <td className="py-3.5 px-2 max-w-[120px] lg:max-w-[160px]">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-semibold text-label-sm border border-slate-200/60 truncate max-w-full" title={c.gugusName}>
-                            {c.gugusName}
-                          </span>
+                        <td className="py-3.5 px-3 min-w-[170px] align-top">
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-semibold text-label-sm border border-slate-200/60 w-max max-w-full truncate" title={c.gugusName}>
+                              {c.gugusName}
+                            </span>
+                            <span className="text-[10.5px] text-slate-600 font-medium flex items-center gap-1 mt-0.5" title={`Pengaju: ${mentorName}`}>
+                              <span className="material-symbols-outlined text-[13px] text-slate-400 shrink-0">badge</span>
+                              <span className="break-words">Pengaju: <strong className="text-slate-800">{mentorName}</strong></span>
+                            </span>
+                          </div>
                         </td>
 
-                        <td className="py-3.5 px-2 whitespace-nowrap">
+                        <td className="py-3.5 px-3 min-w-[210px] align-top">
                           {isReg ? (
                             <div className="flex items-center gap-1.5 text-blue-700 font-bold text-body-sm">
                               <span className="material-symbols-outlined text-[18px]">person_add</span>
@@ -406,13 +429,14 @@ export default function AdminApproval() {
                                   <span>Status: {c.requestedStatus || 'Hadir Penuh'}</span>
                                 </span>
                               </div>
-                              <div className="text-[11px] text-slate-700 font-medium leading-tight">
-                                Kendala: <strong className="text-amber-800">{c.issue}</strong>
+                              <div className="text-[11px] text-slate-700 font-medium leading-tight mt-0.5">
+                                Kendala: <strong className="text-amber-800 font-bold">{c.issue}</strong>
                               </div>
-                              {c.catatan && (
-                                <span className="text-[10.5px] text-slate-500 italic max-w-[200px] truncate" title={c.catatan}>
-                                  "{c.catatan}"
-                                </span>
+                              {mentorNote && (
+                                <div className="text-[10.5px] text-slate-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200/80 leading-snug mt-1 max-w-[240px]">
+                                  <span className="text-amber-900 font-bold block text-[9.5px] uppercase tracking-wider mb-0.5">Catatan Mentor:</span>
+                                  <span className="italic">"{mentorNote}"</span>
+                                </div>
                               )}
                             </div>
                           )}
