@@ -23,9 +23,9 @@ const parseDbDate = (dateStr) => {
   let formatted = dateStr;
   if (typeof dateStr === 'string') {
     formatted = dateStr.replace(' ', 'T');
-    const hasTimezone = formatted.includes('Z') || 
-                        /[+-]\d{2}(:\d{2})?$/.test(formatted) ||
-                        /\+\d{2}$/.test(formatted);
+    const hasTimezone = formatted.includes('Z') ||
+      /[+-]\d{2}(:\d{2})?$/.test(formatted) ||
+      /\+\d{2}$/.test(formatted);
     if (!hasTimezone && (formatted.includes('T') || formatted.includes(':'))) {
       formatted += 'Z';
     }
@@ -120,7 +120,7 @@ export function AppContextProvider({ children }) {
   const [logs, setLogs] = useState([]);
   const [qrCodes, setQrCodes] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Geofencing Location settings state
   const [locationSettings, setLocationSettings] = useState({
     latitude: -6.966748,
@@ -232,6 +232,11 @@ export function AppContextProvider({ children }) {
   // ----------------------------------------------------
   useEffect(() => {
     async function loadData() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setLoading(false);
+        return;
+      }
       try {
         const [pData, mData, gData, cData, lData, qrData, locData] = await Promise.all([
           pesertaDb.fetchAll(),
@@ -779,8 +784,8 @@ export function AppContextProvider({ children }) {
     } catch (err) {
       console.error("Error adding gugus:", err);
       const isRlsError = err.code === '42501' || (err.message && err.message.toLowerCase().includes('row-level security'));
-      const msg = isRlsError 
-        ? "Gagal menambahkan gugus (Akses Ditolak 403 oleh RLS Supabase). Harap hilangkan RLS di Supabase SQL Editor." 
+      const msg = isRlsError
+        ? "Gagal menambahkan gugus (Akses Ditolak 403 oleh RLS Supabase). Harap hilangkan RLS di Supabase SQL Editor."
         : (err.message || "Gagal menambahkan gugus.");
       alert(msg);
       throw err;
@@ -970,7 +975,7 @@ export function AppContextProvider({ children }) {
         const targetStatus = claim.requestedStatus || 'Hadir Penuh';
         await pesertaDb.update(claim.nim, { status: targetStatus });
         setPeserta(prev => prev.map(p => p.id === claim.nim ? { ...p, status: targetStatus } : p));
-        
+
         const timePart = new Date().toISOString().split('T')[1];
         const customWaktu = claim.tanggalHadir ? `${claim.tanggalHadir}T${timePart}` : null;
         const targetDate = claim.tanggalHadir || getTodayWibString();
@@ -1071,11 +1076,11 @@ export function AppContextProvider({ children }) {
       await addLog(student.name, student.id, groupName, currentUser ? currentUser.name : 'Mentor', 'Valid', scanNote, locationData);
       await pesertaDb.update(studentId, { status: 'Hadir Penuh' });
       setPeserta(prev => prev.map(p => String(p.id) === String(studentId) ? { ...p, status: 'Hadir Penuh' } : p));
-      return { 
-        success: true, 
-        isLate: lateInfo.isLate, 
-        currentTimeStr: lateInfo.currentTimeStr, 
-        diffMinutes: lateInfo.diffMinutes 
+      return {
+        success: true,
+        isLate: lateInfo.isLate,
+        currentTimeStr: lateInfo.currentTimeStr,
+        diffMinutes: lateInfo.diffMinutes
       };
     } catch (err) {
       console.error("Error recording scan:", err);
@@ -1106,7 +1111,7 @@ export function AppContextProvider({ children }) {
 
     // Authenticate via Supabase Auth
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message || 'Email atau password salah.');
+    if (error) throw new Error('Email atau password salah.');
 
     // Fetch profile to verify role
     const { data: profile, error: profileErr } = await supabase
@@ -1117,17 +1122,17 @@ export function AppContextProvider({ children }) {
 
     if (profileErr || !profile) {
       await supabase.auth.signOut();
-      throw new Error('Profil tidak ditemukan. Hubungi administrator.');
+      throw new Error('Email atau password salah.');
     }
 
     if (role === 'admin' && profile.role !== 'admin') {
       await supabase.auth.signOut();
-      throw new Error('Akun ini bukan akun admin.');
+      throw new Error('Email atau password salah.');
     }
 
     if (role === 'mentor' && profile.role !== 'mentor') {
       await supabase.auth.signOut();
-      throw new Error('Akun ini bukan akun mentor. Gunakan halaman login admin.');
+      throw new Error('Email atau password salah.');
     }
 
     // For mentor: look up gugusId from gugus table (mentor_id = user.id)
