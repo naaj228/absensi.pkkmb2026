@@ -1,7 +1,7 @@
 import { useContext, useState, useCallback } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { CLAIM_STATUS_OPTIONS } from '../../utils/statusHelper';
+import { CLAIM_STATUS_OPTIONS, getLogDisplayStatus } from '../../utils/statusHelper';
 import { toISOKey, getTodayISOKey, formatIndonesianDate } from '../../utils/dateHelper';
 
 export default function MentorAbsensiManual() {
@@ -34,24 +34,13 @@ export default function MentorAbsensiManual() {
     );
 
     if (validLogOnDate) {
-      const isLate = validLogOnDate.note && (validLogOnDate.note.includes('Terlambat') || validLogOnDate.note.includes('terlambat'));
-      if (isLate) {
-        return { 
-          label: 'Terlambat', 
-          bg: 'bg-amber-100 text-amber-900 border-amber-300 font-bold', 
-          dot: 'bg-amber-500', 
-          isPresent: true,
-          isLate: true,
-          isPending: false,
-          isDitolak: false
-        };
-      }
+      const displayStatus = getLogDisplayStatus(validLogOnDate);
       return { 
-        label: 'Hadir', 
-        bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', 
-        dot: 'bg-emerald-500', 
+        label: displayStatus.label, 
+        bg: displayStatus.bg, 
+        dot: displayStatus.dot, 
         isPresent: true,
-        isLate: false,
+        isLate: validLogOnDate.note && (validLogOnDate.note.includes('Terlambat') || validLogOnDate.note.includes('terlambat')),
         isPending: false,
         isDitolak: false
       };
@@ -63,7 +52,7 @@ export default function MentorAbsensiManual() {
         bg: 'bg-amber-50 text-amber-700 border-amber-200', 
         dot: 'bg-amber-500', 
         isPresent: false,
-        isPending: false,
+        isPending: true,
         isDitolak: false
       };
     }
@@ -313,31 +302,31 @@ export default function MentorAbsensiManual() {
                     </div>
 
                     {/* Action Button */}
-                    <div className="pt-1.5 border-t border-slate-100">
+                    <div className="pt-2 border-t border-slate-100">
                       {b.isPending ? (
-                        <div className="w-full py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-[9.5px] font-bold flex items-center justify-center gap-1">
-                          <span className="material-symbols-outlined text-[13px]">hourglass_empty</span>
-                          <span>Pending</span>
+                        <div className="w-full py-1.5 px-2 bg-amber-50/90 border border-amber-200/80 text-amber-800 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 shadow-2xs select-none">
+                          <span className="material-symbols-outlined text-[14px] text-amber-600">hourglass_top</span>
+                          <span>Menunggu Persetujuan Admin</span>
                         </div>
                       ) : b.isPresent ? (
                         <button
                           onClick={() => handleOpenModal(student)}
-                          className="w-full py-1.5 bg-[#012060]/5 hover:bg-[#012060]/10 border border-[#012060]/20 text-[#012060] rounded-lg text-[9.5px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95"
+                          className="w-full py-1.5 px-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-[#012060] rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 transition-all shadow-2xs cursor-pointer active:scale-95"
                         >
-                          <span className="material-symbols-outlined text-[13px]">edit_note</span>
-                          <span>Ubah Status / Izin</span>
+                          <span className="material-symbols-outlined text-[14px] text-[#012060]">edit_note</span>
+                          <span>Ajukan Ubah Status / Izin</span>
                         </button>
                       ) : (
                         <button
                           onClick={() => handleOpenModal(student)}
-                          className={`w-full py-1.5 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs active:scale-95 ${
+                          className={`w-full py-1.5 px-2 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs active:scale-95 ${
                             b.isDitolak 
                               ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100' 
                               : 'bg-[#012060] hover:bg-[#022b80] text-white'
                           }`}
                         >
-                          <span className="material-symbols-outlined text-[13px]">{b.isDitolak ? 'refresh' : 'edit_note'}</span>
-                          <span>{b.isDitolak ? 'Ajukan Lagi' : 'Absen Manual'}</span>
+                          <span className="material-symbols-outlined text-[14px]">{b.isDitolak ? 'refresh' : 'edit_note'}</span>
+                          <span>{b.isDitolak ? 'Ajukan Ulang Manual' : 'Proses Absensi Manual'}</span>
                         </button>
                       )}
                     </div>
@@ -373,27 +362,27 @@ export default function MentorAbsensiManual() {
 
                   <div className="pt-2 border-t border-slate-100">
                     {b.isPending ? (
-                      <div className="w-full bg-amber-50 border border-amber-200 py-2 rounded-xl text-body-xs font-bold text-amber-700 flex items-center justify-center gap-1.5">
-                        <span className="material-symbols-outlined text-[16px]">hourglass_empty</span>
-                        Menunggu Persetujuan Admin
+                      <div className="w-full bg-amber-50/90 border border-amber-200/80 py-2 px-3 rounded-xl text-body-xs font-bold text-amber-800 flex items-center justify-center gap-1.5 shadow-2xs select-none">
+                        <span className="material-symbols-outlined text-[16px] text-amber-600">hourglass_top</span>
+                        <span>Menunggu Persetujuan Admin</span>
                       </div>
                     ) : b.isPresent ? (
                       <button
                         onClick={() => handleOpenModal(student)}
-                        className="w-full bg-[#012060]/5 hover:bg-[#012060]/10 border border-[#012060]/20 text-[#012060] py-2 rounded-xl text-body-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-98"
+                        className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-[#012060] py-2 px-3 rounded-xl text-body-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-98"
                       >
-                        <span className="material-symbols-outlined text-[16px]">edit_note</span>
+                        <span className="material-symbols-outlined text-[16px] text-[#012060]">edit_note</span>
                         <span>Ajukan Ubah Status / Izin</span>
                       </button>
                     ) : (
                       <button
                         onClick={() => handleOpenModal(student)}
-                        className={`w-full py-2 rounded-xl text-body-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-98 ${
+                        className={`w-full py-2 px-3 rounded-xl text-body-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-98 ${
                           b.isDitolak ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100' : 'bg-[#012060] hover:bg-[#022b80] text-white'
                         }`}
                       >
                         <span className="material-symbols-outlined text-[16px]">{b.isDitolak ? 'refresh' : 'edit_note'}</span>
-                        {b.isDitolak ? 'Ajukan Ulang Manual' : 'Proses Absensi Manual'}
+                        <span>{b.isDitolak ? 'Ajukan Ulang Manual' : 'Proses Absensi Manual'}</span>
                       </button>
                     )}
                   </div>

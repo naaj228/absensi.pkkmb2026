@@ -3,10 +3,52 @@
 const API_BASE = (import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001') + '/api';
 
 /**
+ * Validasi sintaks email dan deteksi typo domain umum di client-side.
+ * @param {string} email 
+ * @returns {{ valid: boolean, reason: string }}
+ */
+export function validateEmailSyntax(email) {
+  if (!email || typeof email !== 'string' || !email.trim()) {
+    return { valid: false, reason: 'Alamat email kosong.' };
+  }
+  const cleanEmail = email.trim().toLowerCase();
+  const basicRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!basicRegex.test(cleanEmail)) {
+    return { valid: false, reason: 'Format email tidak valid (kurang @ atau domainextension).' };
+  }
+
+  const commonTypoDomains = [
+    'gmal.com', 'gmial.com', 'gmaill.com', 'gamil.com', 'gmai.com', 'gmle.com',
+    'gmal.co', 'gmial.co', 'gmaill.co', 'gamil.co', 'gmai.co', 'gmail.co',
+    'yaho.com', 'yahooo.com', 'yaho.co', 'yaho.co.id', 'hotmial.com', 'hotmai.com'
+  ];
+
+  const domain = cleanEmail.split('@')[1] || '';
+  
+  // 1. Cek typo domain umum (Gmail, Yahoo, dll)
+  if (commonTypoDomains.includes(domain)) {
+    return { valid: false, reason: `Typo domain terdeteksi (@${domain}). Gunakan domain resmi (contoh: @gmail.com).` };
+  }
+
+  // 2. Cek typo domain kampus Digitech University
+  const isDigitechTypo = (domain.includes('digitech') || domain.includes('digitek')) && domain !== 'digitechuniversity.ac.id';
+  if (isDigitechTypo) {
+    return { valid: false, reason: `Typo domain kampus terdeteksi (@${domain}). Gunakan domain resmi kampus (@digitechuniversity.ac.id).` };
+  }
+
+  return { valid: true, reason: '' };
+}
+
+/**
  * Kirim QR Code ke 1 peserta via backend Nodemailer.
  * @returns {Promise<{ok: boolean, message: string}>}
  */
 export async function sendQrEmail({ toEmail, toName, nim, gugus, mentor, qrUrl }) {
+  const check = validateEmailSyntax(toEmail);
+  if (!check.valid) {
+    return { ok: false, message: `Gagal validasi: ${check.reason}` };
+  }
+
   try {
     const res = await fetch(`${API_BASE}/send-qr-email`, {
       method: 'POST',

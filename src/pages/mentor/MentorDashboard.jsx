@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
-import { isHadir, STATUS } from '../../utils/statusHelper';
+import { isHadir, STATUS, isAttendanceLog } from '../../utils/statusHelper';
 import { toISOKey, getTodayISOKey } from '../../utils/dateHelper';
 
 export default function MentorDashboard() {
@@ -16,9 +16,10 @@ export default function MentorDashboard() {
   // Filter participants belonging to mentor's group
   const gugusStudents = peserta.filter(p => p.gugusId === mentorGugusId);
 
-  // Filter logs for TODAY ONLY for mentor's gugus
+  // Filter logs for TODAY ONLY for mentor's gugus (Attendance logs only)
   const todayKey = getTodayISOKey();
   const todayMentorLogs = logs.filter(log => 
+    isAttendanceLog(log) &&
     log.gugusName.toLowerCase() === mentorGugusName.toLowerCase() && 
     toISOKey(log.date) === todayKey
   );

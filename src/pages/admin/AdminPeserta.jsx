@@ -46,7 +46,10 @@ export default function AdminPeserta() {
   const getStudentDailyStatus = useCallback((student) => {
     const studentLogOnDate = logs.find(l => 
       String(l.nim) === String(student.id) && 
-      toISOKey(l.date) === targetDateKey
+      toISOKey(l.date) === targetDateKey &&
+      l.status !== 'Info' &&
+      l.scanner !== 'Admin (Tolak)' &&
+      !l.note?.startsWith('Persetujuan')
     );
 
     if (studentLogOnDate) {

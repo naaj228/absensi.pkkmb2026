@@ -168,10 +168,35 @@ export function getLogDisplayStatus(log) {
       pdfBadge: 'background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0;' 
     };
   }
+
+  if (log.status === 'Info') {
+    return { 
+      label: log.note || 'Info', 
+      bg: 'bg-blue-50 text-blue-700 border-blue-200', 
+      dot: 'bg-blue-500', 
+      pdfBadge: 'background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe;' 
+    };
+  }
+
   return { 
     label: 'Scan Gagal', 
     bg: 'bg-rose-50 text-rose-700 border-rose-200', 
     dot: 'bg-rose-500', 
     pdfBadge: 'background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;' 
   };
+}
+
+// Returns true if the log entry is an actual attendance scan/manual claim log (excluding profile edit/add logs)
+export function isAttendanceLog(l) {
+  if (!l) return false;
+  if (l.status === 'Info') return false;
+  if (l.note && (
+    l.note.startsWith('Persetujuan Edit') || 
+    l.note.startsWith('Persetujuan Tambah') || 
+    l.note.startsWith('Persetujuan Registrasi Baru') ||
+    (l.note.startsWith('Persetujuan ditolak:') && !l.note.toLowerCase().includes('absensi'))
+  )) {
+    return false;
+  }
+  return true;
 }

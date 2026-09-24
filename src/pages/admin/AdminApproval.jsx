@@ -25,11 +25,11 @@ export default function AdminApproval() {
 
   const handleReject = (id, name) => {
     window.promptAction(
-      `Tolak pengajuan dari ${name}?`,
-      "Berkas pendukung kurang lengkap / kurang valid",
+      `Apakah Anda yakin ingin menolak pengajuan dari ${name}?`,
+      "",
       async (reason) => {
         try {
-          await rejectClaim(id, reason || "Ditolak oleh Admin");
+          await rejectClaim(id, reason ? reason.trim() : "Ditolak oleh Admin");
           alert(`Pengajuan ${name} telah DITOLAK.`);
         } catch {
           // error is handled in context
@@ -38,17 +38,19 @@ export default function AdminApproval() {
     );
   };
 
-  const filteredClaims = claims.filter(c => {
+  const pendingClaims = claims.filter(c => c.status === 'pending' || !c.status);
+
+  const filteredClaims = pendingClaims.filter(c => {
     const term = searchTerm.toLowerCase();
     const matchesSearch = c.name.toLowerCase().includes(term) || c.nim.includes(term) || c.issue.toLowerCase().includes(term);
     const matchesGugus = selectedGugus === 'all' || c.gugusName.toLowerCase() === selectedGugus.toLowerCase();
     return matchesSearch && matchesGugus;
   });
 
-  const activeGugusWithClaims = Array.from(new Set(claims.map(c => c.gugusName))).filter(Boolean);
+  const activeGugusWithClaims = Array.from(new Set(pendingClaims.map(c => c.gugusName))).filter(Boolean);
 
-  const regClaimsCount = claims.filter(c => c.issue === 'Tambah Peserta').length;
-  const editClaimsCount = claims.filter(c => c.issue === 'Edit Peserta').length;
+  const regClaimsCount = pendingClaims.filter(c => c.issue === 'Tambah Peserta').length;
+  const editClaimsCount = pendingClaims.filter(c => c.issue === 'Edit Peserta').length;
 
   return (
     <div className="w-full bg-[#f8fafc] min-h-screen pb-16">
@@ -92,7 +94,7 @@ export default function AdminApproval() {
             <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Menunggu</span>
               <div className="flex items-end gap-1 mt-2">
-                <span className="text-headline-sm font-extrabold text-[#012060] leading-none">{claims.length}</span>
+                <span className="text-headline-sm font-extrabold text-[#012060] leading-none">{pendingClaims.length}</span>
                 <span className="text-[9px] text-slate-400">Klaim</span>
               </div>
             </div>
@@ -144,10 +146,10 @@ export default function AdminApproval() {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                Semua Gugus ({claims.length})
+                Semua Gugus ({pendingClaims.length})
               </button>
               {activeGugusWithClaims.map(gName => {
-                const count = claims.filter(c => c.gugusName.toLowerCase() === gName.toLowerCase()).length;
+                const count = pendingClaims.filter(c => c.gugusName.toLowerCase() === gName.toLowerCase()).length;
                 return (
                   <button 
                     key={gName} 
@@ -237,8 +239,29 @@ export default function AdminApproval() {
                       {/* Issue details or Catatan */}
                       <div className="text-[10px] space-y-1 text-slate-500 border-t border-slate-100 pt-2 font-medium">
                         {!isReg && !isEdit && (
-                          <div className="text-amber-800 font-bold bg-amber-50 p-1.5 rounded-lg border border-amber-200/60 line-clamp-2 leading-tight">
-                            "{c.issue}" {c.catatan ? `- ${c.catatan}` : ''}
+                          <div className="bg-amber-50/80 p-2 rounded-xl border border-amber-200/70 space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border inline-flex items-center gap-1 ${
+                                c.requestedStatus === 'Hadir Penuh'
+                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  : c.requestedStatus === 'Hadir Sebagian'
+                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                  : 'bg-blue-100 text-blue-800 border-blue-300'
+                              }`}>
+                                <span className="material-symbols-outlined text-[11px]">
+                                  {c.requestedStatus === 'Hadir Penuh' ? 'check_circle' : c.requestedStatus === 'Hadir Sebagian' ? 'timelapse' : 'assignment'}
+                                </span>
+                                <span>{c.requestedStatus || 'Hadir Penuh'}</span>
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-amber-900 font-semibold leading-tight">
+                              Kendala: <span className="font-extrabold">{c.issue}</span>
+                            </div>
+                            {c.catatan && (
+                              <div className="text-[9.5px] text-slate-600 italic leading-tight">
+                                "{c.catatan}"
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -292,16 +315,16 @@ export default function AdminApproval() {
           </div>
 
           {/* DESKTOP TABLE VIEW (Visible on screen >= md) */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[850px]">
+          <div className="hidden md:block overflow-x-auto border-t border-slate-100">
+            <table className="w-full text-left border-collapse table-auto min-w-[650px]">
               <thead>
                 <tr className="bg-[#f8fafc] border-b border-slate-100">
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Peserta</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">NIM</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gugus</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipe Pengajuan</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Waktu</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Aksi</th>
+                  <th className="py-3.5 pl-4 sm:pl-6 pr-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Peserta</th>
+                  <th className="py-3.5 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">NIM</th>
+                  <th className="py-3.5 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gugus</th>
+                  <th className="py-3.5 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Tipe Pengajuan</th>
+                  <th className="py-3.5 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Waktu</th>
+                  <th className="py-3.5 pl-2 pr-4 sm:pr-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-100">
@@ -335,28 +358,28 @@ export default function AdminApproval() {
 
                     return (
                       <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
-                        <td className="py-4 px-6">
+                        <td className="py-3.5 pl-4 sm:pl-6 pr-2 max-w-[150px] lg:max-w-[200px]">
                           <div className="flex flex-col min-w-0">
-                            <span className="text-body-sm font-bold text-slate-800 truncate">{c.name}</span>
+                            <span className="text-body-sm font-bold text-slate-800 truncate" title={c.name}>{c.name}</span>
                             {detailsText ? (
-                              <span className="text-[10px] text-blue-700 font-semibold bg-blue-50 px-2 py-0.5 rounded mt-0.5 w-max max-w-[240px] leading-tight border border-blue-100">{detailsText}</span>
+                              <span className="text-[10px] text-blue-700 font-semibold bg-blue-50 px-2 py-0.5 rounded mt-0.5 w-max max-w-[180px] lg:max-w-[220px] truncate leading-tight border border-blue-100" title={detailsText}>{detailsText}</span>
                             ) : (
-                              <span className="text-[11px] text-slate-400">{c.fakultas || '-'}</span>
+                              <span className="text-[11px] text-slate-400 truncate">{c.fakultas || '-'}</span>
                             )}
                           </div>
                         </td>
 
-                        <td className="py-4 px-6">
+                        <td className="py-3.5 px-2 whitespace-nowrap">
                           <span className="text-body-sm font-bold text-[#012060] font-mono bg-[#012060]/5 px-2.5 py-1 rounded-lg border border-[#012060]/10">{c.nim}</span>
                         </td>
 
-                        <td className="py-4 px-6">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-semibold text-label-sm border border-slate-200/60">
+                        <td className="py-3.5 px-2 max-w-[120px] lg:max-w-[160px]">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-semibold text-label-sm border border-slate-200/60 truncate max-w-full" title={c.gugusName}>
                             {c.gugusName}
                           </span>
                         </td>
 
-                        <td className="py-4 px-6">
+                        <td className="py-3.5 px-2 whitespace-nowrap">
                           {isReg ? (
                             <div className="flex items-center gap-1.5 text-blue-700 font-bold text-body-sm">
                               <span className="material-symbols-outlined text-[18px]">person_add</span>
@@ -368,13 +391,26 @@ export default function AdminApproval() {
                               <span>Ubah Data</span>
                             </div>
                           ) : (
-                            <div className="flex flex-col gap-0.5">
-                              <div className="flex items-center gap-1.5 text-amber-700 font-bold text-body-sm">
-                                <span className="material-symbols-outlined text-[18px]">warning</span>
-                                <span>{c.issue}</span>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border inline-flex items-center gap-1 ${
+                                  c.requestedStatus === 'Hadir Penuh'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : c.requestedStatus === 'Hadir Sebagian'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                                }`}>
+                                  <span className="material-symbols-outlined text-[12px]">
+                                    {c.requestedStatus === 'Hadir Penuh' ? 'check_circle' : c.requestedStatus === 'Hadir Sebagian' ? 'timelapse' : 'assignment'}
+                                  </span>
+                                  <span>Status: {c.requestedStatus || 'Hadir Penuh'}</span>
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-700 font-medium leading-tight">
+                                Kendala: <strong className="text-amber-800">{c.issue}</strong>
                               </div>
                               {c.catatan && (
-                                <span className="text-[11px] text-slate-500 italic max-w-[240px] truncate" title={c.catatan}>
+                                <span className="text-[10.5px] text-slate-500 italic max-w-[200px] truncate" title={c.catatan}>
                                   "{c.catatan}"
                                 </span>
                               )}
@@ -382,27 +418,27 @@ export default function AdminApproval() {
                           )}
                         </td>
 
-                        <td className="py-4 px-6 text-body-sm text-slate-500 font-medium">
+                        <td className="py-3.5 px-2 text-body-sm text-slate-500 font-medium whitespace-nowrap">
                           {c.time}
                         </td>
 
-                        <td className="py-4 px-6 text-right">
-                          <div className="flex justify-end gap-2">
+                        <td className="py-3.5 pl-2 pr-4 sm:pr-6 text-right whitespace-nowrap">
+                          <div className="flex justify-end gap-1.5 whitespace-nowrap">
                             <button 
                               onClick={() => handleReject(c.id, c.name)} 
-                              className="px-3 py-1.5 rounded-xl text-label-sm font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/60 transition-all cursor-pointer flex items-center gap-1"
+                              className="px-2.5 py-1 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/60 transition-all cursor-pointer flex items-center gap-1"
                               title="Tolak Pengajuan"
                             >
-                              <span className="material-symbols-outlined text-[16px]">close</span>
+                              <span className="material-symbols-outlined text-[15px]">close</span>
                               <span>Tolak</span>
                             </button>
 
                             <button 
                               onClick={() => handleApprove(c.id, c.name)} 
-                              className="px-3.5 py-1.5 rounded-xl text-label-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                              className="px-3 py-1 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-all cursor-pointer flex items-center gap-1 active:scale-95"
                               title="Setujui Pengajuan"
                             >
-                              <span className="material-symbols-outlined text-[16px]">check</span>
+                              <span className="material-symbols-outlined text-[15px]">check</span>
                               <span>Setujui</span>
                             </button>
                           </div>
@@ -422,7 +458,7 @@ export default function AdminApproval() {
           {/* Footer Bar */}
           <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-[#f8fafc]/50">
             <span className="text-[11px] sm:text-body-sm font-medium text-slate-500">
-              Menampilkan {filteredClaims.length} dari {claims.length} klaim tertunda
+              Menampilkan {filteredClaims.length} dari {pendingClaims.length} klaim tertunda
             </span>
           </div>
 

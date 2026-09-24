@@ -1,7 +1,7 @@
 import { useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { sendQrEmail, sendBulkQrEmail, checkEmailServerHealth } from '../../lib/emailService';
+import { sendQrEmail, sendBulkQrEmail, checkEmailServerHealth, validateEmailSyntax } from '../../lib/emailService';
 import JSZip from 'jszip';
 import QRCode from 'qrcode';
 
@@ -12,6 +12,7 @@ export default function AdminQrManagement() {
   // Search & Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGugus, setSelectedGugus] = useState('all');
+  const [selectedEmailStatus, setSelectedEmailStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
 
@@ -31,7 +32,17 @@ export default function AdminQrManagement() {
     }
   });
 
-  const recordEmailSent = useCallback((studentId) => {
+  // Track failed email errors per student ID from localStorage
+  const [emailFailedErrors, setEmailFailedErrors] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pkkmb_email_failed_errors');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const recordEmailSuccess = useCallback((studentId) => {
     setEmailSentCounts(prev => {
       const nextCount = (prev[studentId] || 0) + 1;
       const updated = { ...prev, [studentId]: nextCount };
@@ -40,6 +51,26 @@ export default function AdminQrManagement() {
       } catch (err) {
         console.error("Failed to save email sent counts", err);
       }
+      return updated;
+    });
+
+    setEmailFailedErrors(prev => {
+      if (!prev[studentId]) return prev;
+      const updated = { ...prev };
+      delete updated[studentId];
+      try {
+        localStorage.setItem('pkkmb_email_failed_errors', JSON.stringify(updated));
+      } catch (err) {}
+      return updated;
+    });
+  }, []);
+
+  const recordEmailFailed = useCallback((studentId, errorMsg) => {
+    setEmailFailedErrors(prev => {
+      const updated = { ...prev, [studentId]: errorMsg || 'Gagal mengirim email.' };
+      try {
+        localStorage.setItem('pkkmb_email_failed_errors', JSON.stringify(updated));
+      } catch (err) {}
       return updated;
     });
   }, []);
@@ -55,10 +86,32 @@ export default function AdminQrManagement() {
     const term = searchTerm.toLowerCase();
     const matchesSearch = student.name.toLowerCase().includes(term) || 
                           student.id.includes(term) || 
-                          (student.fakultas && student.fakultas.toLowerCase().includes(term));
+                          (student.fakultas && student.fakultas.toLowerCase().includes(term)) ||
+                          (student.email && student.email.toLowerCase().includes(term));
     const matchesGugus = selectedGugus === 'all' || student.gugusId === selectedGugus;
-    return matchesSearch && matchesGugus;
+    
+    let matchesEmailStatus = true;
+    const sentCount = emailSentCounts[student.id] || 0;
+    const hasError = Boolean(emailFailedErrors[student.id]);
+
+    if (selectedEmailStatus === 'unsent') {
+      matchesEmailStatus = sentCount === 0 && !hasError;
+    } else if (selectedEmailStatus === 'failed') {
+      matchesEmailStatus = hasError;
+    } else if (selectedEmailStatus === 'sent') {
+      matchesEmailStatus = sentCount > 0;
+    }
+
+    return matchesSearch && matchesGugus && matchesEmailStatus;
   });
+
+  // Target list for bulk actions according to current Gugus filter
+  const targetStudentsForBulk = selectedGugus === 'all' 
+    ? peserta 
+    : peserta.filter(p => p.gugusId === selectedGugus);
+
+  const selectedGugusObj = gugus.find(g => g.id === selectedGugus);
+  const gugusLabel = selectedGugusObj ? selectedGugusObj.name : 'Gugus';
 
   // Pagination calculation
   const totalItems = filteredStudents.length;
@@ -97,13 +150,21 @@ export default function AdminQrManagement() {
   const handleEmailQr = useCallback(async (student) => {
     if (!student || emailSending) return;
     
+    // Front-end pre-validation check for single email
+    const syntaxCheck = validateEmailSyntax(student.email);
+    if (!syntaxCheck.valid) {
+      recordEmailFailed(student.id, syntaxCheck.reason);
+      alert(`❌ GAGAL VALIDASI EMAIL:\n${student.name} (${student.email})\n\nAlasan: ${syntaxCheck.reason}`);
+      return;
+    }
+
     const count = emailSentCounts[student.id] || 0;
-    let confirmMessage = `Apakah Anda yakin ingin mengirim email QR Code & ID Card ke ${student.name} (${student.email})?`;
+    let confirmMessage = `Apakah Anda yakin ingin mengirim email QR Code & ID Card ke <b>${student.name}</b> (${student.email})?`;
     
     if (count >= 2) {
-      confirmMessage = `⚠️ PERINGATAN: Email QR Code ke ${student.name} (${student.email}) SUDAH DIKIRIM SEBANYAK ${count} KALI!\n\nApakah Anda tetap YAKIN ingin mengirim ulang email lagi (Pengiriman ke-${count + 1})?`;
+      confirmMessage = `⚠️ PERINGATAN: Email QR Code ke <b>${student.name}</b> (${student.email}) SUDAH DIKIRIM SEBANYAK <b>${count} KALI</b>!\n\nApakah Anda tetap YAKIN ingin mengirim ulang email lagi (Pengiriman ke-${count + 1})?`;
     } else if (count === 1) {
-      confirmMessage = `📧 Email QR Code ke ${student.name} (${student.email}) sudah pernah dikirim 1 kali.\n\nApakah Anda yakin ingin mengirim ulang email ini?`;
+      confirmMessage = `📧 Email QR Code ke <b>${student.name}</b> (${student.email}) sudah pernah dikirim <b>1 kali</b>.\n\nApakah Anda yakin ingin mengirim ulang email ini?`;
     }
     
     window.confirmAction(confirmMessage, async () => {
@@ -124,7 +185,7 @@ export default function AdminQrManagement() {
       setEmailSending(false);
       
       if (result.ok || result.success || (result.message && !result.message.toLowerCase().includes('gagal'))) {
-        recordEmailSent(student.id);
+        recordEmailSuccess(student.id);
         const newCount = count + 1;
         if (newCount >= 2) {
           alert(`⚠️ Email QR Code berhasil dikirim ke ${student.name}! (Total email terkirim: ${newCount}x)`);
@@ -132,27 +193,40 @@ export default function AdminQrManagement() {
           alert(result.message || `Email QR Code berhasil dikirim ke ${student.name}!`);
         }
       } else {
-        alert(result.message || 'Gagal mengirim email.');
+        const errDesc = result.message || 'Gagal mengirim email.';
+        recordEmailFailed(student.id, errDesc);
+        alert(`❌ Email gagal dikirim ke ${student.name}:\n${errDesc}`);
       }
     });
-  }, [emailSending, getGugusName, emailSentCounts, recordEmailSent]);
+  }, [emailSending, getGugusName, emailSentCounts, recordEmailSuccess, recordEmailFailed]);
 
-  // Bulk QR email send
+  // Bulk QR email send (Per-Gugus / Semua)
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(null);
   const [bulkPauseMsg, setBulkPauseMsg] = useState('');
   const bulkAbort = useRef(false);
 
   const handleBulkEmailSend = async () => {
-    if (peserta.length === 0) { alert('Tidak ada data peserta.'); return; }
+    const listToSend = selectedGugus === 'all' 
+      ? peserta 
+      : peserta.filter(p => p.gugusId === selectedGugus);
+
+    if (listToSend.length === 0) { 
+      alert('Tidak ada data peserta untuk dikirim pada filter ini.'); 
+      return; 
+    }
+
+    const scopeTitle = selectedGugus === 'all' 
+      ? `seluruh ${listToSend.length} peserta` 
+      : `khusus ${listToSend.length} peserta di ${gugusLabel}`;
     
-    window.confirmAction(`Apakah Anda yakin ingin mengirim email QR Code & ID Card secara massal ke seluruh ${peserta.length} peserta?`, async () => {
+    window.confirmAction(`Apakah Anda yakin ingin mengirim email QR Code & ID Card ${scopeTitle}?`, async () => {
       setShowBulkModal(true);
       bulkAbort.current = false;
       setBulkPauseMsg('');
-      setBulkProgress({ current: 0, total: peserta.length, sent: 0, failed: 0, done: false });
+      setBulkProgress({ current: 0, total: listToSend.length, sent: 0, failed: 0, done: false, errors: [] });
 
-      const students = peserta.map(p => {
+      const studentsData = listToSend.map(p => {
         const groupName = getGugusName(p.gugusId);
         return {
           toEmail: p.email,
@@ -165,33 +239,78 @@ export default function AdminQrManagement() {
         };
       });
 
-      try {
-        const result = await sendBulkQrEmail(students, (event) => {
-          if (event.type === 'progress') {
-            setBulkProgress({ current: event.current, total: event.total, sent: event.sent, failed: event.failed, done: false });
-            setBulkPauseMsg('');
-          } else if (event.type === 'batch_pause') {
-            setBulkPauseMsg(event.message);
-          }
-        });
+      // Filter pre-validation syntax & domain typo errors
+      const validStudents = [];
+      const localFailures = [];
 
-        // Record bulk sent counts
-        setEmailSentCounts(prev => {
-          const updated = { ...prev };
-          peserta.forEach(p => {
-            updated[p.id] = (updated[p.id] || 0) + 1;
+      studentsData.forEach(s => {
+        const check = validateEmailSyntax(s.toEmail);
+        if (!check.valid) {
+          localFailures.push({ nim: s.nim, toEmail: s.toEmail, error: check.reason });
+          recordEmailFailed(s.nim, check.reason);
+        } else {
+          validStudents.push(s);
+        }
+      });
+
+      let sentCount = 0;
+      let failedCount = localFailures.length;
+      let allErrors = [...localFailures];
+
+      if (validStudents.length > 0) {
+        try {
+          const result = await sendBulkQrEmail(validStudents, (event) => {
+            if (event.type === 'progress') {
+              setBulkProgress({ 
+                current: event.current + localFailures.length, 
+                total: listToSend.length, 
+                sent: event.sent, 
+                failed: event.failed + localFailures.length, 
+                done: false 
+              });
+              setBulkPauseMsg('');
+            } else if (event.type === 'batch_pause') {
+              setBulkPauseMsg(event.message);
+            }
           });
-          try {
-            localStorage.setItem('pkkmb_email_sent_counts', JSON.stringify(updated));
-          } catch (e) {
-            console.error("Failed saving bulk email counts", e);
-          }
-          return updated;
-        });
 
-        setBulkProgress(prev => ({ ...prev, ...result, done: true }));
-      } catch (err) {
-        setBulkProgress(prev => ({ ...prev, done: true, errorMsg: err.message }));
+          sentCount = result.sent || 0;
+          failedCount += (result.failed || 0);
+          if (result.errors && result.errors.length > 0) {
+            allErrors = [...allErrors, ...result.errors];
+            result.errors.forEach(e => {
+              recordEmailFailed(e.nim, e.error);
+            });
+          }
+
+          // Record successful sends
+          validStudents.forEach(s => {
+            if (!allErrors.some(e => String(e.nim) === String(s.nim))) {
+              recordEmailSuccess(s.nim);
+            }
+          });
+
+          setBulkProgress({ 
+            current: listToSend.length, 
+            total: listToSend.length, 
+            sent: sentCount, 
+            failed: failedCount, 
+            errors: allErrors, 
+            done: true 
+          });
+        } catch (err) {
+          setBulkProgress(prev => ({ ...prev, done: true, errorMsg: err.message, errors: allErrors }));
+        }
+      } else {
+        // All students in list failed pre-validation
+        setBulkProgress({
+          current: listToSend.length,
+          total: listToSend.length,
+          sent: 0,
+          failed: localFailures.length,
+          errors: localFailures,
+          done: true
+        });
       }
     });
   };
@@ -331,7 +450,11 @@ export default function AdminQrManagement() {
               className="w-full sm:w-auto bg-[#012060] hover:bg-[#022b80] text-white shadow-md px-4 py-2.5 rounded-xl text-label-md font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed active:scale-98"
             >
               <span className="material-symbols-outlined text-[18px]">send</span>
-              <span>Kirim Email Massal ({peserta.length})</span>
+              <span>
+                {selectedGugus === 'all' 
+                  ? `Kirim Email Massal (${peserta.length})` 
+                  : `Kirim Email ${gugusLabel} (${targetStudentsForBulk.length})`}
+              </span>
             </button>
           </div>
         </div>
@@ -371,8 +494,8 @@ export default function AdminQrManagement() {
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
                 <input 
-                  className="w-full sm:w-64 pl-10 pr-9 py-2.5 bg-[#f8fafc] rounded-xl text-body-sm font-semibold text-slate-800 placeholder:text-slate-400 border border-slate-200 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all" 
-                  placeholder="Cari Nama, NIM, Jurusan..." 
+                  className="w-full sm:w-56 pl-10 pr-9 py-2.5 bg-[#f8fafc] rounded-xl text-body-sm font-semibold text-slate-800 placeholder:text-slate-400 border border-slate-200 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all" 
+                  placeholder="Cari Nama, NIM, Email..." 
                   type="text" 
                   value={searchTerm} 
                   onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} 
@@ -390,7 +513,7 @@ export default function AdminQrManagement() {
               {/* Gugus Select Dropdown */}
               <div className="relative group">
                 <select 
-                  className="w-full sm:w-44 appearance-none pl-3.5 pr-9 py-2.5 bg-[#f8fafc] rounded-xl text-body-sm font-semibold text-slate-800 border border-slate-200 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer" 
+                  className="w-full sm:w-40 appearance-none pl-3.5 pr-9 py-2.5 bg-[#f8fafc] rounded-xl text-body-sm font-semibold text-slate-800 border border-slate-200 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer" 
                   value={selectedGugus} 
                   onChange={(e) => { setSelectedGugus(e.target.value); setCurrentPage(1); }}
                 >
@@ -398,6 +521,21 @@ export default function AdminQrManagement() {
                   {gugus.map(g => (
                     <option key={g.id} value={g.id}>{g.name}</option>
                   ))}
+                </select>
+                <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[18px]">expand_more</span>
+              </div>
+
+              {/* Email Status Select Dropdown */}
+              <div className="relative group">
+                <select 
+                  className="w-full sm:w-44 appearance-none pl-3.5 pr-9 py-2.5 bg-[#f8fafc] rounded-xl text-body-sm font-semibold text-slate-800 border border-slate-200 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer" 
+                  value={selectedEmailStatus} 
+                  onChange={(e) => { setSelectedEmailStatus(e.target.value); setCurrentPage(1); }}
+                >
+                  <option value="all">Semua Status Email</option>
+                  <option value="unsent">⚪ Belum Dikirim</option>
+                  <option value="failed">🔴 Gagal Dikirim</option>
+                  <option value="sent">🟢 Sudah Dikirim</option>
                 </select>
                 <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[18px]">expand_more</span>
               </div>
@@ -410,15 +548,35 @@ export default function AdminQrManagement() {
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 {currentItems.map((student) => {
                   const isAttended = ['Hadir Penuh', 'Hadir Sebagian', 'Izin'].includes(student.status);
+                  const hasErr = Boolean(emailFailedErrors[student.id]);
+                  const sentCount = emailSentCounts[student.id] || 0;
 
                   return (
                     <div 
                       key={student.id} 
                       className="bg-white rounded-2xl p-3 shadow-xs border border-slate-200/80 flex flex-col justify-between gap-2.5 hover:shadow-md hover:border-[#012060]/30 transition-all relative overflow-hidden group"
                     >
-                      {/* Card Top: Status Badge */}
-                      <div className="flex items-center justify-end">
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold shrink-0 border ${
+                      {/* Card Top: Status Email & Presensi Badge */}
+                      <div className="flex items-center justify-between gap-1 flex-wrap">
+                        <span className={`px-1.5 py-0.5 rounded-full text-[8.5px] font-extrabold shrink-0 border ${
+                          hasErr
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : sentCount >= 2
+                            ? 'bg-amber-50 text-amber-900 border-amber-300'
+                            : sentCount === 1
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-slate-100 text-slate-500 border-slate-200/80'
+                        }`} title={emailFailedErrors[student.id] || ''}>
+                          {hasErr 
+                            ? '🔴 Gagal Kirim' 
+                            : sentCount >= 2 
+                            ? `🟡 Terkirim ${sentCount}x` 
+                            : sentCount === 1 
+                            ? '🟢 Terkirim 1x' 
+                            : '⚪ Belum Kirim'}
+                        </span>
+
+                        <span className={`px-1.5 py-0.5 rounded-full text-[8.5px] font-extrabold shrink-0 border ${
                           isAttended 
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                             : 'bg-slate-100 text-slate-500 border-slate-200/80'
@@ -445,13 +603,12 @@ export default function AdminQrManagement() {
                           <span className="truncate">{getGugusName(student.gugusId)}</span>
                         </div>
                         <div className="truncate text-slate-400 text-[9.5px]">
-                          {student.fakultas || 'Belum ditentukan'}
+                          {student.email || student.fakultas || 'Belum ditentukan'}
                         </div>
                       </div>
 
                       {/* Highlighted Primary Action + Secondary Buttons */}
                       <div className="flex flex-col gap-1.5 pt-1">
-                        {/* HIGHLIGHTED MAIN BUTTON: LIHAT QR */}
                         <button
                           onClick={() => setSelectedStudent(student)}
                           className="w-full py-2 bg-[#012060] hover:bg-[#022b80] active:scale-95 text-white rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all"
@@ -460,7 +617,6 @@ export default function AdminQrManagement() {
                           <span>Lihat QR</span>
                         </button>
 
-                        {/* Secondary Actions */}
                         <div className="grid grid-cols-2 gap-1.5">
                           <button
                             onClick={() => handleDownloadQr(student)}
@@ -474,21 +630,21 @@ export default function AdminQrManagement() {
                           <button
                             onClick={() => handleEmailQr(student)}
                             className={`py-1.5 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors border ${
-                              (emailSentCounts[student.id] || 0) >= 2
+                              hasErr
+                                ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 font-extrabold'
+                                : sentCount >= 2
                                 ? 'bg-amber-100/90 text-amber-900 border-amber-300 font-extrabold shadow-xs'
-                                : (emailSentCounts[student.id] || 0) === 1
+                                : sentCount === 1
                                 ? 'bg-blue-50 text-blue-700 border-blue-200'
                                 : 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
                             }`}
-                            title={`Status Email: ${(emailSentCounts[student.id] || 0)}x terkirim`}
+                            title={hasErr ? `Gagal: ${emailFailedErrors[student.id]}` : `Status Email: ${sentCount}x terkirim`}
                           >
                             <span className="material-symbols-outlined text-[13px]">
-                              {(emailSentCounts[student.id] || 0) >= 2 ? 'warning' : 'mail'}
+                              {hasErr ? 'error' : sentCount >= 2 ? 'warning' : 'mail'}
                             </span>
                             <span>
-                              {(emailSentCounts[student.id] || 0) > 0 
-                                ? `Email (${emailSentCounts[student.id]}x)` 
-                                : 'Email'}
+                              {hasErr ? 'Kirim Ulang' : sentCount > 0 ? `Email (${sentCount}x)` : 'Email'}
                             </span>
                           </button>
                         </div>
@@ -499,59 +655,115 @@ export default function AdminQrManagement() {
               </div>
             ) : (
               <div className="text-center py-10 text-slate-400 text-body-sm">
-                Tidak ada data peserta ditemukan.
+                Tidak ada data peserta ditemukan pada kriteria filter ini.
               </div>
             )}
           </div>
 
           {/* DESKTOP TABLE VIEW (Visible on screen >= md) */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="hidden md:block overflow-x-auto border-t border-slate-100">
+            <table className="w-full text-left border-collapse table-auto min-w-[680px]">
               <thead>
                 <tr className="bg-[#f8fafc] border-b border-slate-100">
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nama Peserta</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">NIM</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gugus</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jurusan</th>
-                  <th className="py-3.5 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Aksi</th>
+                  <th className="py-3 pl-4 sm:pl-6 pr-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nama Peserta</th>
+                  <th className="py-3 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">NIM</th>
+                  <th className="py-3 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gugus</th>
+                  <th className="py-3 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status Email</th>
+                  <th className="py-3 pl-2 pr-4 sm:pr-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {currentItems.length > 0 ? (
-                  currentItems.map((student) => (
-                    <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
-                      <td className="py-4 px-6">
-                        <div className="min-w-0">
-                          <p className="text-body-md font-bold text-slate-800 truncate group-hover:text-primary transition-colors">{student.name}</p>
-                          <p className="text-[11px] text-slate-400 truncate">{student.email}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="text-body-sm font-semibold text-slate-700 font-mono bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/60">{student.id}</span>
-                      </td>
-                      <td className="py-4 px-6 text-body-sm font-semibold text-slate-700">
-                        {getGugusName(student.gugusId)}
-                      </td>
-                      <td className="py-4 px-6 text-body-sm text-slate-500 truncate max-w-[150px]">
-                        {student.fakultas || '-'}
-                      </td>
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button 
-                            onClick={() => setSelectedStudent(student)} 
-                            className="px-3 py-1.5 bg-[#012060]/5 hover:bg-[#012060]/10 text-[#012060] rounded-xl text-label-sm font-bold transition-colors flex items-center gap-1 cursor-pointer" 
-                            title="Lihat QR Code"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">qr_code</span>
-                            Lihat QR
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                  currentItems.map((student) => {
+                    const hasErr = Boolean(emailFailedErrors[student.id]);
+                    const sentCount = emailSentCounts[student.id] || 0;
+
+                    return (
+                      <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
+                        <td className="py-3 pl-4 sm:pl-6 pr-2 max-w-[160px] xl:max-w-[220px]">
+                          <div className="min-w-0">
+                            <p className="text-body-sm font-bold text-slate-800 truncate group-hover:text-primary transition-colors" title={student.name}>{student.name}</p>
+                            <p className="text-[11px] text-slate-400 truncate" title={student.email}>{student.email}</p>
+                          </div>
+                        </td>
+                        <td className="py-3 px-2 whitespace-nowrap">
+                          <span className="text-body-sm font-semibold text-slate-700 font-mono bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">{student.id}</span>
+                        </td>
+                        <td className="py-3 px-2 max-w-[140px] xl:max-w-[200px]">
+                          <p className="text-body-sm font-semibold text-slate-700 truncate" title={getGugusName(student.gugusId)}>
+                            {getGugusName(student.gugusId)}
+                          </p>
+                        </td>
+                        <td className="py-3 px-2 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold whitespace-nowrap border ${
+                            hasErr
+                              ? 'bg-rose-50 text-rose-700 border-rose-200 cursor-help'
+                              : sentCount >= 2
+                              ? 'bg-amber-50 text-amber-900 border-amber-300'
+                              : sentCount === 1
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-slate-100 text-slate-500 border-slate-200/80'
+                          }`} title={emailFailedErrors[student.id] || ''}>
+                            <span className="material-symbols-outlined text-[13px]">
+                              {hasErr 
+                                ? 'error' 
+                                : sentCount >= 2 
+                                ? 'warning' 
+                                : sentCount === 1 
+                                ? 'mark_email_read' 
+                                : 'mark_email_unread'}
+                            </span>
+                            <span className="whitespace-nowrap">
+                              {hasErr 
+                                ? 'Gagal Kirim' 
+                                : sentCount >= 2 
+                                ? `Terkirim ${sentCount}x` 
+                                : sentCount === 1 
+                                ? 'Terkirim 1x' 
+                                : 'Belum Kirim'}
+                            </span>
+                          </span>
+                          {hasErr && (
+                            <p className="text-[10px] text-rose-600 font-mono mt-0.5 max-w-[140px] truncate" title={emailFailedErrors[student.id]}>
+                              {emailFailedErrors[student.id]}
+                            </p>
+                          )}
+                        </td>
+                        <td className="py-3 pl-2 pr-4 sm:pr-6 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                            <button 
+                              onClick={() => setSelectedStudent(student)} 
+                              className="px-2 py-1 bg-[#012060]/5 hover:bg-[#012060]/10 text-[#012060] rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap" 
+                              title="Lihat QR Code"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">qr_code</span>
+                              <span className="whitespace-nowrap">Lihat QR</span>
+                            </button>
+                            <button
+                              onClick={() => handleEmailQr(student)}
+                              className={`px-2 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border whitespace-nowrap ${
+                                hasErr
+                                  ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 shadow-xs'
+                                  : sentCount >= 2
+                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                  : sentCount === 1
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[14px]">
+                                {hasErr ? 'error' : 'mail'}
+                              </span>
+                              <span className="whitespace-nowrap">{hasErr ? 'Kirim Ulang' : sentCount > 0 ? `Email (${sentCount}x)` : 'Kirim Email'}</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan="5" className="text-center py-10 text-slate-400 text-body-md">Tidak ada data peserta ditemukan.</td>
+                    <td colSpan="5" className="text-center py-10 text-slate-400 text-body-md">Tidak ada data peserta ditemukan pada kriteria filter ini.</td>
                   </tr>
                 )}
               </tbody>

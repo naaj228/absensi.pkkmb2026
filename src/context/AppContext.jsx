@@ -12,7 +12,7 @@ import {
   getWibDateString
 } from '../lib/db';
 
-import { normalizeJurusan } from '../utils/statusHelper';
+import { normalizeJurusan, isAttendanceLog } from '../utils/statusHelper';
 import { checkIsLate } from '../utils/dateHelper';
 
 export const AppContext = createContext();
@@ -70,10 +70,15 @@ const transformClaim = (c) => ({
   nim: c.nim,
   gugusName: c.gugus_nama || '-',
   issue: c.issue,
-  catatan: c.catatan || c.alasan || '',
-  time: c.waktu || new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+  status: c.status || 'pending',
+  catatan: c.catatan || '',
+  alasan: c.alasan || '',
+  rejectionReason: c.alasan || '',
+  diajukanOleh: c.diajukan_oleh || c.diajukanOleh || null,
+  time: c.waktu || (c.created_at ? new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''),
   requestedStatus: c.requested_status || 'Hadir Penuh',
-  tanggalHadir: c.tanggal_hadir || c.tanggalHadir || null
+  tanggalHadir: c.tanggal_hadir || c.tanggalHadir || null,
+  created_at: c.created_at
 });
 
 const transformLog = (l) => ({
@@ -182,16 +187,22 @@ export function AppContextProvider({ children }) {
   const mentorGugusName = mentorGugusObj ? mentorGugusObj.name : '';
 
   const activeAdminNotifications = [
-    ...claims.map(c => `claim-${c.id}`),
-    ...logs.filter(l => l.status !== 'Valid').map(l => `invalid-${l.id}`),
+    ...claims.filter(c => c.status === 'pending' || !c.status).map(c => `claim-${c.id}`),
+    ...logs.filter(l => isAttendanceLog(l) && l.status !== 'Valid').map(l => `invalid-${l.id}`),
     ...qrCodes.map(q => `qr-${q.id}`)
   ].filter(id => !dismissedNotifications.includes(id));
 
   const adminNotificationsCount = activeAdminNotifications.length;
 
   const activeMentorNotifications = [
-    ...logs.filter(l => l.gugusName === mentorGugusName && (l.status !== 'Valid' || l.scanner === 'Admin (Tolak Manual)')).map(l => `log-${l.id}`),
-    ...claims.filter(c => c.gugusName === mentorGugusName).map(c => `claim-${c.id}`)
+    ...claims.filter(c => {
+      if (!currentUser) return false;
+      if (c.diajukanOleh && String(c.diajukanOleh) === String(currentUser.id)) return true;
+      if (c.gugusName && mentorGugusName && c.gugusName !== '-' && c.gugusName.trim().toLowerCase() === mentorGugusName.trim().toLowerCase()) return true;
+      if (mentorGugusId && peserta.some(p => String(p.id) === String(c.nim) && p.gugusId === mentorGugusId)) return true;
+      return false;
+    }).map(c => `claim-${c.id}-${c.status || 'pending'}`),
+    ...logs.filter(l => l.gugusName === mentorGugusName && isAttendanceLog(l) && l.status !== 'Valid').map(l => `invalid-${l.id}`)
   ].filter(id => !dismissedNotifications.includes(id));
 
   const mentorNotificationsCount = activeMentorNotifications.length;
@@ -240,11 +251,11 @@ export function AppContextProvider({ children }) {
           setLocationSettings(locData);
         }
 
-        // Fast O(N+M) Sync of peserta status for TODAY using a Set
+        // Fast O(N+M) Sync of peserta status for TODAY using a Set (Exclude profile edit & add approval logs)
         const todayWib = getTodayWibString();
         const validLogNimsToday = new Set(
           lData
-            .filter(l => l.status === 'Valid' && getWibDateString(l.waktu) === todayWib)
+            .filter(l => l.status === 'Valid' && !l.note?.startsWith('Persetujuan Edit') && !l.note?.startsWith('Persetujuan Tambah') && getWibDateString(l.waktu) === todayWib)
             .map(l => String(l.nim))
         );
 
@@ -408,12 +419,8 @@ export function AppContextProvider({ children }) {
               return [...prev, transformed];
             });
           } else if (payload.eventType === 'UPDATE') {
-            if (payload.new?.status !== 'pending') {
-              setClaims(prev => prev.filter(c => c.id !== payload.new?.id));
-            } else {
-              const transformed = transformClaim(payload.new);
-              setClaims(prev => prev.map(c => c.id === transformed.id ? transformed : c));
-            }
+            const transformed = transformClaim(payload.new);
+            setClaims(prev => prev.map(c => c.id === transformed.id ? transformed : c));
           } else if (payload.eventType === 'DELETE') {
             const id = payload.old?.id;
             if (id) {
@@ -547,8 +554,8 @@ export function AppContextProvider({ children }) {
       if (currentUser?.role === 'mentor') {
         const student = peserta.find(p => p.id === item.id);
         if (student) return;
-        const group = gugus.find(g => g.id === item.gugusId);
-        const groupName = group ? group.name : '-';
+        const group = gugus.find(g => g.id === item.gugusId) || gugus.find(g => g.id === currentUser?.gugusId);
+        const groupName = group ? group.name : (mentorGugusName || '-');
         const newClaim = await claimsDb.add(
           item.id,
           'Tambah Peserta',
@@ -607,8 +614,8 @@ export function AppContextProvider({ children }) {
       }
 
       if (currentUser?.role === 'mentor') {
-        const group = gugus.find(g => g.id === student.gugusId);
-        const groupName = group ? group.name : '-';
+        const group = gugus.find(g => g.id === student.gugusId) || gugus.find(g => g.id === currentUser?.gugusId);
+        const groupName = group ? group.name : (mentorGugusName || '-');
         const newClaim = await claimsDb.add(
           id,
           'Edit Peserta',
@@ -638,8 +645,8 @@ export function AppContextProvider({ children }) {
             const existingLog = logs.find(l => String(l.nim) === String(id) && l.status === 'Valid');
             const noteText = `Ubah Status Manual ke ${newStatus}`;
             if (existingLog) {
-              await logsDb.update(existingLog.id, { note: noteText, scanner: scannerName });
-              setLogs(prev => prev.map(l => l.id === existingLog.id ? { ...l, note: noteText, scanner: scannerName, nim: newId } : l));
+              await logsDb.update(existingLog.id, { note: noteText });
+              setLogs(prev => prev.map(l => l.id === existingLog.id ? { ...l, note: noteText, nim: newId } : l));
             } else {
               await addLog(fields.name || student.name, newId, groupName, scannerName, 'Valid', noteText);
             }
@@ -828,15 +835,16 @@ export function AppContextProvider({ children }) {
     }
   };
 
-  const addLog = async (name, nim, gugusName, scanner, status = 'Valid', note = '', locationData = null, customWaktu = null) => {
+  const addLog = async (name, nim, gugusName, scanner, status = 'Valid', note = '', locationData = null, customWaktu = null, allowOverride = false) => {
     try {
       const todayStr = getTodayWibString();
-      if (status === 'Valid' && logs.some(l => String(l.nim) === String(nim) && l.date === todayStr && l.status === 'Valid')) {
+      const targetDate = customWaktu ? getWibDateString(customWaktu) : todayStr;
+      if (!allowOverride && status === 'Valid' && logs.some(l => String(l.nim) === String(nim) && l.date === targetDate && l.status === 'Valid')) {
         throw new Error(`SUDAH_ABSEN: Mahasiswa dengan NIM ${nim} sudah melakukan absensi hari ini.`);
       }
 
       const student = peserta.find(p => p.id === nim);
-      const inserted = await logsDb.add(name, nim, gugusName, scanner, status, note, student?.uuid, currentUser?.id, locationData, customWaktu);
+      const inserted = await logsDb.add(name, nim, gugusName, scanner, status, note, student?.uuid, currentUser?.id, locationData, customWaktu, allowOverride);
       if (inserted) {
         const transformed = transformLog(inserted);
         setLogs(prev => {
@@ -937,7 +945,7 @@ export function AppContextProvider({ children }) {
 
       if (claim.issue === 'Tambah Peserta') {
         const studentData = JSON.parse(claim.catatan);
-        const added = await pesertaDb.add(studentData);
+        const added = await pesertaDb.add({ ...studentData, status: 'Belum Hadir' });
         if (added) {
           const transformed = transformPeserta(added);
           setPeserta(prev => {
@@ -945,22 +953,48 @@ export function AppContextProvider({ children }) {
             return [...prev, transformed];
           });
         }
-        await addLog(studentData.name, studentData.id, claim.gugusName, 'Admin PKKMB', 'Valid', 'Persetujuan Tambah Peserta');
       } else if (claim.issue === 'Edit Peserta') {
         const studentData = JSON.parse(claim.catatan);
-        await pesertaDb.update(claim.nim, studentData);
-        setPeserta(prev => prev.map(p => p.id === claim.nim ? { ...p, ...studentData } : p));
-        await addLog(studentData.name, claim.nim, claim.gugusName, 'Admin PKKMB', 'Valid', 'Persetujuan Edit Peserta');
+        const original = peserta.find(p => p.id === claim.nim);
+
+        // Strictly ensure profile edits ONLY update profile fields and NEVER touch attendance status
+        const updatedFields = { ...studentData };
+        delete updatedFields.status;
+        if (original) {
+          updatedFields.status = original.status;
+        }
+
+        await pesertaDb.update(claim.nim, updatedFields);
+        setPeserta(prev => prev.map(p => p.id === claim.nim ? { ...p, ...updatedFields } : p));
       } else {
         const targetStatus = claim.requestedStatus || 'Hadir Penuh';
         await pesertaDb.update(claim.nim, { status: targetStatus });
         setPeserta(prev => prev.map(p => p.id === claim.nim ? { ...p, status: targetStatus } : p));
+        
         const timePart = new Date().toISOString().split('T')[1];
         const customWaktu = claim.tanggalHadir ? `${claim.tanggalHadir}T${timePart}` : null;
-        await addLog(claim.name, claim.nim, claim.gugusName, 'Admin PKKMB', 'Valid', 'Persetujuan Absensi Manual', null, customWaktu);
+        const targetDate = claim.tanggalHadir || getTodayWibString();
+
+        const existingLog = logs.find(l => String(l.nim) === String(claim.nim) && l.date === targetDate && l.status === 'Valid');
+        const noteText = `Persetujuan Absensi Manual (${targetStatus})`;
+
+        const submittingMentor = mentors.find(m => m.id === claim.diajukanOleh);
+        const claimMentorName = submittingMentor ? submittingMentor.name : null;
+
+        if (existingLog) {
+          const finalScanner = (existingLog.scanner === 'Admin PKKMB' || existingLog.scanner === 'System') && claimMentorName
+            ? claimMentorName
+            : existingLog.scanner;
+
+          await logsDb.update(existingLog.id, { note: noteText, scanner: finalScanner });
+          setLogs(prev => prev.map(l => l.id === existingLog.id ? { ...l, note: noteText, scanner: finalScanner } : l));
+        } else {
+          const scannerName = claimMentorName || 'Admin PKKMB';
+          await addLog(claim.name, claim.nim, claim.gugusName, scannerName, 'Valid', noteText, null, customWaktu, true);
+        }
       }
       await claimsDb.updateStatus(claimId, 'approved');
-      setClaims(prev => prev.filter(c => c.id !== claimId));
+      setClaims(prev => prev.map(c => c.id === claimId ? { ...c, status: 'approved' } : c));
     } catch (err) {
       console.error("Error approving claim:", err);
       alert("Gagal menyetujui klaim: " + (err.message || err));
@@ -973,15 +1007,15 @@ export function AppContextProvider({ children }) {
       const claim = claims.find(c => c.id === claimId);
       if (!claim) return;
 
-      if (claim.issue === 'Tambah Peserta' || claim.issue === 'Edit Peserta') {
-        await addLog(claim.name, claim.nim, claim.gugusName, 'Admin (Tolak)', 'Tidak Valid', `Persetujuan ditolak: ${reason}`);
-      } else {
-        await pesertaDb.update(claim.nim, { status: 'Manual (Ditolak)' });
-        setPeserta(prev => prev.map(p => p.id === claim.nim ? { ...p, status: 'Manual (Ditolak)' } : p));
-        await addLog(claim.name, claim.nim, claim.gugusName, 'Admin (Tolak Manual)', 'Tidak Valid', reason);
+      const rejectReason = (reason && reason.trim()) ? reason.trim() : 'Ditolak oleh Admin';
+
+      if (claim.issue !== 'Tambah Peserta' && claim.issue !== 'Edit Peserta') {
+        // If an attendance claim is rejected, ensure student attendance status is reset to Belum Hadir
+        await pesertaDb.update(claim.nim, { status: 'Belum Hadir' });
+        setPeserta(prev => prev.map(p => p.id === claim.nim ? { ...p, status: 'Belum Hadir' } : p));
       }
-      await claimsDb.updateStatus(claimId, 'rejected');
-      setClaims(prev => prev.filter(c => c.id !== claimId));
+      await claimsDb.updateStatus(claimId, 'rejected', rejectReason);
+      setClaims(prev => prev.map(c => c.id === claimId ? { ...c, status: 'rejected', alasan: rejectReason } : c));
     } catch (err) {
       console.error("Error rejecting claim:", err);
       alert("Gagal menolak klaim: " + (err.message || err));

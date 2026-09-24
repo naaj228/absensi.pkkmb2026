@@ -1,7 +1,8 @@
 import { useContext, useEffect } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { formatFriendlyDateTime, getTodayISOKey } from '../../utils/dateHelper';
+import { formatFriendlyDateTime } from '../../utils/dateHelper';
+import { isAttendanceLog } from '../../utils/statusHelper';
 
 export default function AdminNotifikasi() {
   const { 
@@ -21,35 +22,48 @@ export default function AdminNotifikasi() {
 
   const notifications = [];
 
-  // 1. Pending Claims Notifications
-  claims.forEach(c => {
+  // 1. Pending Claims Notifications (Filter by pending status)
+  const pendingClaims = claims.filter(c => c.status === 'pending' || !c.status);
+  pendingClaims.forEach(c => {
     const id = `claim-${c.id}`;
     if (dismissedNotifications.includes(id)) return;
-    const claimDate = c.tanggalHadir || c.date || c.created_at;
+    const claimDate = c.tanggalHadir || c.created_at;
     const displayTime = formatFriendlyDateTime(claimDate, c.time);
+    
+    const isEdit = c.issue === 'Edit Peserta';
+    const isReg = c.issue === 'Tambah Peserta';
+
     notifications.push({
       id,
-      type: 'claim',
-      title: 'Klaim Absensi Manual Baru',
-      message: `${c.name} (NIM: ${c.nim}) mengajukan absensi manual: ${c.issue}`,
+      type: isEdit ? 'claim_edit' : isReg ? 'claim_add' : 'claim_attendance',
+      title: isEdit ? 'Pengajuan Edit Data Peserta' : isReg ? 'Pengajuan Registrasi Peserta Baru' : 'Klaim Absensi Manual Baru',
+      message: isEdit 
+        ? `${c.name} (NIM: ${c.nim}) mengajukan perubahan data peserta di ${c.gugusName || 'Gugus'}`
+        : isReg 
+        ? `${c.name} (NIM: ${c.nim}) mengajukan pendaftaran peserta baru di ${c.gugusName || 'Gugus'}`
+        : `${c.name} (NIM: ${c.nim}) mengajukan absensi manual (${c.requestedStatus || 'Hadir Penuh'}): ${c.catatan || c.issue}`,
       time: displayTime,
-      icon: 'assignment_late',
-      color: 'text-amber-600 bg-amber-50 border border-amber-200',
-      actionLabel: 'Tinjau Klaim',
+      icon: isEdit ? 'edit_note' : isReg ? 'person_add' : 'assignment_late',
+      color: isEdit 
+        ? 'text-purple-600 bg-purple-50 border border-purple-200' 
+        : isReg 
+        ? 'text-blue-600 bg-blue-50 border border-blue-200' 
+        : 'text-amber-600 bg-amber-50 border border-amber-200',
+      actionLabel: 'Tinjau Pengajuan',
       action: () => navigate('/admin/approval'),
       originalData: c
     });
   });
 
-  // 2. Invalid Scans Notifications
-  logs.filter(l => l.status !== 'Valid').forEach(l => {
+  // 2. Invalid Attendance Scans Notifications (Strictly exclude profile edit/add logs)
+  logs.filter(l => isAttendanceLog(l) && l.status !== 'Valid').forEach(l => {
     const id = `invalid-${l.id}`;
     if (dismissedNotifications.includes(id)) return;
     const displayTime = formatFriendlyDateTime(l.date, l.timestamp);
     notifications.push({
       id,
       type: 'invalid_scan',
-      title: 'Scan Tidak Valid Dideteksi',
+      title: 'Scan QR Tidak Valid Dideteksi',
       message: `Mahasiswa ${l.name || 'Tidak Dikenal'} (NIM: ${l.nim}) gagal melakukan scan di ${l.gugusName || 'Gugus'}`,
       time: displayTime,
       icon: 'warning',

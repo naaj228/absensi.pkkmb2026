@@ -1,12 +1,14 @@
 import { useContext, useEffect } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { formatFriendlyDateTime, getTodayISOKey } from '../../utils/dateHelper';
+import { formatFriendlyDateTime } from '../../utils/dateHelper';
+import { isAttendanceLog } from '../../utils/statusHelper';
 
 export default function MentorNotifikasi() {
   const { 
     logs, 
     claims, 
+    peserta,
     gugus, 
     currentUser, 
     setMentorNotificationsCleared,
@@ -27,48 +29,109 @@ export default function MentorNotifikasi() {
 
   const notifications = [];
 
-  // 1. Rejections and Invalid Scans in mentor's gugus (Exclude regular successful scans)
-  const groupLogs = logs.filter(l => l.gugusName === mentorGugusName && (l.status !== 'Valid' || l.scanner === 'Admin (Tolak Manual)'));
-  groupLogs.forEach(l => {
-    if (dismissedNotifications.includes(`log-${l.id}`)) return;
-    
-    const isRejection = l.scanner === 'Admin (Tolak Manual)';
-    const displayTime = formatFriendlyDateTime(l.date, l.timestamp);
-    
-    notifications.push({
-      id: `log-${l.id}`,
-      type: 'scan',
-      title: isRejection ? 'Pengajuan Absensi Ditolak' : 'Scan Tidak Valid',
-      message: isRejection 
-        ? `Pengajuan absensi manual untuk ${l.name} (NIM: ${l.nim}) ditolak. Alasan: ${l.note || 'Berkas tidak lengkap.'}`
-        : `Scan untuk ${l.name || 'Mahasiswa'} (NIM: ${l.nim}) gagal / tidak valid.`,
-      time: displayTime,
-      icon: isRejection ? 'cancel' : 'warning',
-      color: 'text-rose-600 bg-rose-50 border border-rose-200',
-      actionLabel: isRejection ? 'Ajukan Kembali' : 'Lihat Anggota',
-      action: () => navigate(isRejection ? '/mentor/absensi-manual' : '/mentor/peserta'),
-      originalData: l
-    });
+  // Robust claim matching for this mentor
+  const groupClaims = claims.filter(c => {
+    if (!c) return false;
+    if (c.diajukanOleh && currentUser?.id && String(c.diajukanOleh) === String(currentUser.id)) return true;
+    if (c.gugusName && mentorGugusName && c.gugusName !== '-' && c.gugusName.trim().toLowerCase() === mentorGugusName.trim().toLowerCase()) return true;
+    if (mentorGugusId && (peserta || []).some(p => String(p.id) === String(c.nim) && p.gugusId === mentorGugusId)) return true;
+    return false;
   });
 
-  // 2. Claims in mentor's gugus
-  const groupClaims = claims.filter(c => c.gugusName === mentorGugusName);
   groupClaims.forEach(c => {
-    const id = `claim-${c.id}`;
+    const id = `claim-${c.id}-${c.status || 'pending'}`;
     if (dismissedNotifications.includes(id)) return;
-    const claimDate = c.tanggalHadir || c.date || c.created_at;
+    const claimDate = c.tanggalHadir || c.created_at;
     const displayTime = formatFriendlyDateTime(claimDate, c.time);
+    
+    const isEdit = c.issue === 'Edit Peserta';
+    const isReg = c.issue === 'Tambah Peserta';
+
+    let detailsText = '';
+    if (isEdit && c.catatan) {
+      try {
+        const updated = JSON.parse(c.catatan);
+        const parts = [];
+        if (updated.name) parts.push(`Nama: ${updated.name}`);
+        if (updated.email) parts.push(`Email: ${updated.email}`);
+        if (updated.fakultas) parts.push(`Jurusan: ${updated.fakultas}`);
+        if (parts.length > 0) detailsText = ` [${parts.join(', ')}]`;
+      } catch {}
+    }
+
+    if (c.status === 'approved') {
+      notifications.push({
+        id,
+        type: 'approved',
+        title: isEdit ? 'Pengajuan Edit Data Disetujui' : isReg ? 'Pengajuan Tambah Peserta Disetujui' : 'Pengajuan Absensi Disetujui',
+        message: isEdit 
+          ? `Pengajuan edit data untuk ${c.name} (NIM: ${c.nim})${detailsText} telah DISETUJUI oleh Admin. Data peserta telah diperbarui.`
+          : isReg 
+          ? `Pengajuan registrasi peserta baru ${c.name} (NIM: ${c.nim}) telah DISETUJUI oleh Admin.`
+          : `Pengajuan absensi manual (${c.requestedStatus || 'Hadir Penuh'}) untuk ${c.name} (NIM: ${c.nim}) telah DISETUJUI oleh Admin.`,
+        time: displayTime,
+        icon: 'check_circle',
+        color: 'text-emerald-600 bg-emerald-50 border border-emerald-200',
+        actionLabel: isEdit || isReg ? 'Lihat Peserta' : 'Lihat Absensi',
+        action: () => navigate(isEdit || isReg ? '/mentor/peserta' : '/mentor/absensi-manual'),
+        originalData: c
+      });
+    } else if (c.status === 'rejected') {
+      const cleanReason = c.rejectionReason || c.alasan || 'Ditolak oleh Admin';
+      notifications.push({
+        id,
+        type: 'rejected',
+        title: isEdit ? 'Pengajuan Edit Data Ditolak' : isReg ? 'Pengajuan Tambah Peserta Ditolak' : 'Pengajuan Absensi Ditolak',
+        message: isEdit
+          ? `Pengajuan edit data untuk ${c.name} (NIM: ${c.nim})${detailsText} DITOLAK oleh Admin. Alasan: "${cleanReason}"`
+          : isReg
+          ? `Pengajuan registrasi peserta baru ${c.name} (NIM: ${c.nim}) DITOLAK oleh Admin. Alasan: "${cleanReason}"`
+          : `Pengajuan absensi manual untuk ${c.name} (NIM: ${c.nim}) DITOLAK oleh Admin. Alasan: "${cleanReason}"`,
+        time: displayTime,
+        icon: 'cancel',
+        color: 'text-rose-600 bg-rose-50 border border-rose-200',
+        actionLabel: isEdit || isReg ? 'Lihat Peserta' : 'Ajukan Kembali',
+        action: () => navigate(isEdit || isReg ? '/mentor/peserta' : '/mentor/absensi-manual'),
+        originalData: c
+      });
+    } else {
+      // Pending 🟡
+      notifications.push({
+        id,
+        type: 'pending',
+        title: isEdit ? 'Pengajuan Edit Data Sedang Diverifikasi' : isReg ? 'Pengajuan Tambah Peserta Sedang Diverifikasi' : 'Pengajuan Absensi Sedang Diverifikasi',
+        message: isEdit
+          ? `Pengajuan edit data untuk ${c.name} (NIM: ${c.nim})${detailsText} sedang diverifikasi oleh Admin.`
+          : isReg
+          ? `Pengajuan registrasi peserta baru ${c.name} (NIM: ${c.nim}) sedang diverifikasi oleh Admin.`
+          : `Pengajuan absensi manual (${c.requestedStatus || 'Hadir Penuh'}) untuk ${c.name} (NIM: ${c.nim}) sedang diverifikasi oleh Admin.${c.catatan ? ` Catatan: "${c.catatan}"` : ''}`,
+        time: displayTime,
+        icon: 'pending_actions',
+        color: 'text-amber-600 bg-amber-50 border border-amber-200',
+        actionLabel: isEdit || isReg ? 'Lihat Peserta' : 'Kelola Absensi',
+        action: () => navigate(isEdit || isReg ? '/mentor/peserta' : '/mentor/absensi-manual'),
+        originalData: c
+      });
+    }
+  });
+
+  // 2. Invalid QR Attendance Scans in mentor's gugus (Strictly exclude profile edit/add logs)
+  const groupLogs = logs.filter(l => l.gugusName === mentorGugusName && isAttendanceLog(l) && l.status !== 'Valid');
+  groupLogs.forEach(l => {
+    const notifId = `invalid-${l.id}`;
+    if (dismissedNotifications.includes(notifId)) return;
+    const displayTime = formatFriendlyDateTime(l.date, l.timestamp);
     notifications.push({
-      id,
-      type: 'claim',
-      title: 'Status Klaim Manual',
-      message: `Klaim absensi manual untuk ${c.name} (NIM: ${c.nim}) sedang diverifikasi oleh Admin.`,
+      id: notifId,
+      type: 'invalid_scan',
+      title: 'Scan QR Tidak Valid',
+      message: `Mahasiswa ${l.name || 'Peserta'} (NIM: ${l.nim}) gagal melakukan scan QR di ${l.gugusName || 'Gugus'}.`,
       time: displayTime,
-      icon: 'pending_actions',
-      color: 'text-amber-600 bg-amber-50 border border-amber-200',
-      actionLabel: 'Kelola Absensi',
-      action: () => navigate('/mentor/absensi-manual'),
-      originalData: c
+      icon: 'warning',
+      color: 'text-rose-600 bg-rose-50 border border-rose-200',
+      actionLabel: 'Lihat Riwayat',
+      action: () => navigate('/mentor/riwayat'),
+      originalData: l
     });
   });
 

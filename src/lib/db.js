@@ -445,7 +445,7 @@ export const claimsDb = {
     const { data, error } = await supabase
       .from('approval_manual')
       .select('*')
-      .eq('status', 'pending');
+      .order('created_at', { ascending: false });
     if (error) throw error;
     return (data || []).map(c => ({
       id: c.id,
@@ -454,10 +454,15 @@ export const claimsDb = {
       nim: c.nim,
       gugusName: c.gugus_nama || '-',
       issue: c.issue,
-      catatan: c.catatan || c.alasan || '',
-      time: c.waktu || new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      status: c.status || 'pending',
+      catatan: c.catatan || '',
+      alasan: c.alasan || '',
+      rejectionReason: c.alasan || '',
+      diajukanOleh: c.diajukan_oleh || null,
+      time: c.waktu || (c.created_at ? new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''),
       requestedStatus: c.requested_status || 'Hadir Penuh',
-      tanggalHadir: c.tanggal_hadir || null
+      tanggalHadir: c.tanggal_hadir || null,
+      created_at: c.created_at
     }));
   },
 
@@ -485,10 +490,12 @@ export const claimsDb = {
     return data;
   },
 
-  async updateStatus(id, newStatus) {
+  async updateStatus(id, newStatus, reason = null) {
+    const payload = { status: newStatus };
+    if (reason) payload.alasan = reason;
     const { data, error } = await supabase
       .from('approval_manual')
-      .update({ status: newStatus })
+      .update(payload)
       .eq('id', id)
       .select();
     if (error) throw error;
@@ -526,9 +533,10 @@ export const logsDb = {
     }));
   },
 
-  async add(name, nim, gugusName, scanner, status = 'Valid', note = '', studentUuid, scannerUuid, locationData = null, customWaktu = null) {
-    if (status === 'Valid') {
+  async add(name, nim, gugusName, scanner, status = 'Valid', note = '', studentUuid, scannerUuid, locationData = null, customWaktu = null, allowOverride = false) {
+    if (status === 'Valid' && !allowOverride) {
       const todayWib = getTodayWibString();
+      const targetDate = customWaktu ? getWibDateString(customWaktu) : todayWib;
       const { data: existingLogs } = await supabase
         .from('absensi')
         .select('*')
@@ -536,7 +544,7 @@ export const logsDb = {
         .eq('status_log', 'Valid');
 
       if (existingLogs && existingLogs.length > 0) {
-        const hasTodayLog = existingLogs.some(l => getWibDateString(l.waktu) === todayWib);
+        const hasTodayLog = existingLogs.some(l => getWibDateString(l.waktu) === targetDate);
         if (hasTodayLog) {
           throw new Error(`SUDAH_ABSEN: Mahasiswa dengan NIM ${nim} sudah melakukan absensi hari ini.`);
         }

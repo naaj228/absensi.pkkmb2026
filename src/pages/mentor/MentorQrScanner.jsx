@@ -1,7 +1,9 @@
+import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import { checkScannerOperationalStatus } from '../../utils/dateHelper';
 import { useNavigate } from 'react-router-dom';
 import jsQR from 'jsqr';
 import { AppContext } from '../../context/AppContext';
+import { isAttendanceLog } from '../../utils/statusHelper';
 
 // Calculate distance between two coordinates in meters
 function getHaversineDistance(lat1, lon1, lat2, lon2) {
@@ -70,7 +72,7 @@ export default function MentorQrScanner() {
   useEffect(() => { isReadyRef.current = isReady; },             [isReady]);
 
   const todayWib = getTodayWibString ? getTodayWibString() : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
-  const gugusLogs = logs.filter(log => log.gugusName === mentorGugusName && log.date === todayWib);
+  const gugusLogs = logs.filter(log => isAttendanceLog(log) && log.gugusName.toLowerCase() === mentorGugusName.toLowerCase() && log.date === todayWib);
 
   // Audio beep
   const playBeep = (type) => {
@@ -103,7 +105,7 @@ export default function MentorQrScanner() {
       setShowFeedback(false);
       setIsReady(true);
       isReadyRef.current = true;
-    }, 2200);
+    }, 4500);
   };
 
   // Process a scanned / typed NIM
@@ -112,9 +114,31 @@ export default function MentorQrScanner() {
 
     const opStatus = checkScannerOperationalStatus(locationSettings);
     if (!opStatus.isOpen) {
-      showResult('invalid', 'Scanner Ditutup', opStatus.message);
+      showResult('invalid', 'Scanner Absensi Ditutup', opStatus.message);
       return;
     }
+
+    // Geofencing Location Check (Enforced for both QR scan and manual NIM input)
+    if (gpsStatusRef.current === 'out-of-range') {
+      const radius = locationSettings?.radiusMeters || 150;
+      const dist = distanceToCenterRef.current || 0;
+      const locName = locationSettings?.locationName || 'Gedung Utama PKKMB';
+      showResult(
+        'invalid', 
+        'Di Luar Radius Absensi!', 
+        `Jarak Anda saat ini ${dist} m dari ${locName}. (Maksimal radius ${radius} m).`
+      );
+      return;
+    }
+    if (gpsStatusRef.current === 'denied') {
+      showResult('invalid', 'Akses Lokasi Ditolak', 'Izinkan akses GPS pada peramban Anda untuk melakukan absensi.');
+      return;
+    }
+    if (gpsStatusRef.current === 'checking') {
+      showResult('invalid', 'Mengecek Lokasi GPS', 'Sedang memverifikasi lokasi GPS Anda, harap tunggu...');
+      return;
+    }
+
     const students = pesertaRef.current;
     const gugusId  = mentorGugusIdRef.current;
     const gugusName = mentorGugusNameRef.current;
@@ -423,26 +447,64 @@ export default function MentorQrScanner() {
                 )}
               </div>
 
-              {/* Scan Feedback Dialog */}
-              <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-30 transition-all duration-300 border max-w-[90%] ${
-                feedbackType === 'success' 
-                  ? 'bg-emerald-600/95 text-white border-white/20' 
-                  : feedbackType === 'late'
-                  ? 'bg-amber-400 text-amber-950 border-amber-200 font-extrabold shadow-amber-950/50'
-                  : feedbackType === 'already' 
-                  ? 'bg-amber-600/95 text-white border-white/20' 
-                  : 'bg-rose-600/95 text-white border-white/20'
-              } ${showFeedback ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}`}>
-                <span className="material-symbols-outlined text-[32px] shrink-0">
-                  {feedbackType === 'success' ? 'check_circle' : feedbackType === 'late' ? 'alarm' : feedbackType === 'already' ? 'warning' : 'cancel'}
-                </span>
-                <div className="overflow-hidden">
-                  <p className={`text-[10px] uppercase tracking-wider font-extrabold ${feedbackType === 'late' ? 'text-amber-950' : 'opacity-85'}`}>{feedbackMsg}</p>
-                  <p className="text-body-md font-extrabold truncate">{scannedName}</p>
+            </div>
+
+            {/* Scan / Input Result Modal Pop-up (z-50 high priority) */}
+            {showFeedback && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                <div className={`w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 border text-center flex flex-col items-center gap-3.5 transform transition-all animate-scale-up ${
+                  feedbackType === 'success' 
+                    ? 'border-emerald-200' 
+                    : feedbackType === 'late'
+                    ? 'border-amber-200'
+                    : feedbackType === 'already' 
+                    ? 'border-amber-200' 
+                    : 'border-rose-200'
+                }`}>
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner ${
+                    feedbackType === 'success'
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                      : feedbackType === 'late'
+                      ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                      : feedbackType === 'already'
+                      ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                      : 'bg-rose-50 text-rose-600 border border-rose-200'
+                  }`}>
+                    <span className="material-symbols-outlined text-[36px]">
+                      {feedbackType === 'success' ? 'check_circle' : feedbackType === 'late' ? 'alarm' : feedbackType === 'already' ? 'warning' : 'explore_off'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <h3 className={`text-body-lg font-extrabold ${
+                      feedbackType === 'success' ? 'text-emerald-700' : feedbackType === 'late' || feedbackType === 'already' ? 'text-amber-700' : 'text-rose-700'
+                    }`}>
+                      {scannedName}
+                    </h3>
+                    <p className="text-body-sm text-slate-600 leading-relaxed font-medium">
+                      {feedbackMsg}
+                    </p>
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      setShowFeedback(false);
+                      setIsReady(true);
+                      isReadyRef.current = true;
+                    }}
+                    className={`w-full py-2.5 rounded-xl font-bold text-body-sm transition-all cursor-pointer shadow-xs active:scale-95 ${
+                      feedbackType === 'success'
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : feedbackType === 'late' || feedbackType === 'already'
+                        ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold'
+                        : 'bg-rose-600 hover:bg-rose-700 text-white'
+                    }`}
+                  >
+                    Saya Mengerti
+                  </button>
                 </div>
               </div>
-
-            </div>
+            )}
 
             {/* Bottom Input & Action Controls */}
             <div className="p-3.5 sm:p-5 bg-black/40 border-t border-white/10 flex flex-col gap-3">

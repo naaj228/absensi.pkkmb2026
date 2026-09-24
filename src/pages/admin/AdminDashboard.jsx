@@ -1,16 +1,16 @@
 import { useContext } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { isHadir } from '../../utils/statusHelper';
+import { isHadir, isAttendanceLog } from '../../utils/statusHelper';
 import { toISOKey, getTodayISOKey } from '../../utils/dateHelper';
 
 export default function AdminDashboard() {
   const { peserta, mentors, gugus, logs, hasAdminNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
-  // Filter logs for TODAY ONLY
+  // Filter logs for TODAY ONLY (Attendance logs only)
   const todayKey = getTodayISOKey();
-  const todayLogs = logs.filter(log => toISOKey(log.date) === todayKey);
+  const todayLogs = logs.filter(log => isAttendanceLog(log) && toISOKey(log.date) === todayKey);
 
   const totalPeserta = peserta.length;
   const totalMentor = mentors.length;

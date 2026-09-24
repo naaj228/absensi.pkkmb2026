@@ -2,18 +2,24 @@ import { useContext, useState } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { isHadir, getLogDisplayStatus } from '../../utils/statusHelper';
+import { isHadir, getLogDisplayStatus, isAttendanceLog } from '../../utils/statusHelper';
 import { groupLogsByDate, formatDDMMYYYY } from '../../utils/dateHelper';
+import ExportModal from '../../components/ExportModal';
 
 export default function AdminRiwayat() {
   const { logs, gugus, peserta, deleteLog, hasAdminNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
+  // Filter out non-attendance profile edit/add logs
+  const attendanceLogs = logs.filter(isAttendanceLog);
+
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGugus, setSelectedGugus] = useState('all');
   const [selectedDate, setSelectedDate] = useState(''); // Default empty to show all history
+  const [isDateFocused, setIsDateFocused] = useState(false);
   const [activeTab, setActiveTab] = useState('Semua');
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Accordion collapse state for date groups
   const [openDates, setOpenDates] = useState({});
@@ -71,11 +77,11 @@ export default function AdminRiwayat() {
   const selectedGugusName = selectedGugusObj ? selectedGugusObj.name : '';
 
   // 1. Generate synthetic "Belum Hadir" logs for dates that have active scan logs
-  const activeDates = Array.from(new Set(logs.map(l => l.date).filter(Boolean)));
+  const activeDates = Array.from(new Set(attendanceLogs.map(l => l.date).filter(Boolean)));
 
   const belumHadirLogs = [];
   activeDates.forEach(dateStr => {
-    const logsOnDate = logs.filter(l => l.date === dateStr);
+    const logsOnDate = attendanceLogs.filter(l => l.date === dateStr);
     const scannedNimsOnDate = new Set(logsOnDate.map(l => String(l.nim)));
 
     peserta.forEach(p => {
@@ -100,7 +106,7 @@ export default function AdminRiwayat() {
     });
   });
 
-  const combinedLogs = [...logs, ...belumHadirLogs];
+  const combinedLogs = [...attendanceLogs, ...belumHadirLogs];
 
   // Filtering logic
   const filteredLogs = combinedLogs.filter(log => {
@@ -195,6 +201,8 @@ export default function AdminRiwayat() {
     else if (type === 'PDF') {
       // Single continuous table format sorted chronologically with Tanggal & Waktu columns
       const rowsHtml = flatLogsChronological.map((log, idx) => {
+        const studentInfo = peserta.find(p => p.id === log.nim);
+        const jurusan = studentInfo ? studentInfo.fakultas : '-';
         const location = log.latitude && log.longitude
           ? (log.locationStatus || 'Dalam Area')
           : (log.scanner?.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi');
@@ -207,6 +215,7 @@ export default function AdminRiwayat() {
             <td style="width: 65px; font-family: monospace;">${log.timestamp}</td>
             <td style="width: 90px; font-family: monospace;">${log.nim}</td>
             <td><strong>${log.name}</strong></td>
+            <td style="width: 120px;">${jurusan}</td>
             <td style="width: 85px;">${log.gugusName}</td>
             <td style="width: 95px;">${log.scanner}</td>
             <td style="text-align: center; width: 95px;">
@@ -245,6 +254,7 @@ export default function AdminRiwayat() {
                   <th style="width: 65px;">Waktu</th>
                   <th style="width: 90px;">NIM</th>
                   <th>Nama Mahasiswa</th>
+                  <th style="width: 120px;">Jurusan / Prodi</th>
                   <th style="width: 85px;">Gugus</th>
                   <th style="width: 95px;">Pemindai</th>
                   <th style="text-align: center; width: 95px;">Status</th>
@@ -300,7 +310,7 @@ export default function AdminRiwayat() {
       matchesGugus = l.gugusName.toLowerCase() === selectedGugusName.toLowerCase();
     }
     const matchesDate = !selectedDate || l.date === selectedDate;
-    return l.status !== 'Valid' && matchesGugus && matchesDate;
+    return isAttendanceLog(l) && l.status !== 'Valid' && matchesGugus && matchesDate;
   }).length;
 
   return (
@@ -339,19 +349,11 @@ export default function AdminRiwayat() {
 
           <div className="flex flex-row w-full sm:w-auto gap-2.5 shrink-0">
             <button
-              onClick={() => handleExport('PDF')}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-[#012060] px-4 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-xs cursor-pointer active:scale-98"
+              onClick={() => setIsExportModalOpen(true)}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#012060] hover:bg-[#022b80] text-white px-5 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-md active:scale-98 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[18px] text-[#012060]">picture_as_pdf</span>
-              <span>Ekspor PDF</span>
-            </button>
-
-            <button
-              onClick={() => handleExport('Excel')}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-[#012060] hover:bg-[#022b80] text-white px-4 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-md active:scale-98 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">table_chart</span>
-              <span>Ekspor Excel</span>
+              <span className="material-symbols-outlined text-[20px]">download</span>
+              <span>Unduh / Ekspor Laporan</span>
             </button>
           </div>
         </div>
@@ -408,11 +410,20 @@ export default function AdminRiwayat() {
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tanggal</label>
                 <div className="relative min-w-[160px]">
                   <input
-                    className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl py-2.5 pl-3.5 pr-9 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer"
+                    className={`w-full bg-[#f8fafc] border border-slate-200 rounded-xl py-2.5 pl-3.5 pr-9 text-body-sm font-semibold text-slate-800 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all cursor-pointer ${
+                      !selectedDate ? 'empty-date' : ''
+                    }`}
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
+                    onFocus={() => setIsDateFocused(true)}
+                    onBlur={() => setIsDateFocused(false)}
                   />
+                  {!selectedDate && !isDateFocused && (
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-body-sm font-medium pointer-events-none">
+                      Pilih Tanggal
+                    </span>
+                  )}
                   {selectedDate && (
                     <button
                       type="button"
@@ -589,11 +600,14 @@ export default function AdminRiwayat() {
                                   </div>
                                 </div>
 
-                                {/* Details: Time & Gugus */}
+                                {/* Details: Time, Jurusan & Gugus */}
                                 <div className="text-[9.5px] space-y-0.5 text-slate-500 border-t border-slate-100 pt-1.5 font-medium">
                                   <div className="flex items-center gap-1 text-slate-700 font-semibold truncate">
                                     <span className="material-symbols-outlined text-[13px] shrink-0 text-[#012060]">schedule</span>
                                     <span>{log.timestamp}</span>
+                                  </div>
+                                  <div className="truncate text-slate-400 text-[9px]" title={peserta.find(p => p.id === log.nim)?.fakultas || '-'}>
+                                    Jurusan: <strong className="text-slate-700">{peserta.find(p => p.id === log.nim)?.fakultas || '-'}</strong>
                                   </div>
                                   <div className="truncate text-slate-400 text-[9px]">
                                     Gugus: <strong className="text-slate-600">{log.gugusName}</strong>
@@ -656,13 +670,14 @@ export default function AdminRiwayat() {
                         <table className="w-full text-left border-collapse table-fixed">
                           <colgroup>
                             <col className="w-[3.5%]" />
-                            <col className="w-[10%]" />
-                            <col className="w-[26%]" />
+                            <col className="w-[8.5%]" />
+                            <col className="w-[20%]" />
                             <col className="w-[15%]" />
+                            <col className="w-[10%]" />
                             <col className="w-[11%]" />
-                            <col className="w-[9.5%]" />
-                            <col className="w-[16%]" />
-                            <col className="w-[9%]" />
+                            <col className="w-[11%]" />
+                            <col className="w-[14%]" />
+                            <col className="w-[7%]" />
                           </colgroup>
                           <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100">
@@ -677,6 +692,7 @@ export default function AdminRiwayat() {
                               </th>
                               <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Waktu</th>
                               <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Peserta</th>
+                              <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Jurusan</th>
                               <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Gugus</th>
                               <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Pemindai</th>
                               <th className="py-2.5 px-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Status</th>
@@ -685,43 +701,51 @@ export default function AdminRiwayat() {
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-slate-100">
-                            {group.logs.map((log) => (
-                              <tr
-                                key={log.id}
-                                onClick={() => navigate(`/admin/peserta/${log.nim}`)}
-                                className="hover:bg-[#012060]/[0.03] transition-all group cursor-pointer"
-                              >
-                                <td className="py-2.5 px-1.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                  <input
-                                    type="checkbox"
-                                    className="w-4 h-4 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer"
-                                    checked={selectedIds.includes(log.id)}
-                                    onChange={(e) => handleSelectOne(log.id, e.target.checked)}
-                                  />
-                                </td>
-                                <td className="py-2.5 px-1.5 truncate">
-                                  {log.note && (log.note.includes('Terlambat') || log.note.includes('terlambat')) ? (
-                                    <span className="text-[10px] font-mono font-extrabold text-amber-900 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md inline-block truncate" title={log.note}>
-                                      {log.timestamp} ⚠️
+                            {group.logs.map((log) => {
+                              const studentInfo = peserta.find(p => p.id === log.nim);
+                              const jurusan = studentInfo ? studentInfo.fakultas : '-';
+                              return (
+                                <tr
+                                  key={log.id}
+                                  onClick={() => navigate(`/admin/peserta/${log.nim}`)}
+                                  className="hover:bg-[#012060]/[0.03] transition-all group cursor-pointer"
+                                >
+                                  <td className="py-2.5 px-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="checkbox"
+                                      className="w-4 h-4 rounded border-slate-300 text-[#012060] focus:ring-[#012060] accent-[#012060] cursor-pointer"
+                                      checked={selectedIds.includes(log.id)}
+                                      onChange={(e) => handleSelectOne(log.id, e.target.checked)}
+                                    />
+                                  </td>
+                                  <td className="py-2.5 px-1.5 truncate">
+                                    {log.note && (log.note.includes('Terlambat') || log.note.includes('terlambat')) ? (
+                                      <span className="text-[10px] font-mono font-extrabold text-amber-900 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md inline-block truncate" title={log.note}>
+                                        {log.timestamp} ⚠️
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11.5px] font-bold text-slate-700 font-mono block truncate">{log.timestamp}</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-1.5 truncate">
+                                    <div className="flex flex-col min-w-0 truncate">
+                                      <span className={`text-[11.5px] font-bold text-slate-800 truncate group-hover:text-[#012060] transition-colors ${log.status === 'Valid' ? '' : 'text-slate-500 italic'}`} title={log.name}>{log.name}</span>
+                                      <span className="text-[10px] text-slate-400 font-mono truncate">NIM: {log.nim}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-1.5 truncate">
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-semibold text-[10px] border border-slate-200/60 max-w-full truncate" title={jurusan}>
+                                      <span className="truncate">{jurusan}</span>
                                     </span>
-                                  ) : (
-                                    <span className="text-[11.5px] font-bold text-slate-700 font-mono block truncate">{log.timestamp}</span>
-                                  )}
-                                </td>
-                                <td className="py-2.5 px-1.5 truncate">
-                                  <div className="flex flex-col min-w-0 truncate">
-                                    <span className={`text-[11.5px] font-bold text-slate-800 truncate group-hover:text-[#012060] transition-colors ${log.status === 'Valid' ? '' : 'text-slate-500 italic'}`} title={log.name}>{log.name}</span>
-                                    <span className="text-[10px] text-slate-400 font-mono truncate">NIM: {log.nim}</span>
-                                  </div>
-                                </td>
-                                <td className="py-2.5 px-1.5 truncate">
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-semibold text-[10px] border border-slate-200/60 max-w-full truncate" title={log.gugusName}>
-                                    <span className="truncate">{log.gugusName}</span>
-                                  </span>
-                                </td>
-                                <td className="py-2.5 px-1.5 truncate">
-                                  <span className="text-[11px] text-slate-700 font-medium truncate block" title={log.scanner}>{log.scanner}</span>
-                                </td>
+                                  </td>
+                                  <td className="py-2.5 px-1.5 truncate">
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-semibold text-[10px] border border-slate-200/60 max-w-full truncate" title={log.gugusName}>
+                                      <span className="truncate">{log.gugusName}</span>
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-1.5 truncate">
+                                    <span className="text-[11px] text-slate-700 font-medium truncate block" title={log.scanner}>{log.scanner}</span>
+                                  </td>
                                 <td className="py-2.5 px-1.5 truncate">
                                   {(() => {
                                     const b = getLogDisplayStatus(log);
@@ -776,7 +800,8 @@ export default function AdminRiwayat() {
                                   </div>
                                 </td>
                               </tr>
-                            ))}
+                            );
+                          })}
                           </tbody>
                         </table>
                       </div>
@@ -791,6 +816,17 @@ export default function AdminRiwayat() {
             </div>
           )}
         </div>
+
+        {/* Export Options Modal */}
+        <ExportModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          gugusList={gugus}
+          logs={combinedLogs}
+          peserta={peserta}
+          initialGugusId={selectedGugus}
+          isMentorView={false}
+        />
 
       </main>
     </div>

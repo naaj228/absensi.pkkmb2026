@@ -108,7 +108,7 @@ async function generateQrBuffer(nim, size) {
 }
 
 /**
- * Generate ID Card depan (dengan nama, NIM, gugus ditempel ke template).
+ * Generate ID Card depan (template bersih/polos tanpa isi teks agar diisi sendiri oleh peserta).
  * @returns {Promise<Buffer>} PNG buffer
  */
 async function generateFrontCard(name, nim, gugus, prodi) {
@@ -116,11 +116,9 @@ async function generateFrontCard(name, nim, gugus, prodi) {
     throw new Error(`Template depan tidak ditemukan: ${FRONT_TEMPLATE}\nLetakkan file front.png di folder server/templates/`);
   }
 
-  const svgOverlay = buildFrontSvg(name, nim, gugus, prodi);
-
+  // Mengembalikan template depan polos/bersih tanpa overlay teks
   return sharp(FRONT_TEMPLATE)
     .resize(COORDS.width, COORDS.height)
-    .composite([{ input: svgOverlay, top: 0, left: 0 }])
     .png()
     .toBuffer();
 }

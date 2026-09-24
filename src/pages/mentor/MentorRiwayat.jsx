@@ -2,8 +2,9 @@ import { useContext, useState } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { isHadir, getLogDisplayStatus } from '../../utils/statusHelper';
+import { isHadir, getLogDisplayStatus, isAttendanceLog } from '../../utils/statusHelper';
 import { groupLogsByDate, formatDDMMYYYY } from '../../utils/dateHelper';
+import ExportModal from '../../components/ExportModal';
 
 export default function MentorRiwayat() {
   const { logs, gugus, peserta, currentUser, hasMentorNotifications } = useContext(AppContext);
@@ -17,8 +18,9 @@ export default function MentorRiwayat() {
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
+  const [isDateFocused, setIsDateFocused] = useState(false);
   const [activeTab, setActiveTab] = useState('Semua');
-  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Accordion collapse state for date groups
   const [openDates, setOpenDates] = useState({});
@@ -37,8 +39,8 @@ export default function MentorRiwayat() {
     return index === 0; // Default: only latest date is open
   };
 
-  // Filtering logic: Only show logs from mentor's own gugus
-  const mentorLogs = logs.filter(log => log.gugusName.toLowerCase() === mentorGugusName.toLowerCase());
+  // Filtering logic: Only show attendance logs from mentor's own gugus (Exclude profile edit/add logs)
+  const mentorLogs = logs.filter(log => log.gugusName.toLowerCase() === mentorGugusName.toLowerCase() && isAttendanceLog(log));
   const mentorPeserta = peserta.filter(p => {
     const pGugus = gugus.find(g => g.id === p.gugusId);
     return pGugus && pGugus.name.toLowerCase() === mentorGugusName.toLowerCase();
@@ -118,12 +120,15 @@ export default function MentorRiwayat() {
     if (type === 'Excel') {
       // Option A for Mentor: Single sheet flat list, chronological order
       const data = flatLogsChronological.map(log => {
+        const studentInfo = peserta.find(p => p.id === log.nim);
+        const jurusan = studentInfo ? studentInfo.fakultas : '-';
         const displayStatus = getLogDisplayStatus(log);
         return {
           'Tanggal': formatDDMMYYYY(log.date),
           'Waktu': log.timestamp,
           'NIM': log.nim,
           'Nama Peserta': log.name,
+          'Jurusan / Prodi': jurusan,
           'Gugus': log.gugusName,
           'Pemindai': log.scanner,
           'Status': displayStatus.label
@@ -133,10 +138,11 @@ export default function MentorRiwayat() {
       const worksheet = XLSX.utils.json_to_sheet(data);
 
       worksheet['!cols'] = [
-        { wch: 15 },
+        { wch: 14 },
         { wch: 12 },
         { wch: 15 },
         { wch: 30 },
+        { wch: 25 },
         { wch: 15 },
         { wch: 25 },
         { wch: 15 }
@@ -149,6 +155,8 @@ export default function MentorRiwayat() {
     else if (type === 'PDF') {
       // Clean single table PDF format sorted chronologically
       const rowsHtml = flatLogsChronological.map((log, idx) => {
+        const studentInfo = peserta.find(p => p.id === log.nim);
+        const jurusan = studentInfo ? studentInfo.fakultas : '-';
         const displayStatus = getLogDisplayStatus(log);
         return `
           <tr>
@@ -157,6 +165,8 @@ export default function MentorRiwayat() {
             <td style="width: 65px; font-family: monospace;">${log.timestamp}</td>
             <td style="width: 90px; font-family: monospace;">${log.nim}</td>
             <td><strong>${log.name}</strong></td>
+            <td style="width: 130px;">${jurusan}</td>
+            <td style="width: 80px;">${log.gugusName}</td>
             <td style="width: 95px;">${log.scanner}</td>
             <td style="text-align: center; width: 95px;">
               <span class="badge" style="${displayStatus.pdfBadge}">
@@ -193,6 +203,8 @@ export default function MentorRiwayat() {
                   <th style="width: 65px;">Waktu</th>
                   <th style="width: 90px;">NIM</th>
                   <th>Nama Mahasiswa</th>
+                  <th style="width: 130px;">Jurusan / Prodi</th>
+                  <th style="width: 80px;">Gugus</th>
                   <th style="width: 95px;">Pemindai</th>
                   <th style="text-align: center; width: 95px;">Status</th>
                 </tr>
@@ -270,36 +282,14 @@ export default function MentorRiwayat() {
             <h2 className="text-body-md sm:text-headline-md font-bold text-[#012060]">Riwayat Absensi</h2>
           </div>
 
-          <div className="relative w-full sm:w-auto shrink-0">
+          <div className="w-full sm:w-auto shrink-0">
             <button
-              onClick={() => setShowExportDropdown(!showExportDropdown)}
-              className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-[#012060] hover:bg-[#022b80] active:scale-95 text-white px-3.5 py-2 rounded-xl text-body-sm font-bold transition-all shadow-md cursor-pointer"
+              onClick={() => setIsExportModalOpen(true)}
+              className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-[#012060] hover:bg-[#022b80] active:scale-95 text-white px-4 py-2.5 rounded-xl text-body-sm font-bold transition-all shadow-md cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">download</span>
-              <span>Unduh Laporan</span>
+              <span>Unduh / Ekspor Laporan</span>
             </button>
-
-            {showExportDropdown && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowExportDropdown(false)}></div>
-                <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white shadow-2xl border border-slate-100 py-1.5 z-50 animate-fade-in">
-                  <button
-                    onClick={() => { handleExport('Excel'); setShowExportDropdown(false); }}
-                    className="w-full text-left px-4 py-2.5 text-body-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-emerald-600 text-[18px]">table_view</span>
-                    <span>Ekspor Excel</span>
-                  </button>
-                  <button
-                    onClick={() => { handleExport('PDF'); setShowExportDropdown(false); }}
-                    className="w-full text-left px-4 py-2.5 text-body-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-rose-600 text-[18px]">picture_as_pdf</span>
-                    <span>Cetak PDF</span>
-                  </button>
-                </div>
-              </>
-            )}
           </div>
         </div>
 
@@ -329,9 +319,13 @@ export default function MentorRiwayat() {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full bg-[#f8fafc] text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 pl-3.5 pr-9 rounded-xl focus:outline-none focus:border-primary transition-all cursor-pointer"
+                onFocus={() => setIsDateFocused(true)}
+                onBlur={() => setIsDateFocused(false)}
+                className={`w-full bg-[#f8fafc] text-slate-800 border border-slate-200 text-body-sm font-semibold py-2 pl-3.5 pr-9 rounded-xl focus:outline-none focus:border-primary transition-all cursor-pointer ${
+                  !selectedDate ? 'empty-date' : ''
+                }`}
               />
-              {!selectedDate && (
+              {!selectedDate && !isDateFocused && (
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-body-sm font-medium pointer-events-none">
                   Pilih Tanggal
                 </span>
@@ -446,8 +440,11 @@ export default function MentorRiwayat() {
                                   </div>
                                 </div>
 
-                                <div className="text-[9px] text-slate-400 border-t border-slate-100 pt-1.5 truncate">
-                                  📷 {log.scanner || 'Pemindai QR'}
+                                <div className="text-[9px] text-slate-400 border-t border-slate-100 pt-1.5 space-y-0.5 truncate">
+                                  <div className="truncate text-slate-500 font-medium">
+                                    Jurusan: <strong className="text-slate-700">{peserta.find(p => p.id === log.nim)?.fakultas || '-'}</strong>
+                                  </div>
+                                  <div className="truncate">📷 {log.scanner || 'Pemindai QR'}</div>
                                 </div>
                               </div>
                             );
@@ -460,23 +457,26 @@ export default function MentorRiwayat() {
                         <table className="w-full text-left border-collapse">
                           <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100">
-                              <th className="py-2.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider w-16 text-center">No</th>
-                              <th className="py-2.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Waktu</th>
-                              <th className="py-2.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mahasiswa</th>
-                              <th className="py-2.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">NIM</th>
-                              <th className="py-2.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pemindai</th>
-                              <th className="py-2.5 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Status</th>
+                              <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider w-12 text-center">No</th>
+                              <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Waktu</th>
+                              <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mahasiswa</th>
+                              <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">NIM</th>
+                              <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jurusan / Prodi</th>
+                              <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pemindai</th>
+                              <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Status</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-slate-100">
                             {group.logs.map((log, idx) => {
+                              const studentInfo = peserta.find(p => p.id === log.nim);
+                              const jurusan = studentInfo ? studentInfo.fakultas : '-';
                               const isValid = log.status === 'Valid';
                               return (
                                 <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
-                                  <td className="py-3 px-5 text-body-xs font-semibold text-slate-400 text-center">
+                                  <td className="py-3 px-4 text-body-xs font-semibold text-slate-400 text-center">
                                     {idx + 1}
                                   </td>
-                                  <td className="py-3 px-5 font-mono">
+                                  <td className="py-3 px-4 font-mono">
                                     {log.note && (log.note.includes('Terlambat') || log.note.includes('terlambat')) ? (
                                       <span className="text-body-xs font-mono font-extrabold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md inline-block">
                                         {log.timestamp} (Terlambat) ⚠️
@@ -487,16 +487,21 @@ export default function MentorRiwayat() {
                                       </span>
                                     )}
                                   </td>
-                                  <td className="py-3 px-5 font-bold text-slate-800 text-body-sm">
+                                  <td className="py-3 px-4 font-bold text-slate-800 text-body-sm">
                                     {log.name}
                                   </td>
-                                  <td className="py-3 px-5">
+                                  <td className="py-3 px-4">
                                     <span className="text-body-sm font-bold text-[#012060] font-mono bg-[#012060]/5 px-2 py-0.5 rounded-md border border-[#012060]/10">{log.nim}</span>
                                   </td>
-                                  <td className="py-3 px-5 text-body-sm text-slate-500 font-medium">
+                                  <td className="py-3 px-4 text-body-sm text-slate-600 font-medium">
+                                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200/60 inline-block truncate max-w-[180px]" title={jurusan}>
+                                      {jurusan}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-body-sm text-slate-500 font-medium">
                                     {log.scanner}
                                   </td>
-                                  <td className="py-3 px-5 text-right">
+                                  <td className="py-3 px-4 text-right">
                                     {(() => {
                                       const b = getLogDisplayStatus(log);
                                       return (
@@ -524,6 +529,18 @@ export default function MentorRiwayat() {
             </div>
           )}
         </div>
+
+        {/* Export Options Modal */}
+        <ExportModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          gugusList={gugus}
+          logs={combinedLogs}
+          peserta={peserta}
+          initialGugusId={mentorGugusId}
+          isMentorView={true}
+          currentMentorGugusName={mentorGugusName}
+        />
 
       </main>
     </div>

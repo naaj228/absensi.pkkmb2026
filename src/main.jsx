@@ -47,7 +47,7 @@ window.confirmAction = (message, onConfirm) => {
         <span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">help</span>
       </div>
       <h3 class="text-headline-sm font-headline-md text-on-surface mb-2">Konfirmasi Aksi</h3>
-      <p class="text-body-sm text-on-surface-variant mb-6 font-sans">${message}</p>
+      <p class="text-body-sm text-on-surface-variant mb-6 font-sans whitespace-pre-line">${message}</p>
       <div class="flex gap-3 w-full">
         <button id="confirm-cancel-btn" class="flex-1 bg-surface-container hover:bg-surface-container-high text-on-surface py-2.5 rounded-xl text-label-md font-label-md transition-colors border border-outline-variant/30 cursor-pointer">
           Batal
@@ -99,7 +99,7 @@ window.promptAction = (message, defaultValue, onConfirm) => {
       <h3 class="text-headline-sm font-headline-md text-on-surface mb-2">Tolak Pengajuan</h3>
       <p class="text-body-sm text-on-surface-variant mb-4 font-sans">${message}</p>
       
-      <input id="prompt-input" type="text" value="${defaultValue}" 
+      <input id="prompt-input" type="text" value="${defaultValue}" placeholder="Alasan penolakan (opsional)..."
         class="w-full bg-surface-container text-on-surface font-sans text-body-sm p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 mb-6 border border-outline-variant/30" />
         
       <div class="flex gap-3 w-full">
