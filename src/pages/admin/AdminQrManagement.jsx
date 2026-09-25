@@ -23,41 +23,6 @@ export default function AdminQrManagement() {
   // Email Server & API Health status
   const [emailServerOnline, setEmailServerOnline] = useState(true);
 
-  // Sync state for migrating local data to Supabase
-  const [hasLocalDataToSync, setHasLocalDataToSync] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-
-  useEffect(() => {
-    try {
-      const savedCounts = localStorage.getItem('pkkmb_email_sent_counts');
-      const savedErrors = localStorage.getItem('pkkmb_email_failed_errors');
-      const hasCounts = savedCounts && Object.keys(JSON.parse(savedCounts)).length > 0;
-      const hasErrors = savedErrors && Object.keys(JSON.parse(savedErrors)).length > 0;
-      if (hasCounts || hasErrors) {
-        setHasLocalDataToSync(true);
-      }
-    } catch (e) {}
-  }, []);
-
-  const handleSyncLocalDataToSupabase = async () => {
-    setSyncing(true);
-    try {
-      const savedCounts = JSON.parse(localStorage.getItem('pkkmb_email_sent_counts') || '{}');
-      const savedErrors = JSON.parse(localStorage.getItem('pkkmb_email_failed_errors') || '{}');
-
-      await pesertaDb.syncBulkEmailCounts(savedCounts, savedErrors);
-      
-      localStorage.removeItem('pkkmb_email_sent_counts');
-      localStorage.removeItem('pkkmb_email_failed_errors');
-      setHasLocalDataToSync(false);
-      alert('🎉 Status pengiriman email kemarin berhasil disinkronkan ke Supabase! Semua device sekarang sudah ter-update.');
-    } catch (err) {
-      alert('Gagal menyinkronkan data ke Supabase: ' + (err.message || 'Terjadi kesalahan'));
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const recordEmailSuccess = useCallback(async (studentId, currentCount = 0) => {
     await pesertaDb.recordEmailSuccess(studentId, currentCount);
   }, []);
@@ -409,29 +374,6 @@ export default function AdminQrManagement() {
                 Kirim email massal dan unduh ZIP membutuhkan server backend aktif. Jalankan perintah <code className="bg-error/15 px-1.5 py-0.5 rounded font-mono text-[10px] sm:text-xs font-bold text-error">npm run dev:all</code> di terminal Anda.
               </p>
             </div>
-          </div>
-        )}
-
-        {/* Sync Local Storage Data to Supabase Banner */}
-        {hasLocalDataToSync && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 relative z-10 shadow-sm">
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[28px] text-amber-600 shrink-0">cloud_upload</span>
-              <div>
-                <h4 className="font-bold text-body-sm sm:text-body-md text-amber-900">Data Pengiriman Email Kemarin Tersedia!</h4>
-                <p className="text-[11px] sm:text-body-sm text-amber-800 mt-0.5">
-                  Ditemukan catatan pengiriman email kemarin di perangkat ini. Klik tombol Sync untuk mengunggah status ke Supabase agar terlihat di semua device/Vercel.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleSyncLocalDataToSupabase}
-              disabled={syncing}
-              className="px-4 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-xs sm:text-body-sm hover:bg-amber-700 transition-colors shadow-sm shrink-0 flex items-center gap-2 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-sm">{syncing ? 'sync' : 'cloud_upload'}</span>
-              {syncing ? 'Menyinkronkan...' : 'Sync Data ke Supabase'}
-            </button>
           </div>
         )}
         
