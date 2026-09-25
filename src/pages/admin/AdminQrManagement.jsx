@@ -2,6 +2,7 @@ import { useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { sendQrEmail, sendBulkQrEmail, checkEmailServerHealth, validateEmailSyntax } from '../../lib/emailService';
+import { pesertaDb } from '../../lib/db';
 import JSZip from 'jszip';
 import QRCode from 'qrcode';
 
@@ -22,57 +23,47 @@ export default function AdminQrManagement() {
   // Email Server & API Health status
   const [emailServerOnline, setEmailServerOnline] = useState(true);
 
-  // Track email sent count per student ID from localStorage
-  const [emailSentCounts, setEmailSentCounts] = useState(() => {
-    try {
-      const saved = localStorage.getItem('pkkmb_email_sent_counts');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  // Sync state for migrating local data to Supabase
+  const [hasLocalDataToSync, setHasLocalDataToSync] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
-  // Track failed email errors per student ID from localStorage
-  const [emailFailedErrors, setEmailFailedErrors] = useState(() => {
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem('pkkmb_email_failed_errors');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
-  const recordEmailSuccess = useCallback((studentId) => {
-    setEmailSentCounts(prev => {
-      const nextCount = (prev[studentId] || 0) + 1;
-      const updated = { ...prev, [studentId]: nextCount };
-      try {
-        localStorage.setItem('pkkmb_email_sent_counts', JSON.stringify(updated));
-      } catch (err) {
-        console.error("Failed to save email sent counts", err);
+      const savedCounts = localStorage.getItem('pkkmb_email_sent_counts');
+      const savedErrors = localStorage.getItem('pkkmb_email_failed_errors');
+      const hasCounts = savedCounts && Object.keys(JSON.parse(savedCounts)).length > 0;
+      const hasErrors = savedErrors && Object.keys(JSON.parse(savedErrors)).length > 0;
+      if (hasCounts || hasErrors) {
+        setHasLocalDataToSync(true);
       }
-      return updated;
-    });
-
-    setEmailFailedErrors(prev => {
-      if (!prev[studentId]) return prev;
-      const updated = { ...prev };
-      delete updated[studentId];
-      try {
-        localStorage.setItem('pkkmb_email_failed_errors', JSON.stringify(updated));
-      } catch (err) {}
-      return updated;
-    });
+    } catch (e) {}
   }, []);
 
-  const recordEmailFailed = useCallback((studentId, errorMsg) => {
-    setEmailFailedErrors(prev => {
-      const updated = { ...prev, [studentId]: errorMsg || 'Gagal mengirim email.' };
-      try {
-        localStorage.setItem('pkkmb_email_failed_errors', JSON.stringify(updated));
-      } catch (err) {}
-      return updated;
-    });
+  const handleSyncLocalDataToSupabase = async () => {
+    setSyncing(true);
+    try {
+      const savedCounts = JSON.parse(localStorage.getItem('pkkmb_email_sent_counts') || '{}');
+      const savedErrors = JSON.parse(localStorage.getItem('pkkmb_email_failed_errors') || '{}');
+
+      await pesertaDb.syncBulkEmailCounts(savedCounts, savedErrors);
+      
+      localStorage.removeItem('pkkmb_email_sent_counts');
+      localStorage.removeItem('pkkmb_email_failed_errors');
+      setHasLocalDataToSync(false);
+      alert('🎉 Status pengiriman email kemarin berhasil disinkronkan ke Supabase! Semua device sekarang sudah ter-update.');
+    } catch (err) {
+      alert('Gagal menyinkronkan data ke Supabase: ' + (err.message || 'Terjadi kesalahan'));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const recordEmailSuccess = useCallback(async (studentId, currentCount = 0) => {
+    await pesertaDb.recordEmailSuccess(studentId, currentCount);
+  }, []);
+
+  const recordEmailFailed = useCallback(async (studentId, errorMsg) => {
+    await pesertaDb.recordEmailFailed(studentId, errorMsg);
   }, []);
 
   useEffect(() => {
@@ -91,8 +82,8 @@ export default function AdminQrManagement() {
     const matchesGugus = selectedGugus === 'all' || student.gugusId === selectedGugus;
     
     let matchesEmailStatus = true;
-    const sentCount = emailSentCounts[student.id] || 0;
-    const hasError = Boolean(emailFailedErrors[student.id]);
+    const sentCount = student.emailSentCount || 0;
+    const hasError = Boolean(student.emailFailedError);
 
     if (selectedEmailStatus === 'unsent') {
       matchesEmailStatus = sentCount === 0 && !hasError;
@@ -158,7 +149,7 @@ export default function AdminQrManagement() {
       return;
     }
 
-    const count = emailSentCounts[student.id] || 0;
+    const count = student.emailSentCount || 0;
     let confirmMessage = `Apakah Anda yakin ingin mengirim email QR Code & ID Card ke <b>${student.name}</b> (${student.email})?`;
     
     if (count >= 2) {
@@ -185,7 +176,7 @@ export default function AdminQrManagement() {
       setEmailSending(false);
       
       if (result.ok || result.success || (result.message && !result.message.toLowerCase().includes('gagal'))) {
-        recordEmailSuccess(student.id);
+        recordEmailSuccess(student.id, count);
         const newCount = count + 1;
         if (newCount >= 2) {
           alert(`⚠️ Email QR Code berhasil dikirim ke ${student.name}! (Total email terkirim: ${newCount}x)`);
@@ -198,7 +189,7 @@ export default function AdminQrManagement() {
         alert(`❌ Email gagal dikirim ke ${student.name}:\n${errDesc}`);
       }
     });
-  }, [emailSending, getGugusName, emailSentCounts, recordEmailSuccess, recordEmailFailed]);
+  }, [emailSending, getGugusName, recordEmailSuccess, recordEmailFailed]);
 
   // Bulk QR email send (Per-Gugus / Semua)
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -286,7 +277,8 @@ export default function AdminQrManagement() {
           // Record successful sends
           validStudents.forEach(s => {
             if (!allErrors.some(e => String(e.nim) === String(s.nim))) {
-              recordEmailSuccess(s.nim);
+              const currentP = peserta.find(p => String(p.id) === String(s.nim));
+              recordEmailSuccess(s.nim, currentP?.emailSentCount || 0);
             }
           });
 
@@ -419,6 +411,29 @@ export default function AdminQrManagement() {
             </div>
           </div>
         )}
+
+        {/* Sync Local Storage Data to Supabase Banner */}
+        {hasLocalDataToSync && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 relative z-10 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[28px] text-amber-600 shrink-0">cloud_upload</span>
+              <div>
+                <h4 className="font-bold text-body-sm sm:text-body-md text-amber-900">Data Pengiriman Email Kemarin Tersedia!</h4>
+                <p className="text-[11px] sm:text-body-sm text-amber-800 mt-0.5">
+                  Ditemukan catatan pengiriman email kemarin di perangkat ini. Klik tombol Sync untuk mengunggah status ke Supabase agar terlihat di semua device/Vercel.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleSyncLocalDataToSupabase}
+              disabled={syncing}
+              className="px-4 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-xs sm:text-body-sm hover:bg-amber-700 transition-colors shadow-sm shrink-0 flex items-center gap-2 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">{syncing ? 'sync' : 'cloud_upload'}</span>
+              {syncing ? 'Menyinkronkan...' : 'Sync Data ke Supabase'}
+            </button>
+          </div>
+        )}
         
         {/* Dashboard Header Panel */}
         <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sm:gap-6 relative overflow-hidden group">
@@ -548,8 +563,8 @@ export default function AdminQrManagement() {
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 {currentItems.map((student) => {
                   const isAttended = ['Hadir Penuh', 'Hadir Sebagian', 'Izin'].includes(student.status);
-                  const hasErr = Boolean(emailFailedErrors[student.id]);
-                  const sentCount = emailSentCounts[student.id] || 0;
+                  const hasErr = Boolean(student.emailFailedError);
+                  const sentCount = student.emailSentCount || 0;
 
                   return (
                     <div 
@@ -566,7 +581,7 @@ export default function AdminQrManagement() {
                             : sentCount === 1
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             : 'bg-slate-100 text-slate-500 border-slate-200/80'
-                        }`} title={emailFailedErrors[student.id] || ''}>
+                        }`} title={student.emailFailedError || ''}>
                           {hasErr 
                             ? '🔴 Gagal Kirim' 
                             : sentCount >= 2 
@@ -638,7 +653,7 @@ export default function AdminQrManagement() {
                                 ? 'bg-blue-50 text-blue-700 border-blue-200'
                                 : 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
                             }`}
-                            title={hasErr ? `Gagal: ${emailFailedErrors[student.id]}` : `Status Email: ${sentCount}x terkirim`}
+                            title={hasErr ? `Gagal: ${student.emailFailedError}` : `Status Email: ${sentCount}x terkirim`}
                           >
                             <span className="material-symbols-outlined text-[13px]">
                               {hasErr ? 'error' : sentCount >= 2 ? 'warning' : 'mail'}
@@ -675,8 +690,8 @@ export default function AdminQrManagement() {
               <tbody className="divide-y divide-slate-100">
                 {currentItems.length > 0 ? (
                   currentItems.map((student) => {
-                    const hasErr = Boolean(emailFailedErrors[student.id]);
-                    const sentCount = emailSentCounts[student.id] || 0;
+                    const hasErr = Boolean(student.emailFailedError);
+                    const sentCount = student.emailSentCount || 0;
 
                     return (
                       <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
@@ -703,7 +718,7 @@ export default function AdminQrManagement() {
                               : sentCount === 1
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                               : 'bg-slate-100 text-slate-500 border-slate-200/80'
-                          }`} title={emailFailedErrors[student.id] || ''}>
+                          }`} title={student.emailFailedError || ''}>
                             <span className="material-symbols-outlined text-[13px]">
                               {hasErr 
                                 ? 'error' 
@@ -724,8 +739,8 @@ export default function AdminQrManagement() {
                             </span>
                           </span>
                           {hasErr && (
-                            <p className="text-[10px] text-rose-600 font-mono mt-0.5 max-w-[140px] truncate" title={emailFailedErrors[student.id]}>
-                              {emailFailedErrors[student.id]}
+                            <p className="text-[10px] text-rose-600 font-mono mt-0.5 max-w-[140px] truncate" title={student.emailFailedError}>
+                              {student.emailFailedError}
                             </p>
                           )}
                         </td>

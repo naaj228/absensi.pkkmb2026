@@ -68,7 +68,10 @@ export const pesertaDb = {
       gugusId: p.gugus_id || '',
       fakultas: p.jurusan || '', // Map jurusan to .fakultas
       status: p.status || 'Belum Hadir',
-      fotoUrl: p.foto_url || ''
+      fotoUrl: p.foto_url || '',
+      emailSentCount: p.email_sent_count || 0,
+      emailFailedError: p.email_failed_error || null,
+      lastEmailSentAt: p.last_email_sent_at || null
     }));
   },
 
@@ -127,6 +130,54 @@ export const pesertaDb = {
       .delete()
       .eq('nim', nim);
     if (error) throw error;
+  },
+
+  async recordEmailSuccess(nim, currentCount = 0) {
+    const nextCount = (currentCount || 0) + 1;
+    const { error } = await supabase
+      .from('peserta')
+      .update({
+        email_sent_count: nextCount,
+        email_failed_error: null,
+        last_email_sent_at: new Date().toISOString()
+      })
+      .eq('nim', nim);
+    if (error) console.warn("Error updating email success count in Supabase:", error);
+    return nextCount;
+  },
+
+  async recordEmailFailed(nim, errorMsg) {
+    const { error } = await supabase
+      .from('peserta')
+      .update({
+        email_failed_error: errorMsg || 'Gagal mengirim email.'
+      })
+      .eq('nim', nim);
+    if (error) console.warn("Error updating email failure status in Supabase:", error);
+  },
+
+  async syncBulkEmailCounts(countsMap = {}, errorsMap = {}) {
+    const nimList = Array.from(new Set([...Object.keys(countsMap), ...Object.keys(errorsMap)]));
+    if (nimList.length === 0) return;
+
+    for (const nim of nimList) {
+      const payload = {};
+      if (countsMap[nim] !== undefined) {
+        payload.email_sent_count = countsMap[nim];
+      }
+      if (errorsMap[nim] !== undefined) {
+        payload.email_failed_error = errorsMap[nim];
+      } else if (countsMap[nim] > 0) {
+        payload.email_failed_error = null;
+      }
+
+      if (Object.keys(payload).length > 0) {
+        await supabase
+          .from('peserta')
+          .update(payload)
+          .eq('nim', nim);
+      }
+    }
   }
 };
 

@@ -2,6 +2,7 @@ import { useContext, useCallback, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
 import { sendQrEmail } from '../../lib/emailService';
+import { pesertaDb } from '../../lib/db';
 import { isHadir, STATUS_OPTIONS, getStatusBadge, getLogDisplayStatus } from '../../utils/statusHelper';
 import { getTodayISOKey, toISOKey } from '../../utils/dateHelper';
 
@@ -29,14 +30,7 @@ export default function AdminPesertaDetail() {
 
   // Email sending state & count tracking
   const [emailSending, setEmailSending] = useState(false);
-  const [emailSentCounts, setEmailSentCounts] = useState(() => {
-    try {
-      const saved = localStorage.getItem('pkkmb_email_sent_counts');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  const count = student?.emailSentCount || 0;
 
   // QR Code URL — same format as AdminQrManagement: NIM encoded into QR
   const qrUrl = student 
@@ -70,11 +64,10 @@ export default function AdminPesertaDetail() {
     }
   }, [qrUrl, student]);
 
-  // Kirim QR Code otomatis via EmailJS
+  // Kirim QR Code otomatis via EmailJS / Server Backend
   const handleEmailQr = useCallback(async () => {
     if (!student || emailSending) return;
     
-    const count = emailSentCounts[student.id] || 0;
     let confirmMessage = `Apakah Anda yakin ingin mengirim email QR Code & ID Card ke ${student.name} (${student.email})?`;
     
     if (count >= 2) {
@@ -97,25 +90,19 @@ export default function AdminPesertaDetail() {
       setEmailSending(false);
       
       if (result.ok || result.success || (result.message && !result.message.toLowerCase().includes('gagal'))) {
-        const nextCount = count + 1;
-        const updated = { ...emailSentCounts, [student.id]: nextCount };
-        setEmailSentCounts(updated);
-        try {
-          localStorage.setItem('pkkmb_email_sent_counts', JSON.stringify(updated));
-        } catch (e) {
-          console.error("Failed saving email count", e);
-        }
-        
+        const nextCount = await pesertaDb.recordEmailSuccess(student.id, count);
         if (nextCount >= 2) {
           alert(`⚠️ Email QR Code berhasil dikirim ke ${student.name}! (Total email terkirim: ${nextCount}x)`);
         } else {
           alert(result.message || `Email QR Code berhasil dikirim ke ${student.name}!`);
         }
       } else {
-        alert(result.message || 'Gagal mengirim email.');
+        const errDesc = result.message || 'Gagal mengirim email.';
+        await pesertaDb.recordEmailFailed(student.id, errDesc);
+        alert(`❌ ${errDesc}`);
       }
     });
-  }, [student, groupName, mentorName, qrUrl, emailSending, emailSentCounts]);
+  }, [student, groupName, mentorName, qrUrl, emailSending, count]);
 
   if (!student) {
     return (
