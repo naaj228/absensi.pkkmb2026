@@ -675,12 +675,6 @@ export const qrSessionsDb = {
 // ----------------------------------------------------
 export const locationSettingsDb = {
   async fetch() {
-    let savedLocal = null;
-    try {
-      const stored = localStorage.getItem('pkkmb_location_settings');
-      if (stored) savedLocal = JSON.parse(stored);
-    } catch {}
-
     const { data, error } = await supabase
       .from('location_settings')
       .select('*')
@@ -689,7 +683,7 @@ export const locationSettingsDb = {
     if (error) console.warn("Supabase location_settings fetch warning:", error);
 
     let supabaseConfig = {};
-    let cleanLocationName = data?.location_name || savedLocal?.locationName || 'Gedung Utama PKKMB (Digitech University)';
+    let cleanLocationName = data?.location_name || 'Gedung Utama PKKMB (Digitech University)';
 
     if (cleanLocationName.includes('|CONFIG:')) {
       const [namePart, configJson] = cleanLocationName.split('|CONFIG:');
@@ -702,15 +696,15 @@ export const locationSettingsDb = {
     }
 
     return {
-      latitude: data?.latitude ?? savedLocal?.latitude ?? -6.966748,
-      longitude: data?.longitude ?? savedLocal?.longitude ?? 107.672466,
-      radiusMeters: data?.radius_meters ?? savedLocal?.radiusMeters ?? 150,
+      latitude: data?.latitude ?? -6.966748,
+      longitude: data?.longitude ?? 107.672466,
+      radiusMeters: data?.radius_meters ?? 150,
       locationName: cleanLocationName,
-      updatedAt: data?.updated_at ?? savedLocal?.updatedAt ?? new Date().toISOString(),
-      startTime: supabaseConfig.startTime ?? data?.start_time ?? savedLocal?.startTime ?? '07:00',
-      onTimeLimit: supabaseConfig.onTimeLimit ?? data?.on_time_limit ?? savedLocal?.onTimeLimit ?? '07:30',
-      endTime: supabaseConfig.endTime ?? data?.end_time ?? savedLocal?.endTime ?? '12:00',
-      scannerStatus: supabaseConfig.scannerStatus ?? data?.scanner_status ?? savedLocal?.scannerStatus ?? 'auto'
+      updatedAt: data?.updated_at ?? new Date().toISOString(),
+      startTime: supabaseConfig.startTime ?? data?.start_time ?? '07:00',
+      onTimeLimit: supabaseConfig.onTimeLimit ?? data?.on_time_limit ?? '07:30',
+      endTime: supabaseConfig.endTime ?? data?.end_time ?? '12:00',
+      scannerStatus: supabaseConfig.scannerStatus ?? data?.scanner_status ?? 'auto'
     };
   },
 
@@ -721,19 +715,6 @@ export const locationSettingsDb = {
       endTime: settings.endTime || '12:00',
       scannerStatus: settings.scannerStatus || 'auto'
     };
-
-    const localPayload = {
-      latitude: settings.latitude,
-      longitude: settings.longitude,
-      radiusMeters: settings.radiusMeters,
-      locationName: settings.locationName,
-      ...configPayload,
-      updatedAt: new Date().toISOString()
-    };
-
-    try {
-      localStorage.setItem('pkkmb_location_settings', JSON.stringify(localPayload));
-    } catch {}
 
     const dbLocationName = `${settings.locationName}|CONFIG:${JSON.stringify(configPayload)}`;
 

@@ -133,23 +133,8 @@ export function AppContextProvider({ children }) {
     scannerStatus: 'auto'
   });
 
-  const [adminUser, setAdminUser] = useState(() => {
-    try {
-      const local = localStorage.getItem('pkkmb_currentUser_admin');
-      return local ? JSON.parse(local) : null;
-    } catch (e) {
-      return null;
-    }
-  });
-
-  const [mentorUser, setMentorUser] = useState(() => {
-    try {
-      const local = localStorage.getItem('pkkmb_currentUser_mentor');
-      return local ? JSON.parse(local) : null;
-    } catch (e) {
-      return null;
-    }
-  });
+  const [adminUser, setAdminUser] = useState(null);
+  const [mentorUser, setMentorUser] = useState(null);
 
   const currentUser = window.location.pathname.startsWith('/admin') ? adminUser : mentorUser;
 
@@ -228,17 +213,78 @@ export function AppContextProvider({ children }) {
   const hasMentorNotifications = mentorNotificationsCount > 0 && !mentorNotificationsCleared;
 
   // ----------------------------------------------------
+  // User Profile Resolver from Supabase Session
+  // ----------------------------------------------------
+  const resolveUserFromSession = async (session) => {
+    if (!session?.user) {
+      setAdminUser(null);
+      setMentorUser(null);
+      return null;
+    }
+
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (profile) {
+        if (profile.role === 'admin') {
+          const u = {
+            id: profile.id,
+            name: profile.full_name || session.user.email,
+            email: profile.email || session.user.email,
+            role: 'admin'
+          };
+          setAdminUser(u);
+          setMentorUser(null);
+          return u;
+        } else {
+          let gugusId = profile.gugus_id || '';
+          if (!gugusId) {
+            const { data: gugusData } = await supabase
+              .from('gugus')
+              .select('id')
+              .eq('mentor_id', profile.id)
+              .maybeSingle();
+            if (gugusData?.id) gugusId = gugusData.id;
+          }
+          const u = {
+            id: profile.id,
+            name: profile.full_name || profile.email || session.user.email,
+            email: profile.email || session.user.email,
+            role: 'mentor',
+            gugusId,
+            nip: profile.nip || '',
+            phone: profile.phone || ''
+          };
+          setMentorUser(u);
+          setAdminUser(null);
+          return u;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to resolve user profile from Supabase session:", e);
+    }
+    return null;
+  };
+
+  // ----------------------------------------------------
   // Initial Data Load (only if Supabase session exists)
   // ----------------------------------------------------
   useEffect(() => {
     async function loadData() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setLoading(false);
-        return;
+      if (session) {
+        await resolveUserFromSession(session);
+      } else {
+        setAdminUser(null);
+        setMentorUser(null);
       }
+
       try {
-        const [pData, mData, gData, cData, lData, qrData, locData] = await Promise.all([
+        const results = await Promise.allSettled([
           pesertaDb.fetchAll(),
           mentorsDb.fetchAll(),
           gugusDb.fetchAll(),
@@ -247,6 +293,23 @@ export function AppContextProvider({ children }) {
           qrSessionsDb.fetchAll(),
           locationSettingsDb.fetch()
         ]);
+
+        const pData = results[0].status === 'fulfilled' ? (results[0].value || []) : [];
+        const mData = results[1].status === 'fulfilled' ? (results[1].value || []) : [];
+        const gData = results[2].status === 'fulfilled' ? (results[2].value || []) : [];
+        const cData = results[3].status === 'fulfilled' ? (results[3].value || []) : [];
+        const lData = results[4].status === 'fulfilled' ? (results[4].value || []) : [];
+        const qrData = results[5].status === 'fulfilled' ? (results[5].value || []) : [];
+        const locData = results[6].status === 'fulfilled' ? results[6].value : null;
+
+        // Log any failed queries for easy debugging without breaking the UI
+        results.forEach((res, idx) => {
+          if (res.status === 'rejected') {
+            const tableNames = ['peserta', 'mentors', 'gugus', 'claims', 'logs', 'qr_sessions', 'location_settings'];
+            console.warn(`Query to ${tableNames[idx]} failed:`, res.reason);
+          }
+        });
+
         setMentors(mData);
         setGugus(gData);
         setClaims(cData);
@@ -290,9 +353,12 @@ export function AppContextProvider({ children }) {
 
     // Listen to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && session) {
+        await resolveUserFromSession(session);
         await loadData();
       } else if (event === 'SIGNED_OUT') {
+        setAdminUser(null);
+        setMentorUser(null);
         setPeserta([]); setMentors([]); setGugus([]);
         setClaims([]); setLogs([]); setQrCodes([]);
       }
@@ -349,15 +415,11 @@ export function AppContextProvider({ children }) {
               if (!prev) return prev;
               // New mentor assigned to this gugus
               if (payload.new?.mentor_id === prev.id) {
-                const updated = { ...prev, gugusId: payload.new.id };
-                localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(updated));
-                return updated;
+                return { ...prev, gugusId: payload.new.id };
               }
               // Old mentor removed from this gugus
               if (payload.old?.mentor_id === prev.id && prev.gugusId === payload.new?.id) {
-                const updated = { ...prev, gugusId: '' };
-                localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(updated));
-                return updated;
+                return { ...prev, gugusId: '' };
               }
               return prev;
             });
@@ -392,14 +454,12 @@ export function AppContextProvider({ children }) {
             // Also update mentorUser if it's the currently logged-in mentor
             setMentorUser(prev => {
               if (!prev || prev.id !== payload.new?.id) return prev;
-              const updated = {
+              return {
                 ...prev,
                 name: payload.new.full_name || payload.new.email,
                 email: payload.new.email,
                 gugusId: payload.new.gugus_id || prev.gugusId || ''
               };
-              localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(updated));
-              return updated;
             });
           } else if (payload.eventType === 'DELETE') {
             const id = payload.old?.id;
@@ -521,22 +581,17 @@ export function AppContextProvider({ children }) {
   const saveCurrentUser = (user, role) => {
     if (role === 'admin') {
       setAdminUser(user);
-      if (user) {
-        localStorage.setItem('pkkmb_currentUser_admin', JSON.stringify(user));
-      } else {
-        localStorage.removeItem('pkkmb_currentUser_admin');
-      }
     } else {
       setMentorUser(user);
-      if (user) {
-        localStorage.setItem('pkkmb_currentUser_mentor', JSON.stringify(user));
-      } else {
-        localStorage.removeItem('pkkmb_currentUser_mentor');
-      }
     }
   };
 
-  const logout = (role) => {
+  const logout = async (role) => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn("SignOut error:", e);
+    }
     saveCurrentUser(null, role);
   };
 
