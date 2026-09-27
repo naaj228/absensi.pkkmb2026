@@ -5,7 +5,7 @@ import { CLAIM_STATUS_OPTIONS, getLogDisplayStatus } from '../../utils/statusHel
 import { toISOKey, getTodayISOKey, formatIndonesianDate } from '../../utils/dateHelper';
 
 export default function MentorAbsensiManual() {
-  const { peserta, gugus, logs, addClaim, currentUser, hasMentorNotifications } = useContext(AppContext);
+  const { peserta, gugus, logs, claims, addClaim, currentUser, hasMentorNotifications } = useContext(AppContext);
   const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,7 +27,13 @@ export default function MentorAbsensiManual() {
   const targetDateKey = toISOKey(selectedDate);
 
   const getStudentDailyStatus = useCallback((student) => {
-    if (student.status === 'Manual (Pending)') {
+    const pendingClaimOnDate = claims.find(c =>
+      String(c.nim) === String(student.id) &&
+      (c.status === 'pending' || !c.status) &&
+      c.tanggalHadir === targetDateKey
+    );
+
+    if (pendingClaimOnDate) {
       return {
         label: 'Pending',
         bg: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -76,13 +82,21 @@ export default function MentorAbsensiManual() {
       isPending: false,
       isDitolak: false
     };
-  }, [logs, targetDateKey]);
+  }, [logs, claims, targetDateKey]);
 
   let hadirStudents = 0;
   gugusStudents.forEach(student => {
     if (getStudentDailyStatus(student).isPresent) hadirStudents++;
   });
-  const pendingStudents = gugusStudents.filter(p => p.status === 'Manual (Pending)').length;
+
+  const pendingStudents = gugusStudents.filter(student =>
+    claims.some(c =>
+      String(c.nim) === String(student.id) &&
+      (c.status === 'pending' || !c.status) &&
+      c.tanggalHadir === targetDateKey
+    )
+  ).length;
+
   const alphaStudents = totalStudents - hadirStudents;
   const attendancePercentage = totalStudents > 0 ? Math.round((hadirStudents / totalStudents) * 100) : 0;
 
@@ -244,8 +258,8 @@ export default function MentorAbsensiManual() {
                   key={tab.key}
                   onClick={() => setFilterTab(tab.key)}
                   className={`flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${filterTab === tab.key
-                      ? 'bg-white text-[#012060] shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-white text-[#012060] shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
                     }`}
                 >
                   <span>{tab.label}</span>
@@ -273,10 +287,10 @@ export default function MentorAbsensiManual() {
                   <div
                     key={student.id}
                     className={`bg-white rounded-2xl p-3 shadow-xs border flex flex-col justify-between gap-2.5 hover:shadow-md transition-all relative overflow-hidden ${b.isPresent
-                        ? 'border-l-4 border-l-emerald-500 border-slate-200/80'
-                        : b.isPending
-                          ? 'border-l-4 border-l-amber-500 border-slate-200/80'
-                          : 'border-l-4 border-l-rose-500 border-slate-200/80'
+                      ? 'border-l-4 border-l-emerald-500 border-slate-200/80'
+                      : b.isPending
+                        ? 'border-l-4 border-l-amber-500 border-slate-200/80'
+                        : 'border-l-4 border-l-rose-500 border-slate-200/80'
                       }`}
                   >
                     {/* Top Bar: Status Badge */}
@@ -317,8 +331,8 @@ export default function MentorAbsensiManual() {
                         <button
                           onClick={() => handleOpenModal(student)}
                           className={`w-full py-1.5 px-2 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs active:scale-95 ${b.isDitolak
-                              ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100'
-                              : 'bg-[#012060] hover:bg-[#022b80] text-white'
+                            ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100'
+                            : 'bg-[#012060] hover:bg-[#022b80] text-white'
                             }`}
                         >
                           <span className="material-symbols-outlined text-[14px]">{b.isDitolak ? 'refresh' : 'edit_note'}</span>
@@ -439,8 +453,8 @@ export default function MentorAbsensiManual() {
                         type="button"
                         onClick={() => setReason(opt.key)}
                         className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all cursor-pointer ${reason === opt.key
-                            ? 'border-[#012060] bg-[#012060]/5 text-[#012060]'
-                            : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                          ? 'border-[#012060] bg-[#012060]/5 text-[#012060]'
+                          : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
                           }`}
                       >
                         <span className="material-symbols-outlined text-[18px]">{opt.icon}</span>
@@ -464,8 +478,8 @@ export default function MentorAbsensiManual() {
                           type="button"
                           onClick={() => setRequestedStatus(opt.value)}
                           className={`flex items-center justify-center gap-1 p-2 rounded-xl border transition-all cursor-pointer ${isSelected
-                              ? 'border-[#012060] bg-[#012060] text-white shadow-xs'
-                              : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                            ? 'border-[#012060] bg-[#012060] text-white shadow-xs'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
                             }`}
                         >
                           <span className="material-symbols-outlined text-[16px]">{icon}</span>
