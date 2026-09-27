@@ -27,18 +27,29 @@ export default function MentorAbsensiManual() {
   const targetDateKey = toISOKey(selectedDate);
 
   const getStudentDailyStatus = useCallback((student) => {
-    const validLogOnDate = logs.find(l => 
-      String(l.nim) === String(student.id) && 
-      l.status === 'Valid' && 
+    if (student.status === 'Manual (Pending)') {
+      return {
+        label: 'Pending',
+        bg: 'bg-amber-50 text-amber-700 border-amber-200',
+        dot: 'bg-amber-500',
+        isPresent: false,
+        isPending: true,
+        isDitolak: false
+      };
+    }
+
+    const validLogOnDate = logs.find(l =>
+      String(l.nim) === String(student.id) &&
+      l.status === 'Valid' &&
       toISOKey(l.date) === targetDateKey
     );
 
     if (validLogOnDate) {
       const displayStatus = getLogDisplayStatus(validLogOnDate);
-      return { 
-        label: displayStatus.label, 
-        bg: displayStatus.bg, 
-        dot: displayStatus.dot, 
+      return {
+        label: displayStatus.label,
+        bg: displayStatus.bg,
+        dot: displayStatus.dot,
         isPresent: true,
         isLate: validLogOnDate.note && (validLogOnDate.note.includes('Terlambat') || validLogOnDate.note.includes('terlambat')),
         isPending: false,
@@ -46,32 +57,21 @@ export default function MentorAbsensiManual() {
       };
     }
 
-    if (student.status === 'Manual (Pending)') {
-      return { 
-        label: 'Pending', 
-        bg: 'bg-amber-50 text-amber-700 border-amber-200', 
-        dot: 'bg-amber-500', 
-        isPresent: false,
-        isPending: true,
-        isDitolak: false
-      };
-    }
-
     if (student.status === 'Manual (Ditolak)') {
-      return { 
-        label: 'Ditolak', 
-        bg: 'bg-rose-50 text-rose-700 border-rose-200', 
-        dot: 'bg-rose-500', 
+      return {
+        label: 'Ditolak',
+        bg: 'bg-rose-50 text-rose-700 border-rose-200',
+        dot: 'bg-rose-500',
         isPresent: false,
         isPending: false,
         isDitolak: true
       };
     }
 
-    return { 
-      label: 'Belum Hadir', 
-      bg: 'bg-rose-50 text-rose-700 border-rose-200', 
-      dot: 'bg-rose-500', 
+    return {
+      label: 'Belum Hadir',
+      bg: 'bg-rose-50 text-rose-700 border-rose-200',
+      dot: 'bg-rose-500',
       isPresent: false,
       isPending: false,
       isDitolak: false
@@ -144,7 +144,7 @@ export default function MentorAbsensiManual() {
           </h1>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <div 
+          <div
             className="relative group cursor-pointer p-2 rounded-xl hover:bg-slate-100 transition-colors"
             onClick={() => navigate('/mentor/notifikasi')}
             title="Notifikasi Mentor"
@@ -157,7 +157,7 @@ export default function MentorAbsensiManual() {
 
       {/* Main Content */}
       <main className="relative pt-20 px-3 sm:px-6 lg:px-8 max-w-container-max mx-auto space-y-4 sm:space-y-6">
-        
+
         {/* Welcome / Stats Banner Card */}
         <div className="relative w-full rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#012060] via-[#022b80] to-[#043fa6] text-white p-4 sm:p-6 shadow-md overflow-hidden">
           <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -196,9 +196,9 @@ export default function MentorAbsensiManual() {
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Pilih Tanggal:</label>
             <div className="relative flex-1 sm:flex-initial min-w-[160px]">
-              <input 
-                type="date" 
-                value={selectedDate} 
+              <input
+                type="date"
+                value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="bg-[#f8fafc] border border-slate-200 text-slate-800 text-body-sm font-semibold rounded-xl pl-3.5 pr-9 py-1.5 focus:outline-none focus:border-primary cursor-pointer w-full"
               />
@@ -243,16 +243,14 @@ export default function MentorAbsensiManual() {
                 <button
                   key={tab.key}
                   onClick={() => setFilterTab(tab.key)}
-                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                    filterTab === tab.key
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${filterTab === tab.key
                       ? 'bg-white text-[#012060] shadow-xs'
                       : 'text-slate-500 hover:text-slate-800'
-                  }`}
+                    }`}
                 >
                   <span>{tab.label}</span>
-                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${
-                    filterTab === tab.key ? 'bg-[#012060]/10 text-[#012060]' : 'bg-slate-200 text-slate-600'
-                  }`}>{tab.count}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${filterTab === tab.key ? 'bg-[#012060]/10 text-[#012060]' : 'bg-slate-200 text-slate-600'
+                    }`}>{tab.count}</span>
                 </button>
               ))}
             </div>
@@ -272,15 +270,14 @@ export default function MentorAbsensiManual() {
                 const b = getStudentDailyStatus(student);
 
                 return (
-                  <div 
-                    key={student.id} 
-                    className={`bg-white rounded-2xl p-3 shadow-xs border flex flex-col justify-between gap-2.5 hover:shadow-md transition-all relative overflow-hidden ${
-                      b.isPresent 
-                        ? 'border-l-4 border-l-emerald-500 border-slate-200/80' 
-                        : b.isPending 
-                        ? 'border-l-4 border-l-amber-500 border-slate-200/80'
-                        : 'border-l-4 border-l-rose-500 border-slate-200/80'
-                    }`}
+                  <div
+                    key={student.id}
+                    className={`bg-white rounded-2xl p-3 shadow-xs border flex flex-col justify-between gap-2.5 hover:shadow-md transition-all relative overflow-hidden ${b.isPresent
+                        ? 'border-l-4 border-l-emerald-500 border-slate-200/80'
+                        : b.isPending
+                          ? 'border-l-4 border-l-amber-500 border-slate-200/80'
+                          : 'border-l-4 border-l-rose-500 border-slate-200/80'
+                      }`}
                   >
                     {/* Top Bar: Status Badge */}
                     <div className="flex items-center justify-end">
@@ -319,11 +316,10 @@ export default function MentorAbsensiManual() {
                       ) : (
                         <button
                           onClick={() => handleOpenModal(student)}
-                          className={`w-full py-1.5 px-2 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs active:scale-95 ${
-                            b.isDitolak 
-                              ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100' 
+                          className={`w-full py-1.5 px-2 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs active:scale-95 ${b.isDitolak
+                              ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100'
                               : 'bg-[#012060] hover:bg-[#022b80] text-white'
-                          }`}
+                            }`}
                         >
                           <span className="material-symbols-outlined text-[14px]">{b.isDitolak ? 'refresh' : 'edit_note'}</span>
                           <span>{b.isDitolak ? 'Ajukan Ulang Manual' : 'Proses Absensi Manual'}</span>
@@ -377,9 +373,8 @@ export default function MentorAbsensiManual() {
                     ) : (
                       <button
                         onClick={() => handleOpenModal(student)}
-                        className={`w-full py-2 px-3 rounded-xl text-body-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-98 ${
-                          b.isDitolak ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100' : 'bg-[#012060] hover:bg-[#022b80] text-white'
-                        }`}
+                        className={`w-full py-2 px-3 rounded-xl text-body-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-98 ${b.isDitolak ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100' : 'bg-[#012060] hover:bg-[#022b80] text-white'
+                          }`}
                       >
                         <span className="material-symbols-outlined text-[16px]">{b.isDitolak ? 'refresh' : 'edit_note'}</span>
                         <span>{b.isDitolak ? 'Ajukan Ulang Manual' : 'Proses Absensi Manual'}</span>
@@ -422,7 +417,7 @@ export default function MentorAbsensiManual() {
             {/* Body */}
             <form onSubmit={handleModalSubmit}>
               <div className="p-3.5 sm:p-5 flex flex-col gap-3.5">
-                
+
                 {/* Info Date Badge */}
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-2.5 flex items-center gap-2 text-blue-900 text-[11px] font-semibold">
                   <span className="material-symbols-outlined text-[16px] text-[#012060]">calendar_today</span>
@@ -443,11 +438,10 @@ export default function MentorAbsensiManual() {
                         key={opt.key}
                         type="button"
                         onClick={() => setReason(opt.key)}
-                        className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all cursor-pointer ${
-                          reason === opt.key 
-                            ? 'border-[#012060] bg-[#012060]/5 text-[#012060]' 
+                        className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all cursor-pointer ${reason === opt.key
+                            ? 'border-[#012060] bg-[#012060]/5 text-[#012060]'
                             : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
-                        }`}
+                          }`}
                       >
                         <span className="material-symbols-outlined text-[18px]">{opt.icon}</span>
                         <span className="text-[9px] font-bold text-center leading-tight">{opt.label}</span>
@@ -465,15 +459,14 @@ export default function MentorAbsensiManual() {
                       const icon = opt.value === 'Hadir Penuh' ? 'task_alt' : opt.value === 'Hadir Sebagian' ? 'contrast' : 'description';
                       const shortLabel = opt.value === 'Hadir Penuh' ? 'Hadir Penuh' : opt.value === 'Hadir Sebagian' ? 'Sebagian' : 'Izin';
                       return (
-                        <button 
-                          key={opt.value} 
-                          type="button" 
+                        <button
+                          key={opt.value}
+                          type="button"
                           onClick={() => setRequestedStatus(opt.value)}
-                          className={`flex items-center justify-center gap-1 p-2 rounded-xl border transition-all cursor-pointer ${
-                            isSelected 
-                              ? 'border-[#012060] bg-[#012060] text-white shadow-xs' 
+                          className={`flex items-center justify-center gap-1 p-2 rounded-xl border transition-all cursor-pointer ${isSelected
+                              ? 'border-[#012060] bg-[#012060] text-white shadow-xs'
                               : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-                          }`}
+                            }`}
                         >
                           <span className="material-symbols-outlined text-[16px]">{icon}</span>
                           <span className="text-[10px] font-bold">{shortLabel}</span>
@@ -502,14 +495,14 @@ export default function MentorAbsensiManual() {
 
               {/* Footer */}
               <div className="p-3 sm:p-4 bg-slate-50 flex gap-2 border-t border-slate-100">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setShowModal(false)}
                   className="flex-1 py-2 rounded-xl text-body-sm font-bold text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="flex-1 py-2 rounded-xl text-body-sm font-bold bg-[#012060] text-white hover:bg-[#022b80] transition-all shadow-md active:scale-95 cursor-pointer"
                 >
