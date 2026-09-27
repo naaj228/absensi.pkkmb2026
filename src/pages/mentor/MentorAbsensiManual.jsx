@@ -27,15 +27,16 @@ export default function MentorAbsensiManual() {
   const targetDateKey = toISOKey(selectedDate);
 
   const getStudentDailyStatus = useCallback((student) => {
-    const pendingClaimOnDate = claims.find(c =>
+    const pendingClaimsForStudent = claims.filter(c =>
       String(c.nim) === String(student.id) &&
       (c.status === 'pending' || !c.status) &&
-      c.tanggalHadir === targetDateKey
+      (targetDateKey === '' || c.tanggalHadir === targetDateKey)
     );
 
-    if (pendingClaimOnDate) {
+    if (pendingClaimsForStudent.length > 0) {
+      const count = pendingClaimsForStudent.length;
       return {
-        label: 'Pending',
+        label: count > 1 ? `Pending (${count})` : 'Pending',
         bg: 'bg-amber-50 text-amber-700 border-amber-200',
         dot: 'bg-amber-500',
         isPresent: false,
@@ -44,11 +45,15 @@ export default function MentorAbsensiManual() {
       };
     }
 
-    const validLogOnDate = logs.find(l =>
-      String(l.nim) === String(student.id) &&
-      l.status === 'Valid' &&
-      toISOKey(l.date) === targetDateKey
-    );
+    const validLogOnDate = targetDateKey === ''
+      ? [...logs]
+        .filter(l => String(l.nim) === String(student.id) && l.status === 'Valid')
+        .sort((a, b) => new Date(b.waktu) - new Date(a.waktu))[0]
+      : logs.find(l =>
+        String(l.nim) === String(student.id) &&
+        l.status === 'Valid' &&
+        toISOKey(l.date) === targetDateKey
+      );
 
     if (validLogOnDate) {
       const displayStatus = getLogDisplayStatus(validLogOnDate);
@@ -93,7 +98,7 @@ export default function MentorAbsensiManual() {
     claims.some(c =>
       String(c.nim) === String(student.id) &&
       (c.status === 'pending' || !c.status) &&
-      c.tanggalHadir === targetDateKey
+      (targetDateKey === '' || c.tanggalHadir === targetDateKey)
     )
   ).length;
 
