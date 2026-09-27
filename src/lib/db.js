@@ -803,9 +803,18 @@ export const locationSettingsDb = {
       // Optional columns missing in DB schema, safely ignored
     }
 
+    const localPayload = {
+      latitude: settings.latitude,
+      longitude: settings.longitude,
+      radiusMeters: settings.radiusMeters,
+      locationName: settings.locationName,
+      startTime: settings.startTime || '07:00',
+      onTimeLimit: settings.onTimeLimit || '07:30',
+      endTime: settings.endTime || '12:00',
+      scannerStatus: settings.scannerStatus || 'auto',
+      updatedAt: coreUpsertObj.updated_at
+    };
+
     return localPayload;
   }
 };
-
-
-
