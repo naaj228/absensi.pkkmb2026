@@ -302,7 +302,9 @@ export default function AdminRiwayat() {
     }
     return true;
   });
-  const totalHadir = filteredPesertaForStats.filter(p => isHadir(p.status)).length;
+  const totalHadir = selectedDate
+    ? new Set(attendanceLogs.filter(l => l.status === 'Valid' && l.date === selectedDate && (selectedGugus === 'all' || l.gugusName.toLowerCase() === selectedGugusName.toLowerCase())).map(l => l.nim)).size
+    : new Set(attendanceLogs.filter(l => l.status === 'Valid' && (selectedGugus === 'all' || l.gugusName.toLowerCase() === selectedGugusName.toLowerCase())).map(l => l.nim)).size;
 
   const totalInvalid = logs.filter(l => {
     let matchesGugus = true;

@@ -16,11 +16,16 @@ export default function AdminDashboard() {
   const totalMentor = mentors.length;
   const totalGugus = gugus.length;
   
-  // Hadir hari ini strictly based on today's valid scan logs
-  const hadirHariIni = new Set(todayLogs.filter(l => l.status === 'Valid').map(l => l.nim)).size;
+  // Separate QR scan attendance from Izin approvals for today
+  const qrHadirLogs = todayLogs.filter(l => l.status === 'Valid' && (!l.note || !l.note.includes('Izin')));
+  const izinLogs = todayLogs.filter(l => l.status === 'Valid' && l.note && l.note.includes('Izin'));
 
-  const alphaCount = Math.max(0, totalPeserta - hadirHariIni);
-  const persentaseKehadiran = totalPeserta > 0 ? ((hadirHariIni / totalPeserta) * 100).toFixed(1) : '0';
+  const hadirQrHariIni = new Set(qrHadirLogs.map(l => l.nim)).size;
+  const izinHariIni = new Set(izinLogs.map(l => l.nim)).size;
+  const totalHadirDanIzin = new Set(todayLogs.filter(l => l.status === 'Valid').map(l => l.nim)).size;
+
+  const alphaCount = Math.max(0, totalPeserta - totalHadirDanIzin);
+  const persentaseKehadiran = totalPeserta > 0 ? ((totalHadirDanIzin / totalPeserta) * 100).toFixed(1) : '0';
 
   // Get top 8 recent scans for TODAY ONLY
   const recentScans = todayLogs.slice(0, 8);
@@ -49,7 +54,7 @@ export default function AdminDashboard() {
       <main className="relative pt-24 min-h-screen px-margin-desktop py-gutter max-w-container-max mx-auto">
         <div className="flex flex-col w-full gap-8 pb-12">
           {/* Top Stats Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
             {/* Card 1: Total Peserta */}
             <div 
               className="bg-surface-container-lowest rounded-[16px] p-3.5 sm:p-4 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer flex flex-col justify-between" 
@@ -92,21 +97,35 @@ export default function AdminDashboard() {
               <h3 className="text-xl sm:text-2xl font-bold text-on-surface leading-none">{totalGugus}</h3>
             </div>
 
-            {/* Card 4: Hadir Hari Ini */}
+            {/* Card 4: Hadir (QR) Hari Ini */}
             <div 
               className="bg-surface-container-lowest rounded-[16px] p-3.5 sm:p-4 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer flex flex-col justify-between" 
               onClick={() => navigate('/admin/riwayat')}
             >
               <div className="flex items-start justify-between gap-1 mb-3">
-                <p className="text-[10px] sm:text-[11px] font-bold text-on-surface-variant uppercase tracking-wider leading-tight">Hadir Hari Ini</p>
+                <p className="text-[10px] sm:text-[11px] font-bold text-on-surface-variant uppercase tracking-wider leading-tight">Hadir (QR)</p>
                 <div className="w-7 h-7 rounded-full bg-[#ecfdf5] flex items-center justify-center shrink-0">
                   <span className="material-symbols-outlined text-[#059669] text-[16px]">check_circle</span>
                 </div>
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-on-surface leading-none">{hadirHariIni}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-on-surface leading-none">{hadirQrHariIni}</h3>
             </div>
 
-            {/* Card 5: Belum Hadir */}
+            {/* Card 5: Izin Hari Ini */}
+            <div 
+              className="bg-surface-container-lowest rounded-[16px] p-3.5 sm:p-4 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer flex flex-col justify-between" 
+              onClick={() => navigate('/admin/riwayat')}
+            >
+              <div className="flex items-start justify-between gap-1 mb-3">
+                <p className="text-[10px] sm:text-[11px] font-bold text-on-surface-variant uppercase tracking-wider leading-tight">Izin Hari Ini</p>
+                <div className="w-7 h-7 rounded-full bg-[#eff6ff] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#2563eb] text-[16px]">assignment_turned_in</span>
+                </div>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-bold text-on-surface leading-none">{izinHariIni}</h3>
+            </div>
+
+            {/* Card 6: Belum Hadir */}
             <div 
               className="bg-surface-container-lowest rounded-[16px] p-3.5 sm:p-4 shadow-[0_10px_30px_rgba(13,27,77,0.05)] hover:-translate-y-1 transition-transform duration-300 cursor-pointer flex flex-col justify-between" 
               onClick={() => navigate('/admin/peserta')}
@@ -120,7 +139,7 @@ export default function AdminDashboard() {
               <h3 className="text-xl sm:text-2xl font-bold text-on-surface leading-none">{alphaCount}</h3>
             </div>
 
-            {/* Card 6: Persentase Kehadiran */}
+            {/* Card 7: Persentase Kehadiran */}
             <div className="bg-primary rounded-[16px] p-3.5 sm:p-4 shadow-[0_10px_30px_rgba(20,44,142,0.15)] text-on-primary flex flex-col justify-between">
               <div className="flex items-start justify-between gap-1 mb-3">
                 <p className="text-[10px] sm:text-[11px] font-bold text-white uppercase tracking-wider leading-tight">Kehadiran</p>
