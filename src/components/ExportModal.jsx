@@ -123,20 +123,34 @@ export default function ExportModal({
         const gugusLogs = filteredLogsToExport.filter(l => l.gugusName.toLowerCase() === gugusObj.name.toLowerCase());
         const totalPesertaGugus = peserta.filter(p => p.gugusId === gugusObj.id).length;
         
-        let totalHadirPenuh = 0;
-        let totalHadirSebagian = 0;
-        let totalIzin = 0;
-        let totalAlpha = 0;
+        const nimHadirPenuh = new Set();
+        const nimHadirSebagian = new Set();
+        const nimIzin = new Set();
 
         gugusLogs.forEach(l => {
           const st = getLogDisplayStatus(l).label;
-          if (st === 'Hadir Penuh') totalHadirPenuh++;
-          else if (st === 'Hadir Sebagian') totalHadirSebagian++;
-          else if (st === 'Izin') totalIzin++;
-          else if (st === 'Alpha') totalAlpha++;
+          if (st === 'Hadir Penuh') {
+            nimHadirPenuh.add(l.nim);
+          } else if (st === 'Hadir Sebagian' || st === 'Terlambat') {
+            nimHadirSebagian.add(l.nim);
+          } else if (st === 'Izin') {
+            nimIzin.add(l.nim);
+          }
         });
 
-        const totalHadir = totalHadirPenuh + totalHadirSebagian;
+        const totalHadirPenuh = nimHadirPenuh.size;
+        const totalHadirSebagian = nimHadirSebagian.size;
+        const totalIzin = nimIzin.size;
+
+        // Total tercatat (Hadir Penuh + Hadir Sebagian + Izin)
+        const totalTercatat = totalHadirPenuh + totalHadirSebagian + totalIzin;
+        
+        // Rumus: Total Alpha / Belum = Total Peserta - Hadir Penuh - Hadir Sebagian - Izin
+        const totalAlphaBelum = Math.max(0, totalPesertaGugus - totalTercatat);
+
+        const persentaseKehadiran = totalPesertaGugus > 0 
+          ? `${Math.round((totalTercatat / totalPesertaGugus) * 100)}%` 
+          : '0%';
 
         return {
           'No': idx + 1,
@@ -145,8 +159,8 @@ export default function ExportModal({
           'Total Hadir Penuh': totalHadirPenuh,
           'Total Hadir Sebagian': totalHadirSebagian,
           'Total Izin': totalIzin,
-          'Total Alpha / Belum': totalPesertaGugus > totalHadir ? (totalPesertaGugus - totalHadir) : 0,
-          'Persentase Kehadiran': totalPesertaGugus > 0 ? `${Math.round((totalHadir / totalPesertaGugus) * 100)}%` : '0%'
+          'Total Alpha / Belum': totalAlphaBelum,
+          'Persentase Kehadiran': persentaseKehadiran
         };
       });
 
