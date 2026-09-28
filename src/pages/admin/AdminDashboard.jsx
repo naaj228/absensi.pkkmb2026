@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { AppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { isHadir, isAttendanceLog } from '../../utils/statusHelper';
+import { isHadir, isAttendanceLog, getLogDisplayStatus } from '../../utils/statusHelper';
 import { toISOKey, getTodayISOKey } from '../../utils/dateHelper';
 
 export default function AdminDashboard() {
@@ -153,27 +153,28 @@ export default function AdminDashboard() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {recentScans.length > 0 ? (
-                recentScans.map((log) => (
-                  <div key={log.id} className="flex items-center justify-between p-3 sm:p-4 rounded-xl bg-surface-container-low hover:bg-surface-container-high transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-full flex-shrink-0 bg-primary/10 flex items-center justify-center text-primary font-bold">
-                        {log.name.substring(0, 2).toUpperCase()}
+                recentScans.map((log) => {
+                  const displayStatus = getLogDisplayStatus(log);
+                  return (
+                    <div key={log.id} className="flex items-center justify-between p-3 sm:p-4 rounded-xl bg-surface-container-low hover:bg-surface-container-high transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full flex-shrink-0 bg-primary/10 flex items-center justify-center text-primary font-bold">
+                          {log.name.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-body-md font-medium text-on-surface truncate">{log.name}</p>
+                          <p className="text-body-sm text-on-surface-variant truncate">{log.gugusName} • {log.scanner}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-body-md font-medium text-on-surface truncate">{log.name}</p>
-                        <p className="text-body-sm text-on-surface-variant truncate">{log.gugusName} • {log.scanner}</p>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-3">
+                        <span className="text-label-sm text-on-surface-variant">{log.timestamp}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${displayStatus.bg}`}>
+                          {displayStatus.label}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-3">
-                      <span className="text-label-sm text-on-surface-variant">{log.timestamp}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        log.status === 'Valid' ? 'bg-[#10b981]/10 text-[#10b981]' : 'bg-error-container/50 text-error'
-                      }`}>
-                        {log.status}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="col-span-full text-center py-8 text-on-surface-variant text-body-md">
                   Belum ada log scan untuk hari ini.

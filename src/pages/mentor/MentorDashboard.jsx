@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
-import { isHadir, STATUS, isAttendanceLog } from '../../utils/statusHelper';
+import { isHadir, STATUS, isAttendanceLog, getLogDisplayStatus } from '../../utils/statusHelper';
 import { toISOKey, getTodayISOKey } from '../../utils/dateHelper';
 
 export default function MentorDashboard() {
@@ -239,7 +239,7 @@ export default function MentorDashboard() {
           {recentScansToday.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {recentScansToday.map((log) => {
-                const isValid = log.status === 'Valid';
+                const displayStatus = getLogDisplayStatus(log);
                 return (
                   <div 
                     key={log.id}
@@ -250,12 +250,8 @@ export default function MentorDashboard() {
                       <p className="text-[10px] text-slate-400 font-mono">NIM: {log.nim} • {log.timestamp}</p>
                     </div>
 
-                    <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold shrink-0 border ${
-                      isValid 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                        : 'bg-rose-50 text-rose-700 border-rose-200'
-                    }`}>
-                      {log.status}
+                    <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold shrink-0 border ${displayStatus.bg}`}>
+                      {displayStatus.label}
                     </span>
                   </div>
                 );

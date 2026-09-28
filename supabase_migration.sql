@@ -312,3 +312,11 @@ BEGIN
   END IF;
 END
 $$;
+
+-- ============================================================
+-- 10. Mencegah Absen Ganda (Duplicate Scan Lock per Hari)
+-- ============================================================
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_absensi_per_hari 
+ON absensi (peserta_nim, ((waktu AT TIME ZONE 'Asia/Jakarta')::date)) 
+WHERE status_log = 'Valid';
+

@@ -47,9 +47,8 @@ export default function AdminPeserta() {
     const studentLogOnDate = logs.find(l => 
       String(l.nim) === String(student.id) && 
       toISOKey(l.date) === targetDateKey &&
-      l.status !== 'Info' &&
-      l.scanner !== 'Admin (Tolak)' &&
-      !l.note?.startsWith('Persetujuan')
+      isAttendanceLog(l) &&
+      l.scanner !== 'Admin (Tolak)'
     );
 
     if (studentLogOnDate) {
@@ -61,22 +60,6 @@ export default function AdminPeserta() {
         isPresent: display.label === 'Hadir Penuh' || display.label === 'Hadir Sebagian',
         isPending: false
       };
-    }
-
-    if (student.status === 'Izin') {
-      return { label: 'Izin', bg: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500', isPresent: false, isPending: false };
-    }
-
-    if (student.status === 'Alpha') {
-      return { label: 'Alpha', bg: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500', isPresent: false, isPending: false };
-    }
-
-    if (student.status === 'Manual (Pending)') {
-      return { label: 'Pending', bg: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500', isPresent: false, isPending: true };
-    }
-
-    if (student.status === 'Manual (Ditolak)') {
-      return { label: 'Ditolak', bg: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500', isPresent: false, isPending: false };
     }
 
     return { label: 'Belum Hadir', bg: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400', isPresent: false, isPending: false };

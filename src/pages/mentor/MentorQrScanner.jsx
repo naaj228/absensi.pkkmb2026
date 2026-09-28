@@ -112,6 +112,10 @@ export default function MentorQrScanner() {
   const processNim = async (nim) => {
     if (!nim) return;
 
+    // Immediately lock synchronously to prevent concurrent calls from 60fps camera loop
+    isReadyRef.current = false;
+    setIsReady(false);
+
     const opStatus = checkScannerOperationalStatus(locationSettings);
     if (!opStatus.isOpen) {
       showResult('invalid', 'Scanner Absensi Ditutup', opStatus.message);
@@ -210,6 +214,8 @@ export default function MentorQrScanner() {
           inversionAttempts: 'attemptBoth',
         });
         if (code?.data) {
+          isReadyRef.current = false;
+          setIsReady(false);
           processNim(code.data);
         }
       }

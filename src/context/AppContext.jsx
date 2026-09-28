@@ -15,6 +15,8 @@ import {
 import { normalizeJurusan, isAttendanceLog } from '../utils/statusHelper';
 import { checkIsLate } from '../utils/dateHelper';
 
+const pendingLogKeys = new Set();
+
 export const AppContext = createContext();
 
 // Helper to parse DB date strings safely as UTC if they lack timezone offsets
@@ -896,9 +898,18 @@ export function AppContextProvider({ children }) {
   };
 
   const addLog = async (name, nim, gugusName, scanner, status = 'Valid', note = '', locationData = null, customWaktu = null, allowOverride = false) => {
+    const todayStr = getTodayWibString();
+    const targetDate = customWaktu ? getWibDateString(customWaktu) : todayStr;
+    const lockKey = `${nim}_${targetDate}`;
+
+    if (!allowOverride && status === 'Valid') {
+      if (pendingLogKeys.has(lockKey)) {
+        throw new Error(`SUDAH_ABSEN: Mahasiswa dengan NIM ${nim} sedang diproses absensinya.`);
+      }
+      pendingLogKeys.add(lockKey);
+    }
+
     try {
-      const todayStr = getTodayWibString();
-      const targetDate = customWaktu ? getWibDateString(customWaktu) : todayStr;
       if (!allowOverride && status === 'Valid' && logs.some(l => String(l.nim) === String(nim) && l.date === targetDate && l.status === 'Valid')) {
         throw new Error(`SUDAH_ABSEN: Mahasiswa dengan NIM ${nim} sudah melakukan absensi hari ini.`);
       }
@@ -916,6 +927,10 @@ export function AppContextProvider({ children }) {
     } catch (err) {
       console.error("Error writing scan log:", err);
       throw err;
+    } finally {
+      if (!allowOverride && status === 'Valid') {
+        pendingLogKeys.delete(lockKey);
+      }
     }
   };
 
