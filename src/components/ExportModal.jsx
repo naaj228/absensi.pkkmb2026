@@ -94,6 +94,79 @@ export default function ExportModal({
     });
   }, [logs, activeGugusObjects, dateMode, selectedDate, statusFilter]);
 
+  const escapeHtml = (str) => {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  };
+
+  // Shared summary rows builder for both Excel and PDF export
+  const buildSummaryRows = () => {
+    const attendanceLogs = logs.filter(isAttendanceLog);
+    const dateFilteredLogs = attendanceLogs.filter(log =>
+      dateMode === 'all' || !selectedDate || log.date === selectedDate
+    );
+
+    return activeGugusObjects.map((gugusObj, idx) => {
+      const gugusLogs = dateFilteredLogs.filter(
+        l => (l.gugusName || '').toLowerCase() === (gugusObj.name || '').toLowerCase()
+      );
+      const totalPesertaGugus = peserta.filter(p => p.gugusId === gugusObj.id).length;
+
+      // Group statuses per student NIM: Map<nim, Set<label>>
+      const studentStatusMap = new Map();
+      gugusLogs.forEach(l => {
+        if (!studentStatusMap.has(l.nim)) {
+          studentStatusMap.set(l.nim, new Set());
+        }
+        const st = getLogDisplayStatus(l).label;
+        studentStatusMap.get(l.nim).add(st);
+      });
+
+      let totalHadirPenuh = 0;
+      let totalHadirSebagian = 0;
+      let totalIzin = 0;
+      let totalTercatat = 0;
+
+      studentStatusMap.forEach((statusSet) => {
+        const hadirLabels = Array.from(statusSet).filter(st => st !== 'Belum Hadir');
+        if (hadirLabels.length === 0) {
+          // Semua log peserta hanya 'Belum Hadir', jangan dihitung ke hadir/tercatat
+          return;
+        }
+
+        totalTercatat++;
+        if (statusSet.size === 1 && statusSet.has('Hadir Penuh')) {
+          totalHadirPenuh++;
+        } else if (statusSet.size === 1 && statusSet.has('Izin')) {
+          totalIzin++;
+        } else {
+          totalHadirSebagian++;
+        }
+      });
+
+      const totalAlphaBelum = totalPesertaGugus - totalTercatat;
+      const persentaseKehadiran = totalPesertaGugus > 0
+        ? `${Math.round((totalTercatat / totalPesertaGugus) * 100)}%`
+        : '0%';
+
+      return {
+        'No': idx + 1,
+        'Gugus': gugusObj.name,
+        'Total Peserta': totalPesertaGugus,
+        'Total Hadir Penuh': totalHadirPenuh,
+        'Total Hadir Sebagian': totalHadirSebagian,
+        'Total Izin': totalIzin,
+        'Total Alpha / Belum': totalAlphaBelum,
+        'Persentase Kehadiran': persentaseKehadiran
+      };
+    });
+  };
+
   // Generate Export File
   const handleGenerateExport = () => {
     if (activeGugusObjects.length === 0) {
@@ -119,51 +192,7 @@ export default function ExportModal({
 
     // 1. REKAPITULASI SUMMARY SHEET (if exporting all or multiple gugus)
     if (activeGugusObjects.length > 1) {
-      const summaryRows = activeGugusObjects.map((gugusObj, idx) => {
-        const gugusLogs = filteredLogsToExport.filter(l => l.gugusName.toLowerCase() === gugusObj.name.toLowerCase());
-        const totalPesertaGugus = peserta.filter(p => p.gugusId === gugusObj.id).length;
-        
-        const nimHadirPenuh = new Set();
-        const nimHadirSebagian = new Set();
-        const nimIzin = new Set();
-
-        gugusLogs.forEach(l => {
-          const st = getLogDisplayStatus(l).label;
-          if (st === 'Hadir Penuh') {
-            nimHadirPenuh.add(l.nim);
-          } else if (st === 'Hadir Sebagian' || st === 'Terlambat') {
-            nimHadirSebagian.add(l.nim);
-          } else if (st === 'Izin') {
-            nimIzin.add(l.nim);
-          }
-        });
-
-        const totalHadirPenuh = nimHadirPenuh.size;
-        const totalHadirSebagian = nimHadirSebagian.size;
-        const totalIzin = nimIzin.size;
-
-        // Total tercatat (Hadir Penuh + Hadir Sebagian + Izin)
-        const totalTercatat = totalHadirPenuh + totalHadirSebagian + totalIzin;
-        
-        // Rumus: Total Alpha / Belum = Total Peserta - Hadir Penuh - Hadir Sebagian - Izin
-        const totalAlphaBelum = Math.max(0, totalPesertaGugus - totalTercatat);
-
-        const persentaseKehadiran = totalPesertaGugus > 0 
-          ? `${Math.round((totalTercatat / totalPesertaGugus) * 100)}%` 
-          : '0%';
-
-        return {
-          'No': idx + 1,
-          'Gugus': gugusObj.name,
-          'Total Peserta': totalPesertaGugus,
-          'Total Hadir Penuh': totalHadirPenuh,
-          'Total Hadir Sebagian': totalHadirSebagian,
-          'Total Izin': totalIzin,
-          'Total Alpha / Belum': totalAlphaBelum,
-          'Persentase Kehadiran': persentaseKehadiran
-        };
-      });
-
+      const summaryRows = buildSummaryRows();
       const summarySheet = XLSX.utils.json_to_sheet(summaryRows);
       summarySheet['!cols'] = [
         { wch: 6 },
@@ -241,34 +270,74 @@ export default function ExportModal({
   };
 
   const generatePdfExport = () => {
+    let rekapHtml = '';
+    if (activeGugusObjects.length > 1) {
+      const summaryData = buildSummaryRows();
+      const rekapRowsHtml = summaryData.map(row => `
+        <tr>
+          <td style="text-align: center; width: 28px;">${row['No']}</td>
+          <td><strong>${escapeHtml(row['Gugus'])}</strong></td>
+          <td style="text-align: center; width: 75px;">${row['Total Peserta']}</td>
+          <td style="text-align: center; width: 85px;">${row['Total Hadir Penuh']}</td>
+          <td style="text-align: center; width: 95px;">${row['Total Hadir Sebagian']}</td>
+          <td style="text-align: center; width: 70px;">${row['Total Izin']}</td>
+          <td style="text-align: center; width: 95px;">${row['Total Alpha / Belum']}</td>
+          <td style="text-align: center; width: 85px; font-weight: 700;">${row['Persentase Kehadiran']}</td>
+        </tr>
+      `).join('');
+
+      rekapHtml = `
+        <div style="margin-bottom: 24px; page-break-after: always;">
+          <h2 style="font-size: 14px; font-weight: 700; color: #012060; border-bottom: 2px solid #012060; padding-bottom: 4px; margin-bottom: 8px;">
+            Rekapitulasi Kehadiran Seluruh Gugus
+          </h2>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: center; width: 28px;">No</th>
+                <th>Gugus</th>
+                <th style="text-align: center; width: 75px;">Total Peserta</th>
+                <th style="text-align: center; width: 85px;">Hadir Penuh</th>
+                <th style="text-align: center; width: 95px;">Hadir Sebagian</th>
+                <th style="text-align: center; width: 70px;">Izin</th>
+                <th style="text-align: center; width: 95px;">Alpha / Belum</th>
+                <th style="text-align: center; width: 85px;">Kehadiran</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rekapRowsHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
     let sectionsHtml = '';
 
     activeGugusObjects.forEach(gugusObj => {
-      const gugusLogs = filteredLogsToExport.filter(l => l.gugusName.toLowerCase() === gugusObj.name.toLowerCase());
+      const gugusLogs = filteredLogsToExport.filter(l => (l.gugusName || '').toLowerCase() === (gugusObj.name || '').toLowerCase());
       
       const rowsHtml = gugusLogs.map((log, idx) => {
         const studentInfo = peserta.find(p => p.id === log.nim);
         const jurusan = studentInfo ? studentInfo.fakultas : '-';
         const displayStatus = getLogDisplayStatus(log);
-        const location = log.latitude && log.longitude
-          ? (log.locationStatus || 'Dalam Area')
-          : (log.scanner?.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi');
+        const location = log.locationStatus || (log.scanner?.startsWith('Admin') ? 'Manual' : 'Tanpa Lokasi');
 
         return `
           <tr>
             <td style="text-align: center; width: 28px;">${idx + 1}</td>
             <td style="width: 70px; font-family: monospace;">${formatDDMMYYYY(log.date)}</td>
             <td style="width: 60px; font-family: monospace;">${log.timestamp}</td>
-            <td style="width: 85px; font-family: monospace;">${log.nim}</td>
-            <td><strong>${log.name}</strong></td>
-            <td style="width: 110px;">${jurusan}</td>
-            <td style="width: 85px;">${log.scanner}</td>
+            <td style="width: 85px; font-family: monospace;">${escapeHtml(log.nim)}</td>
+            <td><strong>${escapeHtml(log.name)}</strong></td>
+            <td style="width: 110px;">${escapeHtml(jurusan)}</td>
+            <td style="width: 85px;">${escapeHtml(log.scanner)}</td>
             <td style="text-align: center; width: 90px;">
               <span class="badge" style="${displayStatus.pdfBadge}">
-                ${displayStatus.label}
+                ${escapeHtml(displayStatus.label)}
               </span>
             </td>
-            <td style="width: 80px; font-size: 9.5px;">${location}</td>
+            <td style="width: 80px; font-size: 9.5px;">${escapeHtml(location)}</td>
           </tr>
         `;
       }).join('');
@@ -276,7 +345,7 @@ export default function ExportModal({
       sectionsHtml += `
         <div style="margin-bottom: 24px;">
           <h2 style="font-size: 14px; font-weight: 700; color: #012060; border-bottom: 2px solid #012060; padding-bottom: 4px; margin-bottom: 8px;">
-            ${gugusObj.name} (${gugusLogs.length} Log Scan)
+            ${escapeHtml(gugusObj.name)} (${gugusLogs.length} Log Scan)
           </h2>
           <table>
             <thead>
@@ -285,7 +354,7 @@ export default function ExportModal({
                 <th style="width: 70px;">Tanggal</th>
                 <th style="width: 60px;">Waktu</th>
                 <th style="width: 85px;">NIM</th>
-                <th>Nama Mahasiswa</th>
+                <th>Nama Peserta</th>
                 <th style="width: 110px;">Jurusan / Prodi</th>
                 <th style="width: 85px;">Pemindai</th>
                 <th style="text-align: center; width: 90px;">Status</th>
@@ -315,6 +384,8 @@ export default function ExportModal({
             h1 { font-size: 18px; font-weight: 800; color: #012060; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; }
             .subtitle { font-size: 11px; font-weight: 600; color: #64748b; text-align: center; margin-bottom: 16px; }
             table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+            thead { display: table-header-group; }
+            tr { page-break-inside: avoid; }
             th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; font-size: 10px; }
             th { background-color: #012060; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 9.5px; letter-spacing: 0.5px; }
             tr:nth-child(even) { background-color: #f8fafc; }
@@ -324,6 +395,7 @@ export default function ExportModal({
         <body>
           <h1>Laporan Riwayat Kehadiran PKKMB 2026</h1>
           <div class="subtitle">Cakupan: ${activeGugusObjects.length} Gugus Terpilih • ${dateScopeText}</div>
+          ${rekapHtml}
           ${sectionsHtml}
         </body>
       </html>
@@ -331,27 +403,55 @@ export default function ExportModal({
 
     const printFrame = document.createElement('iframe');
     printFrame.style.position = 'fixed';
-    printFrame.style.right = '0';
-    printFrame.style.bottom = '0';
-    printFrame.style.width = '0';
-    printFrame.style.height = '0';
+    printFrame.style.left = '-10000px';
+    printFrame.style.top = '0';
+    printFrame.style.width = '1024px';
+    printFrame.style.height = '768px';
     printFrame.style.border = '0';
+    printFrame.style.visibility = 'hidden';
+    printFrame.setAttribute('aria-hidden', 'true');
+
+    const cleanup = () => {
+      if (document.body.contains(printFrame)) {
+        document.body.removeChild(printFrame);
+      }
+    };
+
+    printFrame.onload = () => {
+      const cw = printFrame.contentWindow;
+      if (!cw) return;
+
+      const fontsReady = cw.document.fonts ? cw.document.fonts.ready : Promise.resolve();
+      fontsReady.then(() => {
+        setTimeout(() => {
+          try {
+            cw.addEventListener('afterprint', cleanup, { once: true });
+            cw.focus();
+            cw.print();
+          } catch (err) {
+            console.error('Gagal mencetak dokumen:', err);
+            cleanup();
+          }
+        }, 200);
+      }).catch(() => {
+        setTimeout(() => {
+          try {
+            cw.addEventListener('afterprint', cleanup, { once: true });
+            cw.focus();
+            cw.print();
+          } catch (err) {
+            console.error('Gagal mencetak dokumen:', err);
+            cleanup();
+          }
+        }, 200);
+      });
+    };
+
+    printFrame.srcdoc = html;
     document.body.appendChild(printFrame);
 
-    const frameDoc = printFrame.contentWindow.document;
-    frameDoc.open();
-    frameDoc.write(html);
-    frameDoc.close();
-
-    setTimeout(() => {
-      printFrame.contentWindow.focus();
-      printFrame.contentWindow.print();
-      setTimeout(() => {
-        if (document.body.contains(printFrame)) {
-          document.body.removeChild(printFrame);
-        }
-      }, 1000);
-    }, 300);
+    // Fallback cleanup setelah 60 detik jika afterprint tidak terpanggil
+    setTimeout(cleanup, 60000);
   };
 
   return (
